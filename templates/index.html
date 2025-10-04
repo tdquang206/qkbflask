@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+        <div class="container">
+            <div class="columns">
+                <!-- Left Column: Menu -->
+                <div class="column is-one-quarter">
+                    <aside class="menu">
+                        <p class="menu-label">Menu</p>
+                        <ul class="menu-list">
+                            <li><a href="#">Dashboard</a></li>
+                            <li><a href="/patients">Danh sách BN</a></li>
+                            <li><a href="#">Lịch hẹn</a></li>
+                            <li><a href="/drugs">Thuốc</a></li>
+                        </ul>
+                    </aside>
+                </div>
+
+                <!-- Right Column: Content -->
+                <div class="column">
+                    <div class="box">
+                        <h1 class="title">Welcome to Clinic EMR</h1>
+                        <p>This area is blank for now. You can add forms, charts, or patient data here later.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+</section>
+{% endblock %}

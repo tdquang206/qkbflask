@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">   
+<link rel="stylesheet" href="{{ url_for('static', filename='bulma.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='flatpickr.min.css') }}">
+<script src="{{ url_for('static', filename='flatpickr.js') }}"></script>
+
+<title>Clinic EMR</title>
+</head>
+<body>
+  <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a class="navbar-item" href="/">
+      <strong>Clinic EMR</strong>
+    </a>
+
+    <!-- Hamburger menu for mobile -->
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+
+  <div id="mainNavbar" class="navbar-menu">
+    <div class="navbar-start">
+      <a class="navbar-item" href="/">Dashboard</a>
+      <a class="navbar-item" href="/patients">Danh sách BN</a>
+      <a class="navbar-item" href="#">Lịch hẹn</a>
+      <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
+      <a class="navbar-item" href="/drug_sold">Báo cáo thuốc</a>
+    </div>
+
+    <div class="navbar-end">
+      <div class="navbar-item">
+        <div class="buttons">
+          <a class="button is-light">Log in</a>
+          <a class="button is-link">Sign up</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+  <section class="section">
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </section>
+</body>
+<!-- Menubar js -->
+<script>
+  // Toggle mobile menu
+  document.addEventListener('DOMContentLoaded', () => {
+    const burger = document.querySelector('.navbar-burger');
+    const menu = document.getElementById('mainNavbar');
+
+    burger.addEventListener('click', () => {
+      burger.classList.toggle('is-active');
+      menu.classList.toggle('is-active');
+    });
+  });
+</script>
+</html>

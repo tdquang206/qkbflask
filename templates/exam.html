@@ -1,0 +1,454 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<section class="section">
+  <form id="examForm" action="{{ url_for('exam', patient_id=patient.doc_id) }}" method="POST">
+    <div class="container">
+
+    <!-- Patient Info -->
+    {% if patient.kid_name %}
+      <h1 class="title is-3">Khám bệnh cho: bé {{ patient.kid_name }}</h1>
+    {% else %}
+      <h1 class="title is-3">Khám bệnh cho: con Ba/Mẹ {{ patient.name }} - {{ patient.phone }}</h1>
+    {% endif %}
+
+    <div><input type="hidden" name="mode" value="save"></div>
+
+    <div class="box">
+      <p id="kid_name"><strong>👶 Bé:</strong> {{ patient.kid_name }} - SN {{ patient.kid_birthday }}</p>
+      <p id="phone"><strong>📞 Số điện thoại:</strong> {{ patient.phone }} - {{ patient.name }}</p>
+      <p id="address"><strong>🏠 Địa chỉ:</strong> {{ patient.address }}</p>
+    </div>
+    <!-- Exam Info -->
+    <div class="box">
+      <div class="columns is-multiline">
+
+        <div class="column is-4">
+          <div class="field" id="ngay_kham">
+            <label class="label">📅 Ngày khám</label>
+            <div class="control has-icons-left">
+              <input class="input" type="date" name="exam_date">
+              <span class="icon is-small is-left"><i class="fas fa-calendar-day"></i></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="column is-4">
+          <div class="field">
+            <label class="label">⚖️ Cân nặng (kg)</label>
+            <div class="control has-icons-left">
+              <input class="input" type="number" step="0.1" name="weight" placeholder="Ví dụ: 10.5">
+              <span class="icon is-small is-left"><i class="fas fa-weight"></i></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="column is-4">
+          <div class="field">
+            <label class="label">📏 Chiều cao (cm)</label>
+            <div class="control has-icons-left">
+              <input class="input" type="number" step="0.1" name="height" placeholder="Ví dụ: 78">
+              <span class="icon is-small is-left"><i class="fas fa-ruler-vertical"></i></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="box">
+      <div class="field">
+        <label class="label">📝 Ghi chú, khám bệnh</label>
+        <div class="control">
+          <textarea class="textarea" name="history" rows="4" placeholder="Ghi chú của bác sĩ..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Service Options -->
+ <!-- Service Options -->
+<div class="box">
+  <div class="field">
+    <div class="columns is-vcentered is-multiline">
+      <!-- Column 1: Label -->
+      <div class="column is-3">
+        <label class="label">💵 Loại khám</label>
+      </div>
+
+      <!-- Column 2: Free -->
+      <div class="column is-3">
+        <label class="radio is-large">
+          <input type="radio" name="service_fee" value="0">
+          <span class="option-text">Free</span>
+        </label>
+      </div>
+
+      <!-- Column 3: Khám bệnh -->
+      <div class="column is-3">
+        <label class="radio is-large">
+          <input type="radio" name="service_fee" value="150000" checked>
+          <span class="option-text">Khám bệnh</span>
+        </label>
+      </div>
+
+      <!-- Column 4: Khám chuyên sâu -->
+      <div class="column is-3">
+        <label class="radio is-large">
+          <input type="radio" name="service_fee" value="200000">
+          <span class="option-text">Khám chuyên sâu</span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  <label class="label">💊 Thêm thuốc</label>
+  <div class="field has-addons">
+    <div class="control is-expanded">
+      <div class="select is-fullwidth">
+        <select id="drugSelect">
+          <option value="">-- Chọn thuốc --</option>
+          <!-- options filled dynamically -->
+        </select>
+      </div>
+    </div>
+    <div class="control">
+      <input class="input" type="number" id="drugQty" min="1" value="1">
+    </div>
+        <div class="control">
+      <input class="input" type="text" id="drugNote" placeholder="Ghi chú">
+    </div>
+
+    <div class="control">
+      <button type="button" class="button is-link" id="addDrugBtn">
+        <span class="icon"><i class="fas fa-plus"></i></span>
+        <span>Thêm</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table class="table is-striped is-hoverable is-fullwidth" id="drugTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Tên thuốc</th>
+        <th>Số lượng</th>
+        <th>Ghi chú</th>
+        <th hidden>Giá phụ</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+      <tr>
+        <th colspan="2">Tổng cộng</th>
+        <th id="totalQuantity">0</th>
+        <th></th>
+        <th id="totalPrice">0</th>
+        <th></th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+    </div>
+
+    <!-- Re-exam -->
+    <div class="box">
+      <div class="field is-horizontal" id="ngay_tai_kham">
+        <div class="field-label">
+          <label class="label">📅 Hẹn tái khám</label>
+        </div>
+        <div class="field-body">
+          <div class="control has-icons-left">
+            <input class="input" type="date" name="expected_date">
+            <span class="icon is-small is-left"><i class="fas fa-calendar-check"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save, Print, Back to patient list-->
+    <div class="field is-grouped is-grouped-centered no-print mt-5">
+      <!-- Print Button -->
+      <p class="control">
+        <button type="button" class="button is-info is-medium" id="printBtn">
+          <span class="icon"><i class="fas fa-print"></i></span>
+          <span>In đơn thuốc (Nhớ lưu)<br></span>
+        </button>
+      </p>
+
+      <!-- Save Button -->
+      <p class="control">
+        <button class="button is-primary is-medium" type="submit" id="saveBtn" name="saveBtn">
+          <span class="icon"><i class="fas fa-save"></i></span>
+          <span>Lưu thông tin</span>
+        </button>
+      </p>
+
+      <!-- Back Button -->
+      <p class="control">
+        <a href="{{ url_for('manage_patients') }}" class="button is-medium" id="backBtn">
+          <span class="icon"><i class="fas fa-arrow-left"></i></span>
+          <span>Quay lại danh sách</span>
+        </a>
+      </p>
+    </div>
+
+  </div>
+  </form>
+</section>
+<div id="toast" class="notification is-success" style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">
+  ✅ Đã lưu thành công!
+</div>
+<!-- back to patient list buton -->
+<script>
+document.getElementById("backBtn").addEventListener("click", function() {
+  window.location.href = "/patients"
+})
+</script>
+
+<!-- Toast noti -->
+<script>
+  function showToast(message = "✅ Đã lưu thành công!") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.style.display = "block";
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 3000);
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("examForm");
+  const saveBtn = document.getElementById("saveBtn");
+  if (saveBtn.innerText === "Save") {
+        saveBtn.innerText = "Update";
+        document.querySelector("input[name='mode']").value = "update";
+    }
+
+  form.addEventListener("submit", function(e) {
+    e.preventDefault(); // stop normal form submit
+
+    fetch(this.action, {
+      method: "POST",
+      body: new FormData(this)
+    }).then(res => {
+      if (res.ok) {
+        saveBtn.dataset.saved = "true";
+        saveBtn.classList.remove("is-primary");
+        saveBtn.classList.add("is-success");
+        saveBtn.textContent = "Đã lưu";
+        showToast();
+      } else {
+        showToast("❌ Lỗi khi lưu dữ liệu");
+      }
+    }).catch(err => {
+      console.error(err);
+      showToast("❌ Không thể kết nối server");
+    });
+  });
+});
+</script>
+
+<!-- Get today -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Exam dateA
+  flatpickr("input[name='exam_date']", {
+    dateFormat: "Y-m-d",
+    defaultDate: "today"
+  });
+
+  // Expected re-exam date
+  flatpickr("input[name='expected_date']", {
+    dateFormat: "Y-m-d",
+    minDate: "today"   // optional: cannot pick past dates
+  });
+});
+</script>
+
+<!-- get drug list, sort -->
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+  const drugSelect = document.getElementById("drugSelect");
+  const drugQty = document.getElementById("drugQty");
+  const addDrugBtn = document.getElementById("addDrugBtn");
+  const tableBody = document.querySelector("#drugTable tbody");
+
+  let drugList = [];
+  try {
+    const res = await fetch("/api/drugs");
+    drugList = await res.json();
+    drugList.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d.name;
+      opt.textContent = d.name;
+      opt.dataset.price = d.sell_price;
+      drugSelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load drugs", err);
+  }
+
+  function updateRowNumbers() {
+    tableBody.querySelectorAll("tr").forEach((row, idx) => {
+      row.querySelector("td").textContent = idx + 1;
+    });
+  }
+
+function calculateTotals() {
+  const rows = tableBody.querySelectorAll("tr");
+  if (rows.length === 0) {
+    // If no rows, clear totals or leave them blank
+    document.getElementById("totalQuantity").textContent = "";
+    document.getElementById("totalPrice").textContent = "";
+    return;
+  }
+
+  let qtySum = 0, priceSum = 0;
+  rows.forEach(row => {
+    const qty = parseInt(row.querySelector(".quantity").textContent) || 0;
+    const price = parseFloat(row.dataset.price) || 0;
+    qtySum += qty;
+    priceSum += qty * price;
+  });
+
+  document.getElementById("totalQuantity").textContent = qtySum;
+  document.getElementById("totalPrice").textContent = priceSum.toLocaleString();
+}
+
+addDrugBtn.addEventListener("click", () => {
+  const selected = drugSelect.options[drugSelect.selectedIndex];
+  if (!selected.value) return;
+
+  const qty = parseInt(drugQty.value) || 1;
+  const price = parseFloat(selected.dataset.price) || 0;
+  const note = document.getElementById("drugNote").value || "";
+
+  const row = document.createElement("tr");
+  row.dataset.price = price;
+  row.innerHTML = `
+    <td></td>
+    <td>
+      ${selected.value}
+      <input type="hidden" name="drug_name" value="${selected.value}">
+    </td>
+    <td class="quantity">
+      ${qty}
+      <input type="hidden" name="drug_quantity" value="${qty}">
+    </td>
+    <td>
+      ${note}
+      <input type="hidden" name="drug_note" value="${note}">
+    </td>
+    <td hidden>
+      ${price}
+      <input type="hidden" name="drug_price" value="${price}">
+    </td>
+    <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
+  `;
+  tableBody.appendChild(row);
+  updateRowNumbers();
+  calculateTotals();
+
+  // reset inputs
+  drugSelect.value = "";
+  drugQty.value = "";
+  document.getElementById("drugNote").value = "";
+});
+
+  tableBody.addEventListener("click", e => {
+    if (e.target.classList.contains("removeRow")) {
+      e.target.closest("tr").remove();
+      updateRowNumbers();
+      calculateTotals();
+    }
+  });
+});
+
+</script>
+
+<!-- Print script -->
+<script>
+document.getElementById("printBtn").addEventListener("click", function() {
+  // Collect patient info
+  const kidName = document.getElementById("kid_name")?.textContent || "<Lỗi tên bé>";
+  const birthday = ""; // You may need to get this from patient info
+  const weight = document.querySelector("input[name='weight']").value || "";
+  const height = document.querySelector("input[name='height']").value || "";
+  const phone = document.getElementById("phone")?.textContent || "<Lỗi sđt>";
+  const parentName = ""; // You may need to get this from patient info
+  const address = document.getElementById("address")?.textContent || "<Lỗi địa chỉ>";
+  const history = document.querySelector("textarea[name='history']")?.value || "<Lỗi nội dung khám bệnh>";
+  const ngay_kham = document.querySelector("input[name='exam_date']").value || "<lỗi lấy ngày khám>";
+  const ngay_tai_kham = document.querySelector("input[name='expected_date']").value || "<lỗi lấy ngày tái khám>";
+
+  // Collect drug rows
+  let drugRows = "";
+  let index = 1;
+  document.querySelectorAll("#drugTable tbody tr").forEach(row => {
+    const name = row.children[1]?.textContent || "";
+    const qty = row.children[2]?.textContent || "";
+    const note = row.children[3]?.textContent || "";
+    if (name) {
+      drugRows += `
+        <tr>
+          <td>${index++}</td>
+          <td>${name}</td>
+          <td>${qty}</td>
+          <td>${note}</td>
+        </tr>`;
+    }
+  });
+
+  // Build print content
+  const printContent = `
+    <html>
+      <head>
+        <title>Phiếu Khám</title>
+        <style>
+          @page { size: A5 portrait; margin: 1cm; }
+          body { font-family: sans-serif; font-size: 11pt; }
+          h2 { text-align: center; margin-bottom: 1em; }
+          table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+          th, td { border: 1px solid #000; padding: 4px; text-align: left; }
+        </style>
+      </head>
+      <body>
+        <h2>Phiếu Khám Bệnh - ${ngay_kham}</h2>
+        <p> ${kidName} &nbsp;&nbsp; ${birthday} &nbsp;&nbsp; ${weight}kg &nbsp;&nbsp; ${height}cm</p>
+        <p> ${phone} &nbsp;&nbsp; ${parentName}</p>
+        <p> ${address}</p>
+        <p><strong>Ghi chú / Khám bệnh:</strong> ${history}</p>
+        <p>Hẹn tái khám: ${ngay_tai_kham}</p>
+
+        <h3>💊 Thuốc</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên thuốc</th>
+              <th>Số lượng</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${drugRows || "<tr><td colspan='4'>Toa không thuốc</td></tr>"}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  // Open new window and print
+  const printWindow = window.open("", "_blank");
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+  printWindow.print();
+});
+</script>
+
+{% endblock %}

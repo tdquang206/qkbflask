@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Add New Patient</h1>
+<form method="POST" class="box">
+  <div class="field"><label class="label">Kid Name</label><input class="input" name="kid_name"></div>
+  <div class="field"><label class="label">Kid Birthday</label><input class="input" name="kid_birthday"></div>
+  <div class="field"><label class="label">Parent Name</label><input class="input" name="name" required></div>
+  <div class="field"><label class="label">Phone</label><input class="input" name="phone" required></div>
+  <div class="field"><label class="label">Address</label><input class="input" name="address"></div>
+  <button class="button is-primary">Add Patient</button>
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Exam date
+  flatpickr("input[name='kid_birthday']", {
+    dateFormat: "Y-m-d",
+    defaultDate: ""
+  });
+});
+</script>
+
+{% endblock %}

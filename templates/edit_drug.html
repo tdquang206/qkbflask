@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Edit Drug: {{ drug.name }}</h1>
+
+<form method="POST" class="box">
+  <input type="hidden" name="id" value="{{ drug.doc_id }}">
+  <div class="field"><label class="label">SKU</label><input class="input" name="sku" value="{{ drug.sku }}"></div>
+  <div class="field"><label class="label">Name</label><input class="input" name="name" value="{{ drug.name }}"></div>
+  <div class="field"><label class="label">Sell Price</label><input class="input" name="sell_price" value="{{ drug.sell_price }}"></div>
+  <div class="field"><label class="label">Buy Price</label><input class="input" name="buy_price" value="{{ drug.buy_price }}"></div>
+  <div class="field"><label class="label">Quantity</label><input class="input" name="quantity" value="{{ drug.quantity }}"></div>
+  <div class="field"><label class="label">Inventory</label><input class="input" name="inventory" value="{{ drug.inventory }}"></div>
+  <button class="button is-success">Update</button>
+</form>
+{% endblock %}
+

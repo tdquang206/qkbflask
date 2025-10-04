@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title mb-5">Patients</h1>
+
+<div class="mb-4">
+  <a href="{{ url_for('add_patient') }}" class="button is-primary">➕ Thêm BN mới</a>
+</div>
+
+<div class="field mb-5">
+  <div class="control has-icons-left">
+    <input class="input is-medium" type="text" placeholder="🔍 Search by kid name, parent name, or phone" id="searchInput" onkeyup="filterTable()">
+    <span class="icon is-left">
+      <i class="fas fa-search"></i>
+    </span>
+  </div>
+</div>
+
+<div class="table-container">
+  <table class="table is-fullwidth is-striped is-hoverable" id="patientTable">
+    <thead>
+      <tr>
+        <th>Tên Bé</th>
+        <th>Ngày sinh</th>
+        <th>Tên Ba Mẹ</th>
+        <th>Điện thoại</th>
+        <th>Địa chỉ</th>
+        <th>Ngày khám gần nhất</th>
+        <th class="has-text-centered">Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for patient in patients %}
+      <tr>
+        <td>{{ patient.kid_name }}</td>
+        <td>{{ patient.kid_birthday }}</td>
+        <td>{{ patient.name }}</td>
+        <td>{{ patient.phone }}</td>
+        <td>{{ patient.address }}</td>
+        <td>{{ patient.last_visit or '—' }}</td>
+        <td class="has-text-centered">
+          <div class="buttons are-small is-centered">
+            <a href="/exam/{{ patient.doc_id }}" class="button is-link">Tới màn hình khám bệnh</a>
+            <a href="/edit_patient/{{ patient.doc_id }}" class="button is-warning">Sửa thông tin</a>
+            <a href="/patient/{{ patient.doc_id }}/exams" class="button is-info">Lịch sử khám bệnh</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function filterTable() {
+    const input = document.getElementById("searchInput").value.toLowerCase();
+    const rows = document.querySelectorAll("#patientTable tbody tr");
+
+    rows.forEach(row => {
+      const kid_name = row.cells[0].textContent.toLowerCase();
+      const parent_name = row.cells[2].textContent.toLowerCase();
+      const phone = row.cells[3].textContent.toLowerCase();
+
+      if (kid_name.includes(input) || parent_name.includes(input) || phone.includes(input)) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  }
+</script>
+{% endblock %}

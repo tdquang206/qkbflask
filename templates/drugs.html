@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Manage Drugs</h1>
+
+<form method="POST" class="box" aria-label="drug-form">
+  <div class="field is-horizontal">
+    <div class="field-label is-normal"><label class="label" id="sku_input">SKU</label></div>
+    <div class="field-body"><input class="input" type="text" name="sku" required></div>
+  </div>
+
+  <div class="field is-horizontal">
+    <div class="field-label is-normal"><label class="label" id="drug_name_input">Drug Name</label></div>
+    <div class="field-body"><input class="input" type="text" name="name" required></div>
+  </div>
+
+  <div class="field is-horizontal">
+    <div class="field-label is-normal"><label class="label">Sell Price</label></div>
+    <div class="field-body"><input class="input" type="number" step="0.01" name="sell_price" required></div>
+  </div>
+
+  <div class="field is-horizontal">
+    <div class="field-label is-normal"><label class="label">Buy Price</label></div>
+    <div class="field-body"><input class="input" type="number" step="0.01" name="buy_price" required></div>
+  </div>
+
+  <div class="field is-horizontal">
+    <div class="field-label is-normal"><label class="label">Quantity</label></div>
+    <div class="field-body"><input class="input" type="number" name="quantity" required></div>
+  </div>
+
+  <div class="field is-horizontal">
+    <div class="field-label is-normal"><label class="label">Trong kho</label></div>
+    <div class="field-body"><input class="input" type="text" name="inventory"></div>
+  </div>
+
+  <div class="field">
+    <div class="control">
+      <button class="button is-primary">Add New Drug</button>
+    </div>
+  </div>
+</form>
+
+<div class="field">
+  <div class="control">
+    <input class="input" type="text" placeholder="Search by name or SKU" id="searchInput" onkeyup="filterTable()">
+  </div>
+</div>
+
+<table class="table is-striped is-fullwidth" id="drugTable">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>SKU</th>
+      <th>Name</th>
+      <th>Sell Price</th>
+      <th>Buy Price</th>
+      <th>Quantity</th>
+      <th>Inventory</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for drug in drugs %}
+    <tr>
+      <td>{{ drug.doc_id }}</td>
+      <td>{{ drug.sku }}</td>
+      <td>{{ drug.name }}</td>
+      <td>{{ drug.sell_price }}</td>
+      <td>{{ drug.buy_price }}</td>
+      <td>{{ drug.quantity }}</td>
+      <td>{{ drug.inventory }}</td>
+      <td>
+        <a href="/edit_drug/{{ drug.doc_id }}" class="button is-small is-info">Edit</a>
+        <a href="/delete_drug/{{ drug.doc_id }}" class="button is-small is-danger">Delete</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+function filterTable() {
+  const input = document.getElementById("searchInput").value.toLowerCase();
+  const rows = document.querySelectorAll("#drugTable tbody tr");
+  rows.forEach(row => {
+    const sku = row.cells[1].textContent.toLowerCase();
+    const name = row.cells[2].textContent.toLowerCase();
+    row.style.display = sku.includes(input) || name.includes(input) ? "" : "none";
+  });
+}
+</script>
+
+<!-- auto SKU -->
+<script>
+  function generateRandomLetters(length) {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    return result;
+  }
+
+  document.getElementById("drug_name").addEventListener("blur", function() {
+    const name = this.value.trim();
+    if (name.length > 0) {
+      const prefix = name.substring(0, 3).toUpperCase();
+      const randomPart = generateRandomLetters(3);
+      document.getElementById("sku").value = prefix + randomPart;
+    }
+  });
+  </script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+  <div class="container">
+    <h1 class="title">💊 Báo cáo thuốc đã bán</h1>
+
+    <form method="get" class="box mb-5">
+      <div class="columns is-multiline">
+        <div class="column is-4">
+          <label class="label">Từ ngày</label>
+          <input class="input" type="text" id="start_date" name="start_date" value="{{ start_date or '' }}">
+        </div>
+        <div class="column is-4">
+          <label class="label">Đến ngày</label>
+          <input class="input" type="text" id="end_date" name="end_date" value="{{ end_date or '' }}">
+        </div>
+        <div class="column is-4 is-flex is-align-items-end">
+          <button class="button is-primary" type="submit">
+            <span class="icon"><i class="fas fa-filter"></i></span>
+            <span>Lọc</span>
+          </button>
+        </div>
+      </div>
+    </form>
+
+
+    {% set valid_drug_totals = drug_totals | selectattr("name") | list %}
+    {% if valid_drug_totals %}
+      <div class="table-container">
+        <table class="table is-striped is-hoverable is-fullwidth">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên thuốc</th>
+              <th>Tổng số lượng</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for drug in valid_drug_totals %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ drug.name }}</td>
+              <td>{{ drug.quantity }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="has-text-grey">Không có dữ liệu trong khoảng thời gian này.</p>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  flatpickr("#start_date", { dateFormat: "Y-m-d" });
+  flatpickr("#end_date", { dateFormat: "Y-m-d" });
+});
+</script>
+{% endblock %}

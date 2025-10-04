@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+  <div class="container">
+
+    <!-- Big action button -->
+    <div class="has-text-centered mb-5">
+      <a href="{{ url_for('exam', patient_id=patient.doc_id) }}" class="button is-primary is-large">
+        <span class="icon"><i class="fas fa-stethoscope"></i></span>
+        <span>Tới màn hình khám bệnh hôm nay</span>
+      </a>
+    </div>
+
+    <h1 class="title">Lịch sử khám của {{ patient.kid_name or patient.name }}</h1>
+
+    {% if exams %}
+      {% for exam in exams %}
+      <div class="box mb-6" style="border-left: 6px solid #3273dc;">  <!-- blue stripe -->
+        <h2 class="subtitle">
+          📅 {{ exam.exam_date }}
+          <span class="tag ml-2">Tái khám: {{ exam.expected_date or '—' }}</span>
+        </h2>
+
+        <div class="columns is-multiline">
+          <div class="column is-3"><strong>⚖️ Cân nặng:</strong> {{ exam.weight }} kg</div>
+          <div class="column is-3"><strong>📏 Chiều cao:</strong> {{ exam.height }} cm</div>
+          <div class="column is-6"><strong>📝 Ghi chú:</strong> {{ exam.history }}</div>
+        </div>
+
+    {% set valid_drugs = exam.drugs | selectattr("name") | list %}
+      {% if valid_drugs %}
+        <div class="table-container mt-3">
+          <table class="table is-narrow is-striped is-fullwidth">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tên thuốc</th>
+                <th>Số lượng</th>
+                <th>Ghi chú</th>
+                <th>Giá</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for drug in valid_drugs %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ drug.name }}</td>
+                <td>{{ drug.quantity }}</td>
+                <td>{{ drug.note }}</td>
+                <td>{{ drug.price }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="has-text-grey">💊 Toa không thuốc</p>
+      {% endif %}
+
+
+        <!-- {% if exam.drugs and exam.drugs|length > 0 %}
+        <div class="table-container mt-3">
+          <table class="table is-narrow is-striped is-fullwidth">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tên thuốc</th>
+                <th>Số lượng</th>
+                <th>Ghi chú</th>
+                <th>Giá</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for drug in exam.drugs %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ drug.name }}</td>
+                <td>{{ drug.quantity }}</td>
+                <td>{{ drug.note }}</td>
+                <td>{{ drug.price }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="has-text-grey">💊 Không có thuốc kê trong lần khám này.</p>
+        {% endif %} -->
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="has-text-grey">Chưa có lịch sử khám nào.</p>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}

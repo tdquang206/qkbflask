@@ -1,0 +1,534 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Danh sách nhập thuốc</h1>
+
+<button class="button is-primary mb-4" id="addBuyInvoiceBtn">Nhập thuốc mới vào kho</button>
+
+<div class="modal" id="addBuyInvoice">
+  <div class="modal-background"></div>
+  <div class="modal-card is-full" style="width: 90vw; height: 90vh; max-width: 1100px; max-height: 800px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Nhập Thuốc</p>
+      <button class="delete" aria-label="close"></button>
+    </header>
+
+    <section class="modal-card-body">
+      <!-- Form starts -->
+      <form method="POST" id="nhap_thuoc_form" aria-label="nhap_thuoc_form">
+        <div class="columns">
+          <!-- Date Buy -->
+          <div class="column is-5">
+            <div class="field">
+              <label class="label">📅 Ngày mua</label>
+              <div class="control">
+                <input class="input" type="text" name="date_buy" id="dateBuy" placeholder="Chọn ngày..." required>
+              </div>
+              </div>
+              </div>
+              <!-- One gap -->
+              <div class="column is-1"></div>
+              
+              <!-- Paid Toggle -->
+              <div class="column is-6 is-flex is-align-items-center">
+                <div class="field">
+                  <label class="checkbox" style="transform: scale(2); margin-right: 16px;">
+                    <input type="checkbox" name="paid" value="true">Đã thanh toán
+                  </label>
+                </div>
+              </div>
+
+            
+        </div>
+
+        <!-- Supplier Note -->
+        <div class="field">
+          <label class="label">📒 Ghi chú (nhà cung cấp, số điện thoại...)</label>
+          <div class="control">
+            <textarea class="textarea" name="note" placeholder="Nhập thông tin thêm..."></textarea>
+          </div>
+        </div>
+
+        <!-- Drug Add Box -->
+        <div class="box">
+          <label class="label">💊 Thêm thuốc</label>
+          <div class="columns is-variable is-2">
+
+            <!-- Drug Name -->
+            <div class="column is-3">
+              <div class="field">
+                <div class="control">
+                  <input class="input" type="text" id="drugBuyInput" placeholder="Nhập tên thuốc...">
+                  <div id="drugDropdown" class="dropdown-content box"
+                    style="display:none; position:absolute; z-index:1000; width:100%;">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quantity -->
+            <div class="column is-1">
+              <input class="input" type="number" id="drugBuyQty" min="1" placeholder="1">
+            </div>
+            <!-- Số tiền -->
+            <div class="column is-4">
+              <input class="input" type="number" id="drugBuyCost" min="1" placeholder="Tổng tiền">
+            </div>
+
+            <!-- Note -->
+            <div class="column is-3">
+              <div class="control" style="position:relative;">
+                <input class="input" type="text" id="drugBuyNote" placeholder="Ghi chú nếu cần">
+              </div>
+            </div>
+
+
+            <!-- Đơn giá hiện ở bảng-->
+
+            <!-- Add Button -->
+            <div class="column is-1">
+              <button type="button" class="button is-link is-fullwidth" id="addDrugBtn">
+                <span>Thêm</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drug Table -->
+        <div class="table-container">
+          <table class="table is-striped is-hoverable is-fullwidth" id="drugTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tên thuốc</th>
+                <th>Số lượng</th>
+                <th>Ghi chú</th>
+                <th>Tiền</th>
+                <th>Đơn giá</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+              <tr>
+                <th colspan="2">Tổng cộng bill</th>
+                <th id="totalBuyQuantity">_</th>
+                <th></th>
+                <th id="totalCost">0</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+      </form>
+      <!-- Form ends -->
+    </section>
+
+    <footer class="modal-card-foot">
+      <button class="button is-success" type="submit" form="nhap_thuoc_form">💾 Lưu thông tin</button>
+      <button class="button" id="cancelBtn">Cancel</button>
+    </footer>
+  </div>
+</div>
+
+<!-- past orders list -->
+ <section class="section">
+  <div class="container">
+    <h1 class="title">📜 Lịch sử nhập thuốc</h1>
+
+    <!-- Date filter -->
+    <div class="field">
+      <label class="label">Lọc theo ngày</label>
+      <div class="control">
+        <input id="filterDate" class="input" type="date">
+      </div>
+    </div>
+
+    {% for purchase in purchases %}
+    <div class="box mb-5" style="border-left: 6px solid;">
+      <h2 class="subtitle">
+        📅 {{ purchase.date_buy }}
+        <span class="tag is-{{ 'danger' if not purchase.paid else 'success' }}">
+          {{ 'Chưa thanh toán' if not purchase.paid else 'Đã thanh toán' }}
+        </span>
+      </h2>
+      <p><strong>Ghi chú:</strong> {{ purchase.note or '—' }}</p>
+
+      <!-- Edit button -->
+      <button 
+        class="button is-small is-info editPurchaseBtn" 
+        data-id="{{ purchase.doc_id }}"
+        data-purchase='{{ purchase | tojson }}'>
+        ✏️ Sửa
+      </button>
+
+
+      <div class="table-container mt-3">
+        <table class="table is-striped is-fullwidth is-narrow">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên thuốc</th>
+              <th>Số lượng</th>
+              <th>Ghi chú</th>
+              <th>Tổng tiền</th>
+              <th>Đơn giá</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set total = 0 %}
+            {% for drug in purchase.drugs %}
+              {% set qty = drug.quantity|int %}
+              {% set cost = drug.buy_price|float %}
+              {% set total = total + cost %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ drug.name }}</td>
+                <td>{{ qty }}</td>
+                <td>{{ drug.note }}</td>
+                <td>{{ "{:,.0f}".format(cost) }}</td>
+                <td>{{ "{:,.2f}".format(cost/qty if qty else 0) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="4" class="has-text-right">Tổng cộng</th>
+              <th colspan="2">{{ "{:,.0f}".format(total) }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    {% else %}
+      <p class="has-text-grey">Chưa có lịch sử nhập thuốc.</p>
+    {% endfor %}
+  </div>
+</section>
+
+
+<script>
+// **NEW** - Add new bill open and close
+document.addEventListener('DOMContentLoaded', () => {
+  // --- Modal Control ---
+  const modal = document.getElementById('addBuyInvoice');
+  const openBtn = document.getElementById('addBuyInvoiceBtn');
+  const closeBtn = modal.querySelector('.delete');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  function openModal() { modal.classList.add('is-active'); }
+  function closeModal() { modal.classList.remove('is-active'); }
+
+  openBtn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+
+
+
+  
+});
+</script>
+
+<!-- date pick in modal -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Exam dateA
+  flatpickr("input[name='date_buy']", {
+    dateFormat: "Y-m-d",
+    defaultDate: "today"
+  });
+
+});
+</script>
+
+<!-- get drug list, sort -->
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+  const drugSelect = document.getElementById("drugSelect");
+  const drugQty = document.getElementById("drugBuyQty");
+  const addDrugBtn = document.getElementById("addDrugBtn");
+  const drugBuyCost = document.getElementById("drugBuyCost");
+  const tableBody = document.querySelector("#drugBuyTable tbody");
+
+
+  let currentSelectedDrug = null;
+
+  let drugList = [];
+  try {
+    const res = await fetch("/api/drugs");
+    drugList = await res.json();
+    drugList.sort((a, b) => a.name.localeCompare(b.name));
+    
+  } catch (err) {
+    console.error("Failed to load drugs", err);
+  }
+
+const input = document.getElementById("drugBuyInput");
+const dropdown = document.getElementById("drugDropdown");
+let activeIndex = -1;
+
+
+input.addEventListener("input", () => {
+  const value = input.value.toLowerCase();
+  dropdown.innerHTML = "";
+  if (!value) {
+    dropdown.style.display = "none";
+    return;
+  }
+
+  const matches = drugList.filter(d => d.name.toLowerCase().includes(value));
+  if (matches.length) {
+    matches.forEach(drug => {
+      const option = document.createElement("div");
+      option.className = "dropdown-item drug-item";
+      option.textContent = drug.name;
+
+      option.style.backgroundColor  = "white";
+      option.style.color = "black";
+      option.onclick = () => {
+        input.value = drug.name;
+        dropdown.style.display = "none";
+
+        // Optional: store price or other data
+        input.dataset.price = drug.sell_price;
+      };
+      dropdown.appendChild(option);
+    });
+    dropdown.style.display = "block";
+  } else {
+    dropdown.style.display = "none";
+  }
+});
+
+// 🔽 Keyboard navigation
+input.addEventListener("keydown", (e) => {
+  const items = dropdown.querySelectorAll(".dropdown-item");
+  if (!items.length || dropdown.style.display === "none") return;
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    activeIndex = (activeIndex + 1) % items.length;
+    updateActive(items);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    activeIndex = (activeIndex - 1 + items.length) % items.length;
+    updateActive(items);
+  } else if (e.key === "Enter" || e.key === "Tab") {
+    if (currentIndex >= 0 && currentIndex < items.length) {
+        e.preventDefault();
+        const selectedName = items[currentIndex].textContent.trim();
+        drugInput.value = selectedName;
+        
+        // FIX: Update the selected drug object for consistency
+        const selectedDrug = drugList.find(d => d.name === selectedName);
+        currentSelectedDrug = selectedDrug; 
+        
+        drugDropdown.style.display = "none";
+        drugBuyQty.focus();
+    }
+  }
+});
+
+function updateActive(items) {
+  items.forEach((item, i) => {
+    item.classList.toggle("has-background-primary", i === activeIndex);
+    item.classList.toggle("has-text-white", i === activeIndex);
+  });
+}
+
+
+
+  function updateRowNumbers() {
+    tableBody.querySelectorAll("tr").forEach((row, idx) => {
+      row.querySelector("td").textContent = idx + 1;
+    });
+  }
+
+function calculateTotals() {
+  const rows = tableBody.querySelectorAll("tr");
+  if (rows.length === 0) {
+    // If no rows, clear totals or leave them blank
+    document.getElementById("totalBuyQuantity").textContent = "_";
+    document.getElementById("totalCost").textContent = "_";
+    
+    return;
+  }
+
+  let qtySum = 0, priceSum = 0;
+  rows.forEach(row => {
+    const qty = parseInt(row.querySelector(".quantity").textContent) || 0;
+    const price = parseFloat(row.dataset.price) || 0;
+    qtySum += qty;
+    priceSum += qty * price;
+  });
+
+  document.getElementById("totalBuyQuantity").textContent = qtySum;
+  document.getElementById("totalCost").textContent = priceSum.toLocaleString();
+}
+
+
+
+const table = document.getElementById("drugTable").getElementsByTagName("tbody")[0];
+
+  function updateRowNumbers() {
+    [...table.querySelectorAll("tr")].forEach((row, idx) => {
+      row.querySelector("td").textContent = idx + 1;
+    });
+  }
+
+  addDrugBtn.addEventListener("click", () => {
+    const name = document.getElementById("drugBuyInput").value.trim();
+    const qty = parseInt(document.getElementById("drugBuyQty").value) || 0;
+    const cost = parseFloat(document.getElementById("drugBuyCost").value) || 0;
+    const note = document.getElementById("drugBuyNote").value.trim();
+
+    if (!name || qty <= 0 || cost <= 0) {
+      alert("Please enter valid drug name, quantity, and cost.");
+      return;
+    }
+
+    const pricePerUnit = (cost / qty).toFixed(2);
+
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td></td>
+      <td>${name}</td>
+      <td>${qty}</td>
+      <td>${note}</td>
+      <td>${cost.toLocaleString()}</td>
+      <td>${pricePerUnit}</td>
+      <td><button class="button is-small is-danger removeRow">X</button></td>
+    `;
+
+    table.appendChild(row);
+    updateRowNumbers();
+
+    // Reset inputs
+    document.getElementById("drugBuyInput").value = "";
+    document.getElementById("drugBuyQty").value = "";
+    document.getElementById("drugBuyCost").value = "";
+    document.getElementById("drugBuyNote").value = "";
+  });
+
+  // Remove row
+  table.addEventListener("click", (e) => {
+    if (e.target.classList.contains("removeRow")) {
+      e.target.closest("tr").remove();
+      updateRowNumbers();
+    }
+  });
+});
+
+// submit button  by ajax
+document.getElementById("nhap_thuoc_form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const date_buy = document.getElementById("dateBuy").value;
+  const paid = document.querySelector("input[name='paid']").checked;
+  const note = document.querySelector("textarea[name='note']").value;
+
+  const drugs = [];
+  document.querySelectorAll("#drugTable tbody tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+    drugs.push({
+      name: cells[1].textContent.trim(),
+      quantity: cells[2].textContent.trim(),
+      note: cells[3].textContent.trim(),
+      buy_price: cells[4].textContent.replace(/,/g, "")
+    });
+  });
+
+  const payload = { date_buy, paid, note, drugs };
+
+  const res = await fetch("/mua_thuoc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (data.status === "success") {
+    alert("Saved!");
+    location.reload();
+  }
+});
+
+</script>
+
+
+<!-- open in edit mode for past orders -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".editPurchaseBtn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const purchase = JSON.parse(btn.dataset.purchase);
+    const docId = btn.dataset.id;
+
+    // Fill form fields
+    document.getElementById("dateBuy").value = purchase.date_buy;
+    document.querySelector("input[name='paid']").checked = purchase.paid;
+    document.querySelector("textarea[name='note']").value = purchase.note || "";
+
+    // Clear existing rows
+    const tbody = document.querySelector("#drugTable tbody");
+    tbody.innerHTML = "";
+
+    // Rebuild rows from purchase.drugs
+    purchase.drugs.forEach((drug, idx) => {
+      const row = document.createElement("tr");
+      const pricePerUnit = (drug.buy_price / drug.quantity).toFixed(2);
+      row.innerHTML = `
+        <td>${idx+1}</td>
+        <td>${drug.name}</td>
+        <td>${drug.quantity}</td>
+        <td>${drug.note || ""}</td>
+        <td>${drug.buy_price.toLocaleString()}</td>
+        <td>${pricePerUnit}</td>
+        <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // Switch submit handler to EDIT
+    const form = document.getElementById("nhap_thuoc_form");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+
+      const date_buy = document.getElementById("dateBuy").value;
+      const paid = document.querySelector("input[name='paid']").checked;
+      const note = document.querySelector("textarea[name='note']").value;
+
+      const drugs = [];
+      document.querySelectorAll("#drugTable tbody tr").forEach(row => {
+        const cells = row.querySelectorAll("td");
+        drugs.push({
+          name: cells[1].textContent.trim(),
+          quantity: parseInt(cells[2].textContent.trim()),
+          note: cells[3].textContent.trim(),
+          buy_price: parseFloat(cells[4].textContent.replace(/,/g, ""))
+        });
+      });
+
+      const payload = { date_buy, paid, note, drugs };
+
+      const res = await fetch(`/mua_thuoc/edit/${docId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (data.status === "success") {
+        alert("Cập nhật thành công!");
+        location.reload();
+      }
+    };
+
+    // Open modal
+    document.getElementById("addBuyInvoice").classList.add("is-active");
+  });
+});
+ });
+</script>
+
+{% endblock %}

@@ -1,0 +1,14 @@
+# 2025 - 10- 016
+- Thêm tính năng theo dõi thuốc mua
+
+# 2025 - 10 - 15
+- sửa file in cho đẹp hơn
+
+# 2025-10-14
+- đổi phần chọn thuốc ở màn hình exam
+- chỉnh mặc định khám 150k khi khởi động <th id="totalPrice">_</th> thành 150000 (exam.html)
+- làm màn hình mua thuốc
+
+# 2025-10-13
+- tính tiền, lưu thông tin đơn thuốc ok
+- chọn ngày tái khám ok

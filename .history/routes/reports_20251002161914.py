@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request
 from datetime import datetime
 from collections import defaultdict
 from tinydb import Query
-from app import exams   # import your TinyDB table from app/__init__.py
+from yourapp import exams   # import your TinyDB table from app/__init__.py
 
 reports_bp = Blueprint('reports', __name__)
 

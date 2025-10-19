@@ -2,19 +2,20 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">   
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">  
 <link rel="stylesheet" href="{{ url_for('static', filename='bulma.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='flatpickr.min.css') }}">
 <script src="{{ url_for('static', filename='flatpickr.js') }}"></script>
 
-<title>Clinic EMR</title>
+<title>QKB</title>
 </head>
 <body>
   <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
   <div class="navbar-brand">
     <a class="navbar-item" href="/">
-      <strong>Clinic EMR</strong>
+      <strong>QKB v1</strong>
     </a>
 
     <!-- Hamburger menu for mobile -->
@@ -27,15 +28,24 @@
 
   <div id="mainNavbar" class="navbar-menu">
     <div class="navbar-start">
-      <a class="navbar-item" href="/">Dashboard</a>
+      <a class="navbar-item" href="/">Tổng quan</a>
       <a class="navbar-item" href="/patients">Danh sách BN</a>
       <a class="navbar-item" href="#">Lịch hẹn</a>
-      <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
-      <a class="navbar-item" href="/drug_sold">Báo cáo thuốc</a>
+      <!-- <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
+      <a class="navbar-item" href="/drug_sold">Báo cáo dùng thuốc</a> -->
+      <div class="navbar-item has-dropdown is-hoverable">
+        <a class="navbar-link">Thuốc</a>
+        <div class="navbar-dropdown">
+          <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
+          <a class="navbar-item" href="/mua_thuoc">Mua thuốc</a>
+          <a class="navbar-item" href="/drug_sold">Báo cáo</a>
+        </div>
+      </div>
     </div>
 
     <div class="navbar-end">
       <div class="navbar-item">
+
         <div class="buttons">
           <a class="button is-light">Log in</a>
           <a class="button is-link">Sign up</a>
@@ -63,4 +73,5 @@
     });
   });
 </script>
+
 </html>

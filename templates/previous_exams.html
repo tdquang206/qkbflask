@@ -3,22 +3,60 @@
 <section class="section">
   <div class="container">
 
-    <!-- Big action button -->
+    <div class="columns is-vcentered">
+      <div class="column">
+        <h1 class="title">
+          Sổ khám bệnh của {{ patient.kid_name or patient.name }}
+        </h1>
+      </div>
+      <div class="column is-narrow has-text-right">
+        <a href="{{ url_for('exam', patient_id=patient.doc_id) }}" class="button is-primary">
+          <span class="icon"><i class="fas fa-stethoscope"></i></span>
+          <span>Tới màn hình khám bệnh hôm nay</span>
+        </a>
+      </div>
+    </div>
+
+
+
+    <!-- <h1 class="title">Sổ khám bệnh của {{ patient.kid_name or patient.name }}</h1>
+    
+    Big action button
     <div class="has-text-centered mb-5">
       <a href="{{ url_for('exam', patient_id=patient.doc_id) }}" class="button is-primary is-large">
         <span class="icon"><i class="fas fa-stethoscope"></i></span>
         <span>Tới màn hình khám bệnh hôm nay</span>
       </a>
-    </div>
+    </div> -->
 
-    <h1 class="title">Lịch sử khám của {{ patient.kid_name or patient.name }}</h1>
-
+    <!-- bảng lịch sử khám bệnh -->
     {% if exams %}
       {% for exam in exams %}
-      <div class="box mb-6" style="border-left: 6px solid #3273dc;">  <!-- blue stripe -->
+      <div class="box mb-6" style="border-left: 6px solid #3273dc;">
         <h2 class="subtitle">
           📅 {{ exam.exam_date }}
           <span class="tag ml-2">Tái khám: {{ exam.expected_date or '—' }}</span>
+          <span>
+            <form method="get" action="{{ url_for('exam', patient_id=patient.doc_id) }}">
+              <input type="hidden" name="exam_id" value="{{ exam.id }}">
+              <button type="submit" class="button is-small is-link">
+                <span class="icon"><i class="fas fa-edit"></i></span>
+                <span>Sửa</span>
+              </button>
+            </form>
+          </span>
+          <!-- Delete button -->
+          <span>
+          <form method="post" action="{{ url_for('delete_exam', patient_id=patient.doc_id) }}"
+            onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
+            <input type="hidden" name="exam_id" value="{{ exam.id }}">
+            <button type="submit" class="button is-small is-danger">
+              <span class="icon"><i class="fas fa-trash"></i></span>
+              <span>Xóa</span>
+            </button>
+          </form>
+
+          </span>
         </h2>
 
         <div class="columns is-multiline">
@@ -37,55 +75,36 @@
                 <th>Tên thuốc</th>
                 <th>Số lượng</th>
                 <th>Ghi chú</th>
-                <th>Giá</th>
+                <th>Đơn giá</th>
               </tr>
             </thead>
             <tbody>
+              {% set ns = namespace(total=0) %}
               {% for drug in valid_drugs %}
-              <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ drug.name }}</td>
-                <td>{{ drug.quantity }}</td>
-                <td>{{ drug.note }}</td>
-                <td>{{ drug.price }}</td>
-              </tr>
+                {% set q = (drug.quantity | int(0)) %}
+                {% set p = (drug.price | float(0)) %}
+                {% set ns.total = ns.total + (q * p) %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>{{ drug.name }}</td>
+                  <td>{{ drug.quantity }}</td>
+                  <td>{{ drug.note }}</td>
+                  <td>{{ drug.price }}</td>
+                </tr>
+
               {% endfor %}
             </tbody>
+            <tfoot>
+              <tr>
+                <th colspan="4" class="has-text-right">Tổng cộng</th>
+                <th>{{ ns.total|int(0) }}</th>
+              </tr>
+            </tfoot>
           </table>
         </div>
       {% else %}
         <p class="has-text-grey">💊 Toa không thuốc</p>
       {% endif %}
-
-
-        <!-- {% if exam.drugs and exam.drugs|length > 0 %}
-        <div class="table-container mt-3">
-          <table class="table is-narrow is-striped is-fullwidth">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Tên thuốc</th>
-                <th>Số lượng</th>
-                <th>Ghi chú</th>
-                <th>Giá</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for drug in exam.drugs %}
-              <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ drug.name }}</td>
-                <td>{{ drug.quantity }}</td>
-                <td>{{ drug.note }}</td>
-                <td>{{ drug.price }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-          <p class="has-text-grey">💊 Không có thuốc kê trong lần khám này.</p>
-        {% endif %} -->
       </div>
       {% endfor %}
     {% else %}

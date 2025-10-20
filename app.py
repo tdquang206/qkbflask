@@ -251,35 +251,26 @@ def exam(patient_id):
         elif state == 'update':
             exam_id = request.form.get("exam_id")
             exams = patient.get("exams", [])
+            updated = False
             for i, exam in enumerate(exams):
                 if exam.get("id") == exam_id:
                     # keep the same UUID
                     exam_data["id"] = exam_id
                     exams[i] = exam_data
                     patients.update({"exams": exams}, doc_ids=[patient_id])
+                    updated = True
                     break
+            if not updated:
+                return jsonify({"status": "error", "message": "Exam ID not found"}), 400
+
             
-            # # update logic only runs if state is explicitly 'update'
-            # exam_index_str = request.form.get('exam_index')
-    
-            # # Safely convert to int, handling potential NoneType
-            # if exam_index_str is not None and exam_index_str.isdigit():
-            #     exam_index = int(exam_index_str)
-            #     updated_exams = patient.get("exams", [])
-                
-            #     if 0 <= exam_index < len(updated_exams):
-            #         updated_exams[exam_index] = exam_data
-            #         patients.update({"exams": updated_exams}, doc_ids=[patient_id])
-            # else:
-            #     # Optional: Handle the case where 'update' mode is sent but 'exam_index' is missing/invalid
-            #     # You could log an error or return a 400 Bad Request here.
-            #     pass
-            #     # return redirect(url_for('manage_patients'))
+
             return jsonify({"status": "success", "message": "Dữ liệu đã được lưu thành công"}), 200
 
     return render_template(
         'exam.html',
         patient=patient,
+        exam=exam_data
     )
 
 @app.route("/exam/<int:patient_id>/delete", methods=["POST"])

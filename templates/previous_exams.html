@@ -33,7 +33,57 @@
     {% if exams %}
       {% for exam in exams %}
       <div class="box mb-6" style="border-left: 6px solid #3273dc;">
-        <h2 class="subtitle">
+
+  
+    <div class="columns is-vcentered is-mobile">
+      
+      <!-- Left side: exam info -->
+      <div class="column">
+        <span class="is-4">📅 {{ exam.exam_date }}</span>
+        <span class="ml-4 is-4">Phí khám: 
+          {% if exam.service_fee == "0" %}
+            0
+          {% elif exam.service_fee == "150000" %}
+            150k
+          {% elif exam.service_fee == "200000" %}
+            200k
+          {% else %}
+            _
+          {% endif %}
+        </span>
+        <span class="ml-4 is-4">Tái khám: {{ exam.expected_date or '_' }}</span>
+      </div>
+
+      <!-- Right side: action buttons -->
+      <div class="column is-narrow">
+        <div class="buttons are-small">
+          <!-- Edit button -->
+          <a href="{{ url_for('exam', patient_id=patient.doc_id, exam_id=exam.id) }}" style="display:inline;">
+            <!-- <input type="hidden" name="exam_id" value="{{ exam.id }}"> -->
+            <button type="submit" class="button is-link">
+              <span class="icon"><i class="fas fa-edit"></i></span>
+              <span>Sửa</span>
+            </button>
+          </a>
+
+          <!-- Delete button -->
+          <form method="post" action="{{ url_for('delete_exam', patient_id=patient.doc_id) }}" 
+                style="display:inline;" 
+                onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
+            <input type="hidden" name="exam_id" value="{{ exam.id }}">
+            <button type="submit" class="button is-danger">
+              <span class="icon"><i class="fas fa-trash"></i></span>
+              <span>Xóa</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+       
+
+        <!-- Old header -->
+        <!-- <h2 class="subtitle">
           📅 {{ exam.exam_date }}
           <span class="tag ml-2">Tái khám: {{ exam.expected_date or '—' }}</span>
           <span>
@@ -45,7 +95,7 @@
               </button>
             </form>
           </span>
-          <!-- Delete button -->
+         
           <span>
           <form method="post" action="{{ url_for('delete_exam', patient_id=patient.doc_id) }}"
             onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
@@ -57,7 +107,7 @@
           </form>
 
           </span>
-        </h2>
+        </h2> -->
 
         <div class="columns is-multiline">
           <div class="column is-3"><strong>⚖️ Cân nặng:</strong> {{ exam.weight }} kg</div>
@@ -96,7 +146,7 @@
             </tbody>
             <tfoot>
               <tr>
-                <th colspan="4" class="has-text-right">Tổng cộng</th>
+                <th colspan="4" class="has-text-right">Tổng tiền thuốc</th>
                 <th>{{ ns.total|int(0) }}</th>
               </tr>
             </tfoot>

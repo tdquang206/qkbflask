@@ -10,4 +10,12 @@
     font-weight: 600;
   }
 
+#notificationPanel pre {
+  background: #272822;
+  color: #f8f8f2;
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
 

@@ -12,7 +12,7 @@
       <h1 class="title is-3">Khám bệnh cho: con Ba/Mẹ {{ patient.name }} - {{ patient.phone }}</h1>
     {% endif %}
       <!-- save or update -->
-    <div><input type="hidden" name="mode" value="save"></div>
+    <div><input type="hidden" name="mode" value="{{ 'update' if exam else 'save' }}"></div>
     <div><input type="hidden" name="exam_id" value="{{ exam.id if exam else '' }}"></div>
 
 
@@ -81,7 +81,7 @@
       <!-- Column 2: Free -->
       <div class="column is-3">
         <label class="radio is-large">
-          <input type="radio" name="service_fee" value="0" {% if exam and exam.service_fee == "0" %}checked{% endif %}>
+          <input type="radio" name="service_fee" value="0" {% if exam and exam.service_fee|string == "0" %}checked{% endif %}>
           <span class="option-text">Free</span>
         </label>
       </div>
@@ -89,7 +89,7 @@
       <!-- Column 3: Khám bệnh -->
       <div class="column is-3">
         <label class="radio is-large">
-          <input type="radio" name="service_fee" value="150000" {% if exam and exam.service_fee == "150000" %}checked{% endif %}>
+          <input type="radio" name="service_fee" value="150000" {% if exam and exam.service_fee|string == "150000" %}checked{% endif %}>
           <span class="option-text">Khám bệnh</span>
         </label>
       </div>
@@ -97,7 +97,7 @@
       <!-- Column 4: Khám chuyên sâu -->
       <div class="column is-3">
         <label class="radio is-large">
-          <input type="radio" name="service_fee" value="200000" {% if exam and exam.service_fee == "200000" %}checked{% endif %}>
+          <input type="radio" name="service_fee" value="200000" {% if exam and exam.service_fee|string == "200000" %}checked{% endif %}>
           <span class="option-text">Khám chuyên sâu</span>
         </label>
       </div>
@@ -196,9 +196,9 @@
     <tfoot>
       <tr>
         <th colspan="2">Tổng cộng</th>
-        <th id="totalQuantity">_</th>
+        <th id="totalQuantity">{{ exam.totalQuantity if exam else '' }}</th>
         <th></th>
-        <th id="totalPrice">150000</th>
+        <th id="totalPrice">{{ exam.totalPrice if exam else 150000 }}</th>
         <th></th>
       </tr>
     </tfoot>
@@ -267,7 +267,7 @@
       <p class="control">
         <button class="button is-primary is-medium" type="submit" id="saveBtn" name="saveBtn">
           <span class="icon"><i class="fas fa-save"></i></span>
-          <span id="saveBtnText">Lưu thông tin</span>
+          <span id="saveBtnText">{{ 'Cập nhật' if exam else 'Lưu thông tin' }}</span>
         </button>
       </p>
 
@@ -364,12 +364,13 @@ document.addEventListener("DOMContentLoaded", function() {
   // Exam dateA
   flatpickr("input[name='exam_date']", {
     dateFormat: "Y-m-d",
-    defaultDate: "today"
+    defaultDate: document.querySelector("input[name='exam_date']").value || "today"
   });
 
   // Expected re-exam date
   flatpickr("input[name='expected_date']", {
     dateFormat: "Y-m-d",
+    defaultDate: document.querySelector("input[name='expected_date']").value || null,
     minDate: "today"   // optional: cannot pick past dates
   });
 });

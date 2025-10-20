@@ -59,6 +59,26 @@
       {% block content %}{% endblock %}
     </div>
   </section>
+
+  <!-- Toggle Button -->
+  <button id="toggleNotifications"
+          style="position:fixed; bottom:20px; right:20px; z-index:2100;
+                background:#3273dc; color:white; border:none; border-radius:50%;
+                width:40px; height:40px; font-size:18px; cursor:pointer;">
+    i
+  </button>
+
+  <!-- Notification Panel -->
+  <div id="notificationPanel"
+      style="position:fixed; top:0; right:-350px; width:350px; height:100%;
+              background:#f9f9f9; border-left:2px solid #ccc;
+              overflow-y:auto; padding:1rem; font-family:monospace;
+              font-size:0.9rem; z-index:2000; transition:right 0.3s ease;">
+    <h3 style="margin-top:0;">📋 Notifications</h3>
+    <div id="notificationContent"></div>
+  </div>
+
+
 </body>
 <!-- Menubar js -->
 <script>
@@ -72,6 +92,68 @@
       menu.classList.toggle('is-active');
     });
   });
+</script>
+
+<!-- toggle noti -->
+<script>
+  const toggleBtn = document.getElementById("toggleNotifications");
+  const panel = document.getElementById("notificationPanel");
+
+  let panelOpen = false;
+
+  toggleBtn.addEventListener("click", () => {
+    panelOpen = !panelOpen;
+    panel.style.right = panelOpen ? "0" : "-350px";
+  });
+
+  // Global helper to show JSON in the panel
+    const errorLog = []; // keep last 20 errors
+
+  // Global helper to show JSON in the panel
+  function showNotification(data) {
+    // only log errors
+    if (!data || data.status !== "error") return;
+
+    // push to error log
+    errorLog.unshift(data);
+    if (errorLog.length > 20) {
+      errorLog.pop(); // keep only last 20
+    }
+
+    // render panel
+    const content = document.getElementById("notificationContent");
+    content.innerHTML = ""; // clear old
+
+    errorLog.forEach(err => {
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(err, null, 2);
+      const divider = document.createElement("hr");
+      content.appendChild(pre);
+      content.appendChild(divider);
+    });
+
+    // auto-open when new error arrives
+    panel.style.right = "0";
+    panelOpen = true;
+  }
+
+  // Intercept fetch responses globally
+  (function() {
+    const origFetch = window.fetch;
+    window.fetch = function() {
+      return origFetch.apply(this, arguments).then(async res => {
+        try {
+          const clone = res.clone();
+          const data = await clone.json();
+          showNotification(data);
+        } catch (e) {
+          // not JSON, ignore
+        }
+        return res;
+      });
+    };
+  })();
+
 </script>
 
 </html>

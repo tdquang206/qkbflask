@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Chỉnh thông tin mua ngày {{ purchase.date_buy }}</h1>
+
+<form method="POST" id="nhap_thuoc_form" aria-label="nhap_thuoc_form">
+  <div class="columns">
+    <!-- Date Buy -->
+    <div class="column is-5">
+      <div class="field">
+        <label class="label">📅 Ngày mua</label>
+        <div class="control">
+          <input class="input" type="date" name="date_buy" id="dateBuy"
+                 value="{{ purchase.date_buy }}" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="column is-1"></div>
+
+    <!-- Paid Toggle -->
+    <div class="column is-6 is-flex is-align-items-center">
+      <div class="field">
+        <label class="checkbox" style="transform: scale(2); margin-right: 16px;">
+          <input type="checkbox" name="paid" value="true"
+                 {% if purchase.paid %}checked{% endif %}>
+          Đã thanh toán
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supplier Note -->
+  <div class="field">
+    <label class="label">📒 Ghi chú (nhà cung cấp, số điện thoại...)</label>
+    <div class="control">
+      <textarea class="textarea" name="note"
+                placeholder="Nhập thông tin thêm...">{{ purchase.note }}</textarea>
+    </div>
+  </div>
+
+  <!-- Drug Add Box (same as new form) -->
+  <div class="box">
+    <label class="label">💊 Thêm thuốc</label>
+    <div class="columns is-variable is-2">
+      <div class="column is-4">
+        <div class="field">
+          <div class="control">
+            <input class="input" type="text" id="drugBuyInput" placeholder="Nhập tên thuốc...">
+            <div id="drugDropdown" class="dropdown-content box"
+                 style="display:none; position:absolute; z-index:1000; width:100%;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="column is-1">
+        <input class="input" type="number" id="drugBuyQty" min="1" placeholder="1">
+      </div>
+      <div class="column is-2">
+        <input class="input" type="number" id="drugBuyCost" min="1" placeholder="Tổng tiền">
+      </div>
+      <div class="column is-3">
+        <div class="control" style="position:relative;">
+          <input class="input" type="text" id="drugBuyNote" placeholder="Ghi chú nếu cần">
+        </div>
+      </div>
+      <div class="column is-1">
+        <button type="button" class="button is-link is-fullwidth" id="addDrugBtn">
+          <span>Thêm</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drug Table -->
+  <div class="table-container">
+    <table class="table is-striped is-hoverable is-fullwidth" id="drugTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tên thuốc</th>
+          <th>Số lượng</th>
+          <th>Ghi chú</th>
+          <th>Tiền</th>
+          <th>Đơn giá</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in purchase.drugs %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><input type="text" name="drug_name" value="{{ d.name }}" class="input"></td>
+          <td><input type="number" name="drug_quantity" value="{{ d.quantity }}" class="input quantityInput"></td>
+          <td><input type="text" name="drug_note" value="{{ d.note }}" class="input"></td>
+          <td><input type="number" name="drug_buy_price" value="{{ d.buy_price }}" class="input priceInput"></td>
+          <td><input type="text" name="drug_buy_ppu" class="input ppuInput" value="{{ d.ppu }}" /></td>
+          <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2">Tổng cộng bill</th>
+          <th id="totalBuyQuantity">_</th>
+          <th></th>
+          <th id="totalCost">{{ purchase.total_cost }}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="field is-grouped">
+    <div class="control">
+      <button type="submit" class="button is-primary">💾 Lưu thay đổi</button>
+    </div>
+    <div class="control">
+      <a href="{{ url_for('mua_thuoc.mua_thuoc') }}" class="button">Hủy</a>
+    </div>
+    <div class="control">
+      <a href="{{ url_for('mua_thuoc.mua_thuoc_delete', purchase_uuid = purchase.uuid) }}" class="button is-danger">Xóa đơn mua này</a>
+    </div>
+
+  
+  </div> 
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+  // 📅 Date picker
+  flatpickr("input[name='date_buy']", {
+    dateFormat: "Y-m-d",
+    defaultDate: document.getElementById("dateBuy").value || "today"
+  });
+
+  // 🔽 Load drug list
+  let drugList = [];
+  try {
+    const res = await fetch("/api/drugs");
+    drugList = await res.json();
+    drugList.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    console.error("Failed to load drugs", err);
+  }
+
+  const input = document.getElementById("drugBuyInput");
+  const dropdown = document.getElementById("drugDropdown");
+  const addDrugBtn = document.getElementById("addDrugBtn");
+  const tableBody = document.querySelector("#drugTable tbody");
+
+  let activeIndex = -1;
+
+  // 🔽 Autocomplete
+  input.addEventListener("input", () => {
+    const value = input.value.toLowerCase();
+    dropdown.innerHTML = "";
+    if (!value) {
+      dropdown.style.display = "none";
+      return;
+    }
+    const matches = drugList.filter(d => d.name.toLowerCase().includes(value));
+    if (matches.length) {
+      matches.forEach(drug => {
+        const option = document.createElement("div");
+        option.className = "dropdown-item drug-item";
+        option.textContent = drug.name;
+        option.style.backgroundColor  = "white";
+        option.style.color = "black";
+        option.onclick = () => {
+          input.value = drug.name;
+          dropdown.style.display = "none";
+          input.dataset.price = drug.sell_price;
+        };
+        dropdown.appendChild(option);
+      });
+      dropdown.style.display = "block";
+    } else {
+      dropdown.style.display = "none";
+    }
+  });
+
+  // 🔽 Keyboard navigation
+  input.addEventListener("keydown", (e) => {
+    const items = dropdown.querySelectorAll(".dropdown-item");
+    if (!items.length || dropdown.style.display === "none") return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIndex = (activeIndex + 1) % items.length;
+      updateActive(items);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIndex = (activeIndex - 1 + items.length) % items.length;
+      updateActive(items);
+    } else if (e.key === "Enter") {
+      if (activeIndex >= 0 && activeIndex < items.length) {
+        e.preventDefault();
+        const selectedName = items[activeIndex].textContent.trim();
+        input.value = selectedName;
+        dropdown.style.display = "none";
+      }
+    }
+  });
+
+  function updateActive(items) {
+    items.forEach((item, i) => {
+      item.classList.toggle("has-background-primary", i === activeIndex);
+      item.classList.toggle("has-text-white", i === activeIndex);
+    });
+  }
+
+  // 🔽 Totals
+  function calculateTotals() {
+    const rows = tableBody.querySelectorAll("tr");
+    if (rows.length === 0) {
+      document.getElementById("totalBuyQuantity").textContent = "_";
+      document.getElementById("totalCost").textContent = "_";
+      return;
+    }
+    let qtySum = 0, priceSum = 0;
+    rows.forEach(row => {
+      const qty = parseInt(row.querySelector(".quantityInput").value) || 0;
+      const price = parseFloat(row.querySelector(".priceInput").value) || 0;
+      qtySum += qty;
+      // price là tổng tiền 1 món
+      priceSum += price;
+    });
+    document.getElementById("totalBuyQuantity").textContent = qtySum;
+    document.getElementById("totalCost").textContent = priceSum.toLocaleString();
+  }
+
+  function updateRowNumbers() {
+    [...tableBody.querySelectorAll("tr")].forEach((row, idx) => {
+      row.querySelector("td").textContent = idx + 1;
+    });
+    calculateTotals();
+  }
+
+  // 🔽 Add drug row
+  addDrugBtn.addEventListener("click", () => {
+    const name = document.getElementById("drugBuyInput").value.trim();
+    const qty = parseInt(document.getElementById("drugBuyQty").value) || 0;
+    const cost = parseFloat(document.getElementById("drugBuyCost").value) || 0;
+    const note = document.getElementById("drugBuyNote").value.trim();
+
+    if (!name || qty <= 0 || cost <= 0) {
+      alert("Please enter valid drug name, quantity, and cost.");
+      return;
+    }
+
+    const pricePerUnit = (cost / qty).toFixed(0);
+
+    function escapeHtml(str) {
+      return (str + '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td></td>
+      <td><input type="text" name="drug_name" class="input" value="${escapeHtml(name)}"></td>
+      <td><input type="number" name="drug_quantity" class="input quantityInput" value="${qty}"></td>
+      <td><input type="text" name="drug_note" class="input" value="${escapeHtml(note)}"></td>
+      <td><input type="number" name="drug_buy_price" class="input priceInput" value="${cost}"></td>
+      <td><input type="text" name="drug_buy_ppu" class="input ppuInput" value="${pricePerUnit}" /></td>
+      <td><button class="button is-small is-danger removeRow">X</button></td>
+    `;
+    tableBody.appendChild(row);
+    updateRowNumbers();
+
+    // Reset inputs
+    document.getElementById("drugBuyInput").value = "";
+    document.getElementById("drugBuyQty").value = "";
+    document.getElementById("drugBuyCost").value = "";
+    document.getElementById("drugBuyNote").value = "";
+  });
+
+  // 🔽 Remove row
+  tableBody.addEventListener("click", (e) => {
+    if (e.target.classList.contains("removeRow")) {
+      e.target.closest("tr").remove();
+      updateRowNumbers();
+    }
+  });
+
+  // 🔽 Recalculate when editing inputs
+  tableBody.addEventListener("input", (e) => {
+    if (e.target.classList.contains("quantityInput") || e.target.classList.contains("priceInput")) {
+      calculateTotals();
+    }
+  });
+
+  // 🔽 Submit form (new or edit)
+  document.getElementById("nhap_thuoc_form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const date_buy = document.getElementById("dateBuy").value;
+    const paid = document.querySelector("input[name='paid']").checked;
+    const note = document.querySelector("textarea[name='note']").value;
+    const totalCost = document.getElementById("totalCost").textContent.replace(/,/g, "");
+
+    const drugs = [];
+    tableBody.querySelectorAll("tr").forEach(row => {
+      const nameEl = row.querySelector("input[name='drug_name']");
+      const qtyEl = row.querySelector("input[name='drug_quantity']") || row.querySelector(".quantityInput");
+      const noteEl = row.querySelector("input[name='drug_note']");
+      const priceEl = row.querySelector("input[name='drug_buy_price']") || row.querySelector(".priceInput");
+      const ppuEl = row.querySelector("input[name='drug_buy_ppu']") || row.querySelector(".ppuInput");
+
+      const nameVal = nameEl ? nameEl.value.trim() : (row.children[1]?.textContent || "").trim();
+      const qtyVal = qtyEl ? qtyEl.value : (row.children[2]?.textContent || "").trim();
+      const noteVal = noteEl ? noteEl.value.trim() : (row.children[3]?.textContent || "").trim();
+      const priceVal = priceEl ? priceEl.value : (row.children[4]?.textContent || "").trim();
+      const ppuVal = ppuEl ? ppuEl.value : (row.children[5]?.textContent || "").trim();
+
+      // skip empty rows
+      if (!nameVal) return;
+
+
+
+      drugs.push({
+        name: nameVal,
+        quantity: qtyVal ? String(qtyVal) : "0",
+        note: noteVal || "",
+        buy_price: priceVal ? String(priceVal) : "0",
+        ppu: ppuVal ? String(ppuVal) : "0"
+      });
+    });
+
+    const payload = { date_buy, paid, note, drugs, totalCost };
+
+    // 🔑 Detect if editing (uuid injected into template)
+    const uuid = "{{ purchase.uuid }}";
+    const url = `/mua_thuoc/edit/${uuid}`;
+    
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    // handle JSON or fallback
+    let data = null;
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      data = await res.json();
+    }
+
+    if (data && data.status === "success") {
+      alert("Saved!");
+      window.location.href = "/mua_thuoc";
+    } else if (res.redirected) {
+      window.location.href = res.url;
+    } else {
+      // fallback: navigate back
+      window.location.href = "/mua_thuoc";
+    }
+  });
+
+  // 🔽 Initial totals (for edit page with prefilled rows)
+  calculateTotals();
+});
+</script>
+
+
+{% endblock %}

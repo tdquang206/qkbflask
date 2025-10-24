@@ -740,6 +740,11 @@ document.getElementById("printBtn").addEventListener("click", function() {
   // Remove last 3 digits (if length > 3), else set to "0"
   let totalShort = (clean.length > 3 ? clean.slice(0, -3) : "0") + "";
 
+  console.log('raw totalPrice text:', totalPrice);
+  console.log('clean:', clean);
+  console.log('clean length:', clean.length);
+
+
     // Get print time as yymmddhhmmss
   const now = new Date();
   const pad = n => n.toString().padStart(2, "0");
@@ -765,13 +770,6 @@ document.getElementById("printBtn").addEventListener("click", function() {
           th { font-weight: bold; text-align: left; }
           tbody tr { margin-bottom: 5px; display: table-row;}
           tbody td { padding-top: 5px; padding-bottom: 10px }
-          /* Define a running element for the footer */
-          .footer {
-            position: running(pageFooter);
-            text-align: center;
-            font-size: 12px;
-          }
-
           @media print {
             th, td {
               border: none;
@@ -785,7 +783,7 @@ document.getElementById("printBtn").addEventListener("click", function() {
               position: fixed;
               bottom: 1cm;
               width: 100%;
-              text-align: right;
+              text-align: left;
               font-size: 12px;
             }
           }
@@ -961,6 +959,7 @@ document.addEventListener("DOMContentLoaded", () => {
       hintBox.style.display = hintBox.style.display === "none" ? "block" : "none";
     });
   }
+  calculateTotals();
 });
 </script>
 

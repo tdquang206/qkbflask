@@ -32,10 +32,10 @@ def manage_drugs():
         drugs.insert({
             'sku': request.form['sku'],
             'name': request.form['name'],
-            'sell_price': float(request.form['sell_price']),
-            'buy_price': float(request.form['buy_price']),
-            'quantity': int(request.form['quantity']),
-            'inventory': int(request.form['inventory']) if request.form['inventory'].isdigit() else ""
+            'sell_price': float(request.form.get('sell_price', 0)) if request.form.get('sell_price', '').isdigit() else "",
+            'buy_price': float(request.form.get('buy_price', 0)) if request.form.get('buy_price', '').isdigit() else "",
+            'quantity': int(request.form.get('quantity', 0)) if request.form.get('quantity', '').isdigit() else "",
+            'inventory': int(request.form.get('inventory', 0)) if request.form.get('inventory', '').isdigit() else ""
         })
         return redirect(url_for('manage_drugs'))
     
@@ -48,10 +48,10 @@ def edit_drug(drug_id):
         drugs.update({
             'sku': request.form['sku'],
             'name': request.form['name'],
-            'sell_price': float(request.form['sell_price']),
-            'buy_price': float(request.form['buy_price']),
-            'quantity': int(request.form['quantity']),
-            'inventory': request.form['inventory']
+            'sell_price': float(request.form.get('sell_price', 0)) if request.form.get('sell_price', '').isdigit() else "",
+            'buy_price': float(request.form.get('buy_price', 0)) if request.form.get('buy_price', '').isdigit() else "",
+            'quantity': int(request.form.get('quantity', 0)) if request.form.get('quantity', '').isdigit() else "",
+            'inventory': int(request.form.get('inventory', 0)) if request.form.get('inventory', '').isdigit() else ""
         }, doc_ids=[drug_id])
         return redirect(url_for('manage_drugs'))
     return render_template('edit_drug.html', drug=drug)

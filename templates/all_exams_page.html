@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Danh sách toa thuốc</h1>
+
+<section class="section">
+    <div class="container">
+        <ht class="title">Toa thuốc tháng này</ht>
+
+        <div class="table-container">
+            <table class="table is-striped is-hoverable is-fullwidth">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Ngày</th>
+                        <th>Tên bé - Ba Mẹ</th>
+                        <th>Số tiền</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exam in exams %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ exam.exam_date}}</td>
+                        <td>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên"}} --- {{ exam.parent_name }}</td>
+                        <td>{{ "{:,}".format(exam.total_money) }}</td>
+                        <td>
+                            <a href="{{ url_for('exam', patient_id=exam.patient_id, exam_id=exam.exam_id) }}"
+                                class="button is-small is-info">Xem</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+
+    </div>
+</section>
+
+
+{% endblock %}

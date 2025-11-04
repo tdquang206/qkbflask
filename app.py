@@ -18,6 +18,9 @@ exams = db.table('exams')
 from routes.mua_thuoc import mua_thuoc_bp
 app.register_blueprint(mua_thuoc_bp)
 
+from routes.route_all_exams_page import exams_list_bp
+app.register_blueprint(exams_list_bp)
+
 
 @app.route('/')
 def index():

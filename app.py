@@ -21,6 +21,8 @@ app.register_blueprint(mua_thuoc_bp)
 from routes.route_all_exams_page import exams_list_bp
 app.register_blueprint(exams_list_bp)
 
+from routes.exam import exam_bp
+app.register_blueprint(exam_bp)
 
 @app.route('/')
 def index():
@@ -162,148 +164,6 @@ def view_exams(patient_id):
 
     # Render the renamed template
     return render_template('previous_exams.html', patient=patient, exams=patient_exams)
-
-# Mới thêm hôm nay
-@app.route("/exam/<int:patient_id>/<exam_id>")
-def edit_exam(patient_id, exam_id):
-    patient = patients.get(doc_id=patient_id)
-    exam = next((e for e in patient["exams"] if e["id"] == exam_id), None)
-    return render_template("exam.html", patient=patient, exam=exam)
-
-
-@app.route('/exam/<int:patient_id>', methods=['GET', 'POST'])
-def exam(patient_id):
-    Patient = Query()
-    patient = patients.get(doc_id=patient_id)
-
-    if request.method == "GET":
-        exam_id = request.args.get("exam_id")
-        exam = None
-        if exam_id:
-            # look up by UUID
-            exam = next((e for e in patient.get("exams", []) if e.get("id") == exam_id), None)
-        return render_template("exam.html", patient=patient, exam=exam)
-
-    
-    if request.method == 'POST':
-        # save state or not
-        state = request.form.get('mode')
-        # data
-        exam_date = request.form.get('exam_date')
-        weight = request.form.get('weight')
-        height = request.form.get('height')
-        history = request.form.get('history')
-        # string, e.g. "50000"
-        service_fee = request.form.get("service_fee")  
-        
-        expected_date = request.form.get('expected_date')
-
-        # Collect drug rows (they come as lists)
-        drug_names = request.form.getlist('drug_name')
-        drug_quantities = request.form.getlist('drug_quantity')
-        drug_notes = request.form.getlist('drug_note')
-        drug_prices = request.form.getlist('drug_price')
-
-        # try to discard empty name when receiving data
-        drugs = []
-        for name, qty, note, price in zip(drug_names, drug_quantities, drug_notes, drug_prices):
-            if name.strip():
-                drugs.append({
-                    'name': name,
-                    'quantity': qty,
-                    'note': note,
-                    'price': price
-                })
-
-        # prepair exam data
-        exam_data = {
-            'patient_id': patient_id,
-            'exam_date': exam_date,
-            'weight': weight,
-            'height': height,
-            'history': history,
-            'service_fee': service_fee,
-            'expected_date': expected_date,
-            'drugs': drugs,
-            # get submit time # YYMMDDHHMMSS
-            'submit_time' : datetime.now().strftime('%y%m%d%H%M%S')
-        }
-        
-        
-        # image path
-        image = request.files.get('lab_image')
-        image_path = ''
-
-        if image and image.filename:
-            filename = secure_filename(image.filename)
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            image.save(image_path)
-        
-        # save or update if state = reques.form.get('mode') == 'save'
-        if state == 'save':
-            # inject uuid v4
-            exam_data["id"] = str(uuid.uuid4())
-            exams_list = patient.get("exams", [])
-            patients.update({"exams": exams_list + [exam_data]}, doc_ids=[patient_id])
-            # exams.insert(exam_data) Copilot set this one makes broken data
-            # Update last_visit
-            patients.update({'last_visit': exam_date}, doc_ids=[patient_id])
-            return jsonify({"status": "success", "exam_id": exam_data["id"]}), 200
-
-
-        elif state == 'update':
-            exam_id = request.form.get("exam_id")
-            exams = patient.get("exams", [])
-            updated = False
-            for i, exam in enumerate(exams):
-                if exam.get("id") == exam_id:
-                    # keep the same UUID
-                    exam_data["id"] = exam_id
-                    exams[i] = exam_data
-                    patients.update({"exams": exams}, doc_ids=[patient_id])
-                    updated = True
-                    break
-            if not updated:
-                return jsonify({"status": "error", "message": "Exam ID not found"}), 400
-
-            
-
-            return jsonify({"status": "success", "message": "Dữ liệu đã được lưu thành công"}), 200
-
-    return render_template(
-        'exam.html',
-        patient=patient,
-        exam=exam_data
-    )
-
-@app.route("/exam/<int:patient_id>/delete", methods=["POST"])
-def delete_exam(patient_id):
-    print("Delete called for patient:", patient_id)
-    print("Form data:", request.form.to_dict())
-
-    patient = patients.get(doc_id=patient_id)
-    exam_id = request.form.get("exam_id")
-
-    if not patient:
-        print("No patient found with that ID")
-        return "Exam not found", 404
-
-    if not exam_id:
-        print("No exam_id in form")
-        return "Exam not found", 404
-
-    exams = patient.get("exams", [])
-    print("Existing exam IDs:", [e.get("id") for e in exams])
-
-    new_exams = [e for e in exams if e.get("id") != exam_id]
-
-    if len(new_exams) != len(exams):
-        patients.update({"exams": new_exams}, doc_ids=[patient_id])
-        print("Exam deleted:", exam_id)
-    else:
-        print("Exam_id not matched:", exam_id)
-
-    return redirect(url_for("view_exams", patient_id=patient_id))
     
 @app.route('/drug_sold')
 def drug_sold():

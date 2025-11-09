@@ -2,7 +2,7 @@
 {% block content %}
 
 <section class="section">
-  <form id="examForm" action="{{ url_for('exam', patient_id=patient.doc_id) }}" method="POST">
+  <form id="examForm" action="/exam/{{ patient.doc_id }}/new_exam" method="POST" onsubmit="calculateTotals()">
     <div class="container">
 
       <!-- Patient Info -->
@@ -11,9 +11,7 @@
       {% else %}
       <h1 class="title is-3">Khám bệnh cho: con Ba/Mẹ {{ patient.name }} - {{ patient.phone }}</h1>
       {% endif %}
-      <!-- save or update -->
-      <div><input type="hidden" name="mode" value="{{ 'update' if exam else 'save' }}"></div>
-      <div><input type="hidden" name="exam_id" value="{{ exam.id if exam else '' }}"></div>
+      <div><input type="hidden" name="patient_id" value="{{ patient.doc_id }}"></div>
 
 
       <div class="box">
@@ -66,8 +64,7 @@
         <div class="field">
           <label class="label">📝 Ghi chú, khám bệnh</label>
           <div class="control">
-            <textarea class="textarea" name="history" rows="4"
-              placeholder="Ghi chú của bác sĩ...">{{ exam.history if exam else '' }}</textarea>
+            <textarea class="textarea" name="history" rows="4" placeholder="Ghi chú của bác sĩ..."></textarea>
           </div>
         </div>
       </div>
@@ -85,17 +82,15 @@
             <!-- Column 2: Free -->
             <div class="column is-3">
               <label class="radio is-large">
-                <input type="radio" name="service_fee" value="0" {% if exam and exam.service_fee|string=="0" %}checked{%
-                  endif %}>
-                <span class="option-text">Free</span>
+                <input type="radio" name="service_fee" value="0">
+                <span class="option-text">Miễn phí khám</span>
               </label>
             </div>
 
             <!-- Column 3: Khám bệnh -->
             <div class="column is-3">
               <label class="radio is-large">
-                <input type="radio" name="service_fee" value="150000" {% if exam and exam.service_fee|string=="150000"
-                  %}checked{% endif %}>
+                <input type="radio" name="service_fee" value="150000" id="service_fee_default">
                 <span class="option-text">Khám bệnh</span>
               </label>
             </div>
@@ -103,8 +98,7 @@
             <!-- Column 4: Khám chuyên sâu -->
             <div class="column is-3">
               <label class="radio is-large">
-                <input type="radio" name="service_fee" value="200000" {% if exam and exam.service_fee|string=="200000"
-                  %}checked{% endif %}>
+                <input type="radio" name="service_fee" value="200000">
                 <span class="option-text">Khám chuyên sâu</span>
               </label>
             </div>
@@ -131,9 +125,6 @@
           <div class="column is-1">
             <input class="input" type="number" id="drugQty" min="1" placeholder="1">
           </div>
-          <!-- <div class="column is-6">
-      <input class="input" type="text" id="drugNote" placeholder="Ghi chú dùng thuốc">
-    </div> -->
 
           <!-- Schedule Note Input -->
           <div class="column is-6">
@@ -171,50 +162,21 @@
             </tr>
           </thead>
           <tbody id="drugTableBody">
-            {% if exam and exam.drugs %}
-            {% for d in exam.drugs %}
-            <tr data-price="{{ d.price }}">
-              <td>{{ loop.index }}</td>
-              <td>
-                {{ d.name }}
-                <input type="hidden" name="drug_name" value="{{ d.name }}">
-              </td>
-              <td class="quantity">
-                {{ d.quantity }}
-                <input type="hidden" name="drug_quantity" value="{{ d.quantity }}">
-              </td>
-              <td>
-                {{ d.note }}
-                <input type="hidden" name="drug_note" value="{{ d.note }}">
-              </td>
-              <td hidden>
-                {{ d.price }}
-                <input type="hidden" name="drug_price" value="{{ d.price }}">
-              </td>
-              <td>
-                <button type="button" class="button is-small is-danger removeRow">X</button>
-              </td>
-            </tr>
-            {% endfor %}
-            {% endif %}
-
 
           </tbody>
           <tfoot>
             <tr>
               <th colspan="2">Tổng cộng</th>
-              <th id="totalQuantity">{{ exam.totalQuantity if exam else '' }}</th>
+              <th id="totalQuantity"></th>
               <th></th>
-              <th id="totalPrice">{{ exam.totalPrice if exam else 150000 }}</th>
-              <th></th>
+              <th id="totalPrice"></th>
+              <!-- hidden input to meet form -->
+              <th><input name="total_money" value="" hidden></th>
             </tr>
           </tfoot>
         </table>
       </div>
     </div>
-
-    <!-- Re-exam -->
-    <!-- Re-exam -->
     <div class="box">
       <div class="columns is-vcentered is-mobile is-variable is-1 reexam-columns">
         <!-- label "Tái khám sau" -->
@@ -252,18 +214,15 @@
         <div class="column is-6">
           <div class="field">
             <div class="control has-icons-left">
-              <input id="expected_date" name="expected_date" class="input" type="text" placeholder="Chọn ngày"
-                value="{{ exam.expected_date if exam else '' }}">
+              <input id="expected_date" name="expected_date" class="input" type="text" placeholder="Chọn ngày" value="">
               <span class="icon is-small is-left"><i class="fas fa-calendar-check"></i></span>
             </div>
           </div>
         </div>
       </div>
     </div>
-
-
     <!-- Save, Print, Back to patient list-->
-    <div class="field is-grouped is-grouped-centered no-print mt-5">
+    <div class=" field is-grouped is-grouped-centered no-print mt-5">
       <!-- Print Button -->
       <p class="control">
         <button type="button" class="button is-info is-medium" id="printBtn">
@@ -275,16 +234,12 @@
       <p class="control">
         <button class="button is-primary is-medium" type="submit" id="saveBtn" name="saveBtn">
 
-          <span id="saveBtnText">{{ 'Cập nhật' if exam else 'Lưu thông tin' }}</span>
+          <span id="saveBtnText">Lưu</span>
         </button>
       </p>
 
       <!-- Back Button -->
       <p class="control">
-        <!-- <a href="{{ url_for('manage_patients') }}" class="button is-medium" id="backBtn">
-          <span class="icon"><i class="fas fa-arrow-left"></i></span>
-          <span>Quay lại danh sách</span>
-        </a> -->
         <a href="javascript:history.back()" class="button is-medium" id="backBtn">
           <span>Quay lại danh sách</span>
         </a>
@@ -306,14 +261,33 @@
 </script>
 
 <script>
+  function calculateTotals() {
+    const tableBody = document.getElementById("drugTableBody");
+    const rows = tableBody.querySelectorAll("tr");
+    let qtySum = 0, priceSum = 0;
+    rows.forEach(row => {
+      const qty = parseInt(row.querySelector(".quantity").textContent) || 0;
+      const price = parseFloat(row.dataset.price) || 0;
+      qtySum += qty;
+      priceSum += qty * price;
+    });
 
+    // Get selected service_fee value and add to total price
+    const serviceFee = parseFloat(document.querySelector("input[name='service_fee']:checked")?.value || 0);
+    const totalWithService = priceSum + serviceFee;
+
+    document.getElementById("totalQuantity").textContent = qtySum;
+    document.getElementById("totalPrice").textContent = totalWithService.toLocaleString();
+    document.querySelector("input[name='total_money']").value = totalWithService;
+  }
 </script>
 
 <!-- Toast noti -->
 <script>
-  function showToast(message = "✅ Đã lưu thành công!") {
+  function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
     const toast = document.getElementById("toast");
     toast.textContent = message;
+    toast.className = `notification ${type}`;
     toast.style.display = "block";
     setTimeout(() => {
       toast.style.display = "none";
@@ -323,22 +297,11 @@
     const form = document.getElementById("examForm");
     const saveBtn = document.getElementById("saveBtn");
     const saveBtnText = document.getElementById("saveBtnText");
-    // if (saveBtn.innerText.trim() === "Lưu thông tin") {
-    //       saveBtn.innerText = "Cập nhật";
-    //       document.querySelector("input[name='mode']").value = "update";
-    //   }
+
+    document.getElementById("service_fee_default").checked = true;
 
     form.addEventListener("submit", function (e) {
       e.preventDefault(); // stop normal form submit
-
-      const examId = document.querySelector("input[name='exam_id']").value;
-      const mode = document.querySelector("input[name='mode']").value;
-
-      if (mode === "update" && !examId) {
-        showToast("❌ Không tìm thấy exam_id để cập nhật");
-        return; // stop submission
-      }
-
 
       fetch(this.action, {
         method: "POST",
@@ -347,24 +310,21 @@
         .then(res => res.json())
         .then(data => {
           if (data.status === "success") {
-            // update hidden inputs so next submit is update
-            document.querySelector("input[name='exam_id']").value = data.exam_id;
-            document.querySelector("input[name='mode']").value = "update";
 
             // update button UI
             saveBtn.dataset.saved = "true";
             saveBtn.classList.remove("is-primary");
             saveBtn.classList.add("is-success");
-            saveBtn.textContent = "Cập nhật";
+            saveBtn.textContent = "Đã lưu";
 
-            showToast("✅ Đã lưu");
+            showToast("✅ Đã lưu", "is-success");
+            setTimeout(() => { window.location.href = data.redirect_url; })
           } else {
-            showToast("❌ Lỗi khi lưu dữ liệu");
+            showToast("❌ Lỗi khi lưu dữ liệu", "is-danger");
           }
-
         }).catch(err => {
           console.error(err);
-          showToast("❌ Không thể kết nối server");
+          showToast("❌ Lỗi khi gửi data", "is-danger");
         });
     });
   });
@@ -385,7 +345,7 @@
       defaultDate: document.querySelector("input[name='expected_date']").value || null,
       minDate: "today"   // optional: cannot pick past dates
     });
-    calculateTotals();
+
   });
 </script>
 
@@ -470,7 +430,6 @@
         examInput.value = new Date().toISOString().slice(0, 10);
       }
       updateExpectedFromDays();
-      calculateTotals();
     })();
   });
 </script>
@@ -612,33 +571,6 @@
         recalcTotals();
       }
     });
-
-
-    function calculateTotals() {
-      const rows = tableBody.querySelectorAll("tr");
-      // if (rows.length === 0) {
-      //   // If no rows, clear totals or leave them blank
-      //   document.getElementById("totalQuantity").textContent = "_";
-      //   document.getElementById("totalPrice").textContent = "_";
-
-      //   return;
-      // }
-
-      let qtySum = 0, priceSum = 0;
-      rows.forEach(row => {
-        const qty = parseInt(row.querySelector(".quantity").textContent) || 0;
-        const price = parseFloat(row.dataset.price) || 0;
-        qtySum += qty;
-        priceSum += qty * price;
-      });
-
-      // Get selected service_fee value and add to total price
-      const serviceFee = parseFloat(document.querySelector("input[name='service_fee']:checked")?.value || 0);
-      const totalWithService = priceSum + serviceFee;
-
-      document.getElementById("totalQuantity").textContent = qtySum;
-      document.getElementById("totalPrice").textContent = totalWithService.toLocaleString();
-    }
 
     // on service_fee changes
     document.querySelectorAll("input[name='service_fee']").forEach(radio => {
@@ -976,5 +908,7 @@
     calculateTotals();
   });
 </script>
+
+<!-- on page load -->
 
 {% endblock %}

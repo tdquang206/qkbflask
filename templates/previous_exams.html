@@ -3,122 +3,174 @@
 <section class="section">
   <div class="container">
 
-    <div class="columns is-vcentered">
-      <div class="column">
-        <h1 class="title">
-          Sổ khám bệnh của {{ patient.kid_name or patient.name }}
-        </h1>
+    <div class="box">
+
+      <h1 class="title">
+        Sổ khám bệnh của: Bé {{ patient.kid_name if patient.kid_name else 'Chưa có tên bé'}}
+      </h1>
+      <p class="h1">Ba / Mẹ {{ patient.name }} {{ patient.phone }} - {{ patient.address }}</p>
+    </div>
+
+    <div><a href="{{ url_for('exam.new_exam', patient_id=patient.doc_id) }}" class="button is-primary">
+        <span>Tạo toa thuốc mới</span>
+      </a></div>
+    {% if exams %}
+    <div class="is-flex is-align-content-space-evenly is-flex-wrap-wrap"
+      style="justify-content: space-between; align-items: center;">
+      <div>
+        <p>Tổng: {{ exams|length }} lần</p>
       </div>
-      <div class="column is-narrow has-text-right">
-        <a href="{{ url_for('exam', patient_id=patient.doc_id) }}" class="button is-primary">
-          <span class="icon"><i class="fas fa-stethoscope"></i></span>
-          <span>Tới màn hình khám bệnh hôm nay</span>
-        </a>
+      <div>
       </div>
     </div>
+    {% endif %}
 
     {% if exams %}
-      {% for exam in exams %}
-      <div class="box mb-6" style="border-left: 6px solid #3273dc;">
+    {% for exam in exams %}
 
-  
-    <div class="columns is-vcentered is-mobile">
-      
-      <!-- Left side: exam info -->
-      <div class="column">
-        <span class="is-4">📅 {{ exam.exam_date }}</span>
-        <span class="ml-4 is-4">Phí khám: 
-          {% if exam.service_fee == "0" %}
+    <div class="box mb-6" style="border-left: 6px solid #3273dc;">
+
+
+      <div class="columns is-vcentered is-mobile">
+
+        <!-- Left side: exam info -->
+        <div class="column">
+          <span class="is-4">📅 {{ exam.exam_date }}</span>
+          <span class="ml-4 is-4">Phí khám:
+            {% if exam.service_fee == "0" %}
             0
-          {% elif exam.service_fee == "150000" %}
+            {% elif exam.service_fee == "150000" %}
             150k
-          {% elif exam.service_fee == "200000" %}
+            {% elif exam.service_fee == "200000" %}
             200k
-          {% else %}
+            {% else %}
             _
-          {% endif %}
-        </span>
-        <span class="ml-4 is-4">Tái khám: {{ exam.expected_date or '_' }}</span>
-      </div>
-
-      <!-- Right side: action buttons -->
-      <div class="column is-narrow">
-        <div class="buttons are-small">
-          <!-- Edit button -->
-          <a href="{{ url_for('exam', patient_id=patient.doc_id, exam_id=exam.id) }}" style="display:inline;">
-            <!-- <input type="hidden" name="exam_id" value="{{ exam.id }}"> -->
-            <button type="submit" class="button is-link">
-              <span>Sửa</span>
-            </button>
-          </a>
-
-          <!-- Delete button -->
-          <form method="post" action="{{ url_for('delete_exam', patient_id=patient.doc_id) }}" 
-                style="display:inline;" 
-                onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
-            <input type="hidden" name="exam_id" value="{{ exam.id }}">
-            <button type="submit" class="button is-danger">
-              <span class="icon"><i class="fas fa-trash"></i></span>
-              <span>Xóa</span>
-            </button>
-          </form>
-        </div>
-      </div>
-
-    </div>
- 
-        <div class="columns is-multiline">
-          <div class="column is-3"><strong>⚖️ Cân nặng:</strong> {{ exam.weight }} kg</div>
-          <div class="column is-3"><strong>📏 Chiều cao:</strong> {{ exam.height }} cm</div>
-          <div class="column is-6"><strong>📝 Ghi chú:</strong> {{ exam.history }}</div>
+            {% endif %}
+          </span>
+          <span class="ml-4 is-4">Tái khám: {{ exam.expected_date or '_' }}</span>
         </div>
 
-    {% set valid_drugs = exam.drugs | selectattr("name") | list %}
+        <!-- Right side: action buttons -->
+        <div class="column is-narrow">
+          <div class="buttons are-small">
+            <!-- Edit button -->
+            <a href="{{ url_for('exam.edit_exam', patient_id=patient.doc_id, exam_id=exam.id) }}"
+              style="display:inline;">
+              <!-- <input type="hidden" name="exam_id" value="{{ exam.id }}"> -->
+              <button type="submit" class="button is-link">
+                <span>Sửa</span>
+              </button>
+            </a>
+
+            <!-- Delete button -->
+            <form method="post" action="{{ url_for('exam.delete_exam', patient_id=patient.doc_id, exam_id=exam.id) }}"
+              style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
+              <input type="hidden" name="exam_id" value="{{ exam.id }}">
+              <button type="submit" class="button is-danger delete-exam-btn">
+                <span>Xóa</span>
+              </button>
+            </form>
+
+          </div>
+        </div>
+
+      </div>
+
+      <div class="columns is-multiline">
+        <div class="column is-3"><strong>⚖️ Cân nặng:</strong> {{ exam.weight }} kg</div>
+        <div class="column is-3"><strong>📏 Chiều cao:</strong> {{ exam.height }} cm</div>
+        <div class="column is-6"><strong>📝 Ghi chú:</strong> {{ exam.history|replace('\n',' ')|replace('\r',
+          '')|replace('\r\n', '') }}</div>
+      </div>
+
+      {% set valid_drugs = exam.drugs | selectattr("name") | list %}
       {% if valid_drugs %}
-        <div class="table-container mt-3">
-          <table class="table is-narrow is-striped is-fullwidth">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Tên thuốc</th>
-                <th>Số lượng</th>
-                <th>Ghi chú</th>
-                <th>Đơn giá</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% set ns = namespace(total=0) %}
-              {% for drug in valid_drugs %}
-                {% set q = (drug.quantity | int(0)) %}
-                {% set p = (drug.price | float(0)) %}
-                {% set ns.total = ns.total + (q * p) %}
-                <tr>
-                  <td>{{ loop.index }}</td>
-                  <td>{{ drug.name }}</td>
-                  <td>{{ drug.quantity }}</td>
-                  <td>{{ drug.note }}</td>
-                  <td>{{ drug.price }}</td>
-                </tr>
+      <div class="table-container mt-3">
+        <table class="table is-narrow is-striped is-fullwidth">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên thuốc</th>
+              <th>Số lượng</th>
+              <th>Ghi chú</th>
+              <th>Đơn giá</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set ns = namespace(total=0) %}
+            {% for drug in valid_drugs %}
+            {% set q = (drug.quantity | int(0)) %}
+            {% set p = (drug.price | float(0)) %}
+            {% set ns.total = ns.total + (q * p) %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ drug.name }}</td>
+              <td>{{ drug.quantity }}</td>
+              <td>{{ drug.note }}</td>
+              <td>{{ drug.price }}</td>
+            </tr>
 
-              {% endfor %}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th colspan="4" class="has-text-right">Tổng tiền thuốc</th>
-                <th>{{ ns.total|int(0) }}</th>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      {% else %}
-        <p class="has-text-grey">💊 Toa không thuốc</p>
-      {% endif %}
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="4" class="has-text-right">Tổng tiền thuốc</th>
+              <th>{{ ns.total|int(0) }}</th>
+            </tr>
+          </tfoot>
+        </table>
       </div>
-      {% endfor %}
+      {% else %}
+      <p class="has-text-grey">💊 Toa không thuốc</p>
+      {% endif %}
+    </div>
+    {% endfor %}
     {% else %}
-      <p class="has-text-grey">Chưa có lịch sử khám nào.</p>
+    <p class="has-text-grey">Chưa có lịch sử khám nào.</p>
     {% endif %}
 
   </div>
 </section>
+<div id="toast" class="notification is-success"
+  style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">
+  ✅ Đã xóa thành công!
+</div>
+
+<script>
+  function showToast(message = "✅ Đã xóa thành công!", type = "is-success") {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.className = `notification ${type}`;
+    toast.style.display = "block";
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 3000);
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll('form[action*="/delete_exam/"]').forEach(form => {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        fetch(this.action, {
+          method: "POST",
+          body: new FormData(this)
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === "success") {
+              showToast("✅ Đã xóa", "is-success");
+              setTimeout(() => {
+                window.location.href = data.redirect_url;
+              }, 500);
+            } else {
+              showToast("❌ Lỗi khi xóa toa thuốc", "is-danger");
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            showToast("❌ Lỗi khi gửi data", "is-danger");
+          });
+      });
+    });
+  });
+</script>
 {% endblock %}

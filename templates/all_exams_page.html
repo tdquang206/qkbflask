@@ -26,7 +26,14 @@
                         <td>{{ "{:,}".format(exam.total_money) }}</td>
                         <td>
                             <a href="{{ url_for('exam', patient_id=exam.patient_id, exam_id=exam.exam_id) }}"
-                                class="button is-small is-info">Xem</a>
+                                class="button is-info">Xem</a>
+                            {% if exam.paid_status %}
+                            <button class="button is-outline is-success money_received_status" disabled>Đã nhận
+                                tiền</button>
+                            {% else %}
+                            <a class="button is-warning money_received_btn" data-exam-id="{{ exam.exam_id }}"
+                                data-patient-id="{{ exam.patient_id }}">Chưa kiểm tra tiền</a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -37,6 +44,62 @@
 
     </div>
 </section>
+<!-- Toast notification -->
+<div id="toast" class="notification" style="display:none; position:fixed; top:20px; right:20px; z-index:1000;"></div>
+<!-- Toast noti -->
+<script>
+    function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = `notification ${type}`;
+        toast.style.display = "block";
+        setTimeout(() => {
+            toast.style.display = "none";
+        }, 3000);
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".money_received_btn").forEach(function (btn) {
+            btn.addEventListener("click", async function () {
+                try {
+                    const examId = btn.getAttribute("data-exam-id");
+                    const patientId = btn.getAttribute("data-patient-id");
 
+                    console.log('Sending request:', {
+                        patient_id: patientId,
+                        exam_id: examId
+                    })
+
+                    const response = await fetch('/api/mark_paid', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            patient_id: patientId,
+                            exam_id: examId
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                    }
+
+                    if (data.success) {
+                        this.outerHTML = '<span class="label is-success">Đã nhận tiền</span>';
+                        showToast("✅ Đã lưu thành công!", "is-success");
+                    } else {
+                        throw new Error(data.error || "Unknown error");
+                    }
+
+                } catch (err) {
+                    console.log('Error', error);
+                    showToast(`Lỗi: ${error.message}`, "is-danger");
+                }
+            });
+        });
+    });
+</script>
 
 {% endblock %}

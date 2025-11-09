@@ -1,3 +1,13 @@
+# 2025-11-09
+- tách dc route exam
+    + add_new
+    + delete
+    + read / update
+
+# 2025-11-05
+- thêm payment verified (kế toán kiểm tra nhận tiền chưa)
+    - app.py
+
 # 2025 - 10 - 21
 - Màn hình mua thuốc
 

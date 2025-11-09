@@ -1,59 +1,61 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">  
-<link rel="stylesheet" href="{{ url_for('static', filename='bulma.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='flatpickr.min.css') }}">
-<script src="{{ url_for('static', filename='flatpickr.js') }}"></script>
+  <meta name="color-scheme" content="light">
+  <link rel="stylesheet" href="{{ url_for('static', filename='bulma.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='flatpickr.min.css') }}">
+  <script src="{{ url_for('static', filename='flatpickr.js') }}"></script>
 
-<title>QKB</title>
+  <title>QKB</title>
 </head>
+
 <body>
   <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
-  <div class="navbar-brand">
-    <a class="navbar-item" href="/">
-      <strong>QKB v1</strong>
-    </a>
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <strong>QKB v1</strong>
+      </a>
 
-    <!-- Hamburger menu for mobile -->
-    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-    </a>
-  </div>
+      <!-- Hamburger menu for mobile -->
+      <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </a>
+    </div>
 
-  <div id="mainNavbar" class="navbar-menu">
-    <div class="navbar-start">
-      <a class="navbar-item" href="/">Tổng quan</a>
-      <a class="navbar-item" href="/patients">Danh sách BN</a>
-      <a class="navbar-item" href="#">Lịch hẹn</a>
-      <!-- <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
+    <div id="mainNavbar" class="navbar-menu">
+      <div class="navbar-start">
+        <a class="navbar-item" href="/">Tổng quan</a>
+        <a class="navbar-item" href="/patients">Danh sách BN</a>
+        <a class="navbar-item" href="/danh_sach_kham_benh">Danh sách toa thuốc</a>
+        <!-- <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
       <a class="navbar-item" href="/drug_sold">Báo cáo dùng thuốc</a> -->
-      <div class="navbar-item has-dropdown is-hoverable">
-        <a class="navbar-link">Thuốc</a>
-        <div class="navbar-dropdown">
-          <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
-          <a class="navbar-item" href="/mua_thuoc">Mua thuốc</a>
-          <a class="navbar-item" href="/drug_sold">Báo cáo</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">Thuốc</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
+            <a class="navbar-item" href="/mua_thuoc">Mua thuốc</a>
+            <a class="navbar-item" href="/drug_sold">Báo cáo</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="navbar-end">
+        <div class="navbar-item">
+
+          <div class="buttons">
+            <a class="button is-light">Log in</a>
+            <a class="button is-link">Sign up</a>
+          </div>
         </div>
       </div>
     </div>
-
-    <div class="navbar-end">
-      <div class="navbar-item">
-
-        <div class="buttons">
-          <a class="button is-light">Log in</a>
-          <a class="button is-link">Sign up</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</nav>
+  </nav>
   <section class="section">
     <div class="container">
       {% block content %}{% endblock %}
@@ -61,16 +63,14 @@
   </section>
 
   <!-- Toggle Button -->
-  <button id="toggleNotifications"
-          style="position:fixed; bottom:20px; right:20px; z-index:2100;
+  <button id="toggleNotifications" style="position:fixed; bottom:20px; right:20px; z-index:2100;
                 background:#3273dc; color:white; border:none; border-radius:50%;
                 width:40px; height:40px; font-size:18px; cursor:pointer;">
     i
   </button>
 
   <!-- Notification Panel -->
-  <div id="notificationPanel"
-      style="position:fixed; top:0; right:-350px; width:350px; height:100%;
+  <div id="notificationPanel" style="position:fixed; top:0; right:-350px; width:350px; height:100%;
               background:#f9f9f9; border-left:2px solid #ccc;
               overflow-y:auto; padding:1rem; font-family:monospace;
               font-size:0.9rem; z-index:2000; transition:right 0.3s ease;">
@@ -107,7 +107,7 @@
   });
 
   // Global helper to show JSON in the panel
-    const errorLog = []; // keep last 20 errors
+  const errorLog = []; // keep last 20 errors
 
   // Global helper to show JSON in the panel
   function showNotification(data) {
@@ -138,9 +138,9 @@
   }
 
   // Intercept fetch responses globally
-  (function() {
+  (function () {
     const origFetch = window.fetch;
-    window.fetch = function() {
+    window.fetch = function () {
       return origFetch.apply(this, arguments).then(async res => {
         try {
           const clone = res.clone();

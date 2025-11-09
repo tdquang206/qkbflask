@@ -1,0 +1,1005 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<section class="section">
+  <form id="examForm" action="{{ url_for('exam.edit_exam', patient_id=patient.doc_id, exam_id=exam.id) }}" method="POST"
+    onsubmit="calculateTotals()">
+    <div class="container">
+
+      <!-- Patient Info -->
+      {% if patient.kid_name %}
+      <h1 class="title is-3">Khám bệnh cho: bé {{ patient.kid_name }}</h1>
+      {% else %}
+      <h1 class="title is-3">Khám bệnh cho: con Ba/Mẹ {{ patient.name }} - {{ patient.phone }}</h1>
+      {% endif %}
+      <!-- save or update -->
+      <!-- 3 hidden inputs for whatever -->
+      <div><input type="hidden" name="exam_id" value="{{ exam.id if exam.id else '' }}"></div>
+      <div><input type="hidden" name="patient_id" value="{{ patient.doc_id if patient.doc_id else '' }}"></div>
+
+
+      <div class="box">
+        <p id="kid_name"><strong>👶 Bé:</strong> {{ patient.kid_name }} - SN {{ patient.kid_birthday }}</p>
+        <p id="phone"><strong>📞 Số điện thoại:</strong> {{ patient.phone }} - {{ patient.name }}</p>
+        <p id="address"><strong>🏠 Địa chỉ:</strong> {{ patient.address }}</p>
+      </div>
+      <!-- Exam Info -->
+      <div class="box">
+        <div class="columns is-multiline">
+
+          <div class="column is-4">
+            <div class="field" id="ngay_kham">
+              <label class="label">📅 Ngày khám</label>
+              <div class="control has-icons-left">
+                <input class="input" type="date" name="exam_date" id="exam_date"
+                  value="{{ exam.exam_date if exam.exam_date else ''}}">
+                <span class="icon is-small is-left"><i class="fas fa-calendar-day"></i></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="column is-4">
+            <div class="field">
+              <label class="label">⚖️ Cân nặng (kg)</label>
+              <div class="control has-icons-left">
+                <input class="input" type="number" step="0.1" name="weight" placeholder="Ví dụ: 10.5"
+                  value="{{ exam.weight if exam.weight else '' }}">
+                <span class="icon is-small is-left"><i class="fas fa-weight"></i></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="column is-4">
+            <div class="field">
+              <label class="label">📏 Chiều cao (cm)</label>
+              <div class="control has-icons-left">
+                <input class="input" type="number" step="0.1" name="height" placeholder="Ví dụ: 78"
+                  value="{{ exam.height if exam.height else '' }}">
+                <span class="icon is-small is-left"><i class="fas fa-ruler-vertical"></i></span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="box">
+        <div class="field">
+          <label class="label">📝 Ghi chú, khám bệnh</label>
+          <div class="control">
+            <textarea class="textarea" name="history" rows="4"
+              placeholder="Ghi chú của bác sĩ...">{{ exam.history if exam.history else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Options -->
+      <!-- Service Options -->
+      <div class="box">
+        <div class="field">
+          <div class="columns is-vcentered is-multiline">
+            <!-- Column 1: Label -->
+            <div class="column is-3">
+              <label class="label">💵 Loại khám</label>
+            </div>
+
+            <!-- Column 2: Free -->
+            <div class="column is-3">
+              <label class="radio is-large">
+                <input type="radio" name="service_fee" value="0" {% if exam and exam.service_fee|string=="0" %}checked{%
+                  endif %}>
+                <span class="option-text">Free</span>
+              </label>
+            </div>
+
+            <!-- Column 3: Khám bệnh -->
+            <div class="column is-3">
+              <label class="radio is-large">
+                <input type="radio" name="service_fee" value="150000" {% if exam and exam.service_fee|string=="150000"
+                  %}checked{% endif %}>
+                <span class="option-text">Khám bệnh</span>
+              </label>
+            </div>
+
+            <!-- Column 4: Khám chuyên sâu -->
+            <div class="column is-3">
+              <label class="radio is-large">
+                <input type="radio" name="service_fee" value="200000" {% if exam and exam.service_fee|string=="200000"
+                  %}checked{% endif %}>
+                <span class="option-text">Khám chuyên sâu</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thêm thuốc row, bulma grid 4 1 6 1 tổng 12-->
+      <div class="box">
+        <label class="label">💊 Thêm thuốc</label>
+        <div class="columns is-variable is-2">
+          <div class="column is-4">
+
+            <div class="field">
+              <div class="control">
+                <input class="input" type="text" id="drugInput" placeholder="Nhập tên thuốc...">
+                <div id="drugDropdown" class="dropdown-content box"
+                  style="display:none; position:absolute; z-index:1000; width:100%;">
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="column is-1">
+            <input class="input" type="number" id="drugQty" min="1" placeholder="1">
+          </div>
+
+          <!-- Schedule Note Input -->
+          <div class="column is-6">
+            <div class="control" style="position:relative;">
+              <input class="input" type="text" id="drugNote" placeholder="Nhập lịch uống (ví dụ: 1111 hoặc ghi chú)">
+              <div id="scheduleSuggestions" class="box"
+                style="position:absolute; z-index:100; width:100%; max-height:200px; overflow-y:auto; display:none; padding:0;">
+              </div>
+              <button id="hintBtn" type="button" class="button is-small is-light"
+                style="position:absolute; right:-60px; top:0;">?</button>
+            </div>
+          </div>
+
+          <!-- thêm button -->
+          <div class="column is-1">
+            <button type="button" class="button is-link is-fullwidth" id="addDrugBtn">
+
+              <span>Thêm</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- drug table -->
+      <div class="table-container">
+        <table class="table is-striped is-hoverable is-fullwidth" id="drugTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên thuốc</th>
+              <th>Số lượng</th>
+              <th>Ghi chú</th>
+              <th hidden>Giá phụ</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="drugTableBody">
+            {% if exam and exam.drugs %}
+            {% for d in exam.drugs %}
+            <tr data-price="{{ d.price }}">
+              <td>{{ loop.index }}</td>
+              <td>
+                {{ d.name }}
+                <input type="hidden" name="drug_name" value="{{ d.name }}">
+              </td>
+              <td class="quantity">
+                {{ d.quantity }}
+                <input type="hidden" name="drug_quantity" value="{{ d.quantity }}">
+              </td>
+              <td>
+                {{ d.note }}
+                <input type="hidden" name="drug_note" value="{{ d.note }}">
+              </td>
+              <td hidden>
+                {{ d.price }}
+                <input type="hidden" name="drug_price" value="{{ d.price }}">
+              </td>
+              <td>
+                <button type="button" class="button is-small is-danger removeRow">X</button>
+              </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+
+
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="2">Tổng cộng</th>
+              <th id="totalQuantity">{{ exam.totalQuantity if exam.totalQuantity else '' }}</th>
+              <th></th>
+              <th id="totalPrice">{{ exam.total_money if exam.total_money else '' }}</th>
+              <!-- hidden input to meet form -->
+              <th><input name="total_money" value="{{ exam.total_money if exam.total_money else '' }}" hidden></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="box">
+      <div class="columns is-vcentered is-mobile is-variable is-1 reexam-columns">
+        <!-- label "Tái khám sau" -->
+        <div class="column is-narrow">
+          <span class="has-text-weight-semibold">Tái khám sau</span>
+        </div>
+
+        <!-- small gap (keeps a little space before input) -->
+        <div class="column is-narrow gap-small" aria-hidden="true"></div>
+
+        <!-- numeric input (compact) -->
+        <div class="column is-narrow">
+          <div class="field">
+            <div class="control">
+              <input id="re_exam_after_days" class="input is-small" type="number" min="0" placeholder="ví dụ: 7"
+                value="" style="width:80px">
+            </div>
+          </div>
+        </div>
+
+        <!-- text "ngày" immediately after input -->
+        <div class="column is-narrow">
+          <span>ngày</span>
+        </div>
+
+        <!-- big gap between "ngày" and "Dự kiến" -->
+        <div class="column is-narrow gap-big" aria-hidden="true"></div>
+
+        <!-- label "Dự kiến" -->
+        <div class="column is-narrow">
+          <span class="has-text-weight-semibold">Dự kiến</span>
+        </div>
+
+        <!-- calendar picker -->
+        <div class="column is-6">
+          <div class="field">
+            <div class="control has-icons-left">
+              <input id="expected_date" name="expected_date" class="input" type="text" placeholder="Chọn ngày"
+                value="{{ exam.expected_date if exam else '' }}">
+              <span class="icon is-small is-left"><i class="fas fa-calendar-check"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- paid status and button -->
+    <div class="is-flex is-align-content-from-start is-flex-wrap-wrap"
+      style="justify-content: space-between; align-items: center;">
+      <div>
+        <p id="paid_status_text">Tình trạng thanh toán:
+          {% if exam.paid_status == True %} Đã thanh toán
+          {% elif exam.paid_status == False %} Chưa thanh toán
+          {% else %} Chưa biết
+          {% endif %}
+        </p>
+      </div>
+      <div><button type="button" class="button is-info" id="paid_status_toggle_btn">Thay đổi</button>
+      </div>
+    </div>
+
+
+    <!-- Save, Print, Back to patient list-->
+    <div class=" field is-grouped is-grouped-centered no-print mt-5">
+      <!-- Print Button -->
+      <p class="control">
+        <button type="button" class="button is-info is-medium" id="printBtn">
+          <span>In đơn thuốc (Nhớ lưu)<br></span>
+        </button>
+      </p>
+
+      <!-- Save Button -->
+      <p class="control">
+        <button class="button is-primary is-medium" type="submit" id="saveBtn" name="saveBtn">
+
+          <span id="saveBtnText">{{ 'Cập nhật' if exam.id else 'Not found exam_id' }}</span>
+        </button>
+      </p>
+
+      <!-- Back Button -->
+      <p class="control">
+        <a href="javascript:history.back()" class="button is-medium" id="backBtn">
+          <span>Quay lại</span>
+        </a>
+      </p>
+    </div>
+
+    </div>
+  </form>
+</section>
+<div id="toast" class="notification is-success"
+  style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">
+  ✅ Đã lưu thành công!
+</div>
+
+<script>
+  function calculateTotals() {
+    const tableBody = document.getElementById("drugTableBody");
+    const rows = tableBody.querySelectorAll("tr");
+    let qtySum = 0, priceSum = 0;
+    rows.forEach(row => {
+      const qty = parseInt(row.querySelector(".quantity").textContent) || 0;
+      const price = parseFloat(row.dataset.price) || 0;
+      qtySum += qty;
+      priceSum += qty * price;
+    });
+
+    // Get selected service_fee value and add to total price
+    const serviceFee = parseFloat(document.querySelector("input[name='service_fee']:checked")?.value || 0);
+    const totalWithService = priceSum + serviceFee;
+
+    document.getElementById("totalQuantity").textContent = qtySum;
+    document.getElementById("totalPrice").textContent = totalWithService.toLocaleString();
+    document.querySelector("input[name='total_money']").value = totalWithService;
+  }
+</script>
+
+<!-- Toast noti -->
+<script>
+  function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.className = `notification ${type}`;
+    toast.style.display = "block";
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 3000);
+  }
+  // toggle paid_status
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("paid_status_toggle_btn").addEventListener("click", async function () {
+      try {
+        const examId = document.getElementsByName("exam_id")[0].value;
+        const patientId = document.getElementsByName("patient_id")[0].value;
+        const paid_status_textEl = document.getElementById("paid_status_text");
+
+        console.log('Sending request:', {
+          patient_id: patientId,
+          exam_id: examId
+        });
+
+        const response = await fetch('/api/mark_paid', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            patient_id: patientId,
+            exam_id: examId
+          })
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        if (data.success) {
+          paid_status_text.value = "Đã nhận tiền"
+          showToast("✅ Đã lưu thành công!", "is-success");
+
+        } else {
+          throw new Error(data.error || "Unknown error");
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showToast(`Lỗi: ${error.message}`, "is-danger");
+      }
+
+    })
+  })
+
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("examForm");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveBtnText = document.getElementById("saveBtnText");
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); // stop normal form submit
+
+      const examId = document.querySelector("input[name='exam_id']").value;
+      const patientId = document.querySelector("input[name='patient_id']").value;
+      console.log(examId, patientId)
+
+      fetch(this.action, {
+        method: "POST",
+        body: new FormData(this)
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "success") {
+            // update button UI
+            saveBtn.dataset.saved = "true";
+            saveBtn.classList.add("is-outlined");
+            saveBtn.textContent = "Đã cập nhật";
+
+            showToast("✅ Đã lưu", "is-success");
+
+          } else {
+            showToast("❌ Lỗi khi lưu dữ liệu", "is-danger");
+          }
+
+        }).catch(err => {
+          console.error(err);
+          showToast("❌ Có lỗi chưa xác định", "is-danger");
+        });
+    });
+  });
+</script>
+
+<!-- Get today -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Exam dateA
+    flatpickr("input[name='exam_date']", {
+      dateFormat: "Y-m-d",
+      defaultDate: document.querySelector("input[name='exam_date']").value || "today"
+    });
+
+    // Expected re-exam date
+    flatpickr("input[name='expected_date']", {
+      dateFormat: "Y-m-d",
+      defaultDate: document.querySelector("input[name='expected_date']").value || null,
+      minDate: "today"   // optional: cannot pick past dates
+    });
+
+  });
+</script>
+
+<!-- tính ngày tái khám -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const examInput = document.getElementById("exam_date") || document.querySelector("input[name='exam_date']");
+    const daysInput = document.getElementById("re_exam_after_days");
+    const expectedInput = document.getElementById("expected_date");
+
+    function parseDateLike(value) {
+      if (!value) return null;
+      const d = new Date(value);
+      return isNaN(d) ? null : d;
+    }
+
+    function addDaysTo(dateLike, days) {
+      const base = parseDateLike(dateLike);
+      if (!base) return null;
+      const d = new Date(base);
+      d.setDate(d.getDate() + Number(days));
+      return d;
+    }
+
+    // initialize flatpickr with altInput but don't set a default date yet
+    const reexamPicker = flatpickr(expectedInput, {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "l d/m/Y",
+      allowInput: true,
+      locale: {
+        firstDayOfWeek: 1,
+        weekdays: { shorthand: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'], longhand: ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'] },
+        months: { shorthand: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'], longhand: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'] }
+      },
+      onChange(selectedDates) {
+        if (!selectedDates.length || !examInput || !examInput.value) return;
+        const examDate = parseDateLike(examInput.value);
+        if (!examDate) return;
+        const diff = Math.round((selectedDates[0] - examDate) / (1000 * 60 * 60 * 24));
+        daysInput.value = diff;
+        // if diff is 0 or less, you may want to allow 0 but per request 0 should hide date
+        if (diff <= 0) {
+          reexamPicker.clear();
+          expectedInput.value = "";
+          if (expectedInput._flatpickr && expectedInput._flatpickr.altInput) expectedInput._flatpickr.altInput.value = "";
+        }
+      }
+    });
+
+    function clearExpected() {
+      reexamPicker.clear();
+      // remove any displayed altInput text
+      if (expectedInput._flatpickr && expectedInput._flatpickr.altInput) expectedInput._flatpickr.altInput.value = "";
+      expectedInput.value = "";
+    }
+
+    function updateExpectedFromDays() {
+      const daysRaw = daysInput.value;
+      const days = daysRaw === "" ? null : Number(daysRaw);
+      const examVal = examInput ? examInput.value : null;
+      if (!examVal) { clearExpected(); return; }
+      if (days === null || isNaN(days) || days <= 0) { clearExpected(); return; }
+      const newDate = addDaysTo(examVal, days);
+      if (!newDate) { clearExpected(); return; }
+      reexamPicker.setDate(newDate, true);
+    }
+
+    // events
+    daysInput.addEventListener("input", updateExpectedFromDays);
+    daysInput.addEventListener("change", updateExpectedFromDays);
+
+    if (examInput) {
+      examInput.addEventListener("input", updateExpectedFromDays);
+      examInput.addEventListener("change", updateExpectedFromDays);
+    }
+
+    // initialize on load
+    (function init() {
+      // ensure exam has a sensible value (optional)
+      if (examInput && !examInput.value) {
+        examInput.value = new Date().toISOString().slice(0, 10);
+      }
+      updateExpectedFromDays();
+      calculateTotals();
+    })();
+  });
+</script>
+
+<!-- get drug list, sort -->
+<script>
+  document.addEventListener("DOMContentLoaded", async function () {
+    const drugSelect = document.getElementById("drugSelect");
+    const drugQty = document.getElementById("drugQty");
+    const addDrugBtn = document.getElementById("addDrugBtn");
+    const tableBody = document.querySelector("#drugTable tbody");
+
+    let currentSelectedDrug = null;
+
+    let drugList = [];
+    try {
+      const res = await fetch("/api/drugs");
+      drugList = await res.json();
+      drugList.sort((a, b) => a.name.localeCompare(b.name));
+
+    } catch (err) {
+      console.error("Failed to load drugs", err);
+    }
+
+    const input = document.getElementById("drugInput");
+    const dropdown = document.getElementById("drugDropdown");
+    let activeIndex = -1;
+
+
+    input.addEventListener("input", () => {
+      const value = input.value.toLowerCase();
+      dropdown.innerHTML = "";
+      if (!value) {
+        dropdown.style.display = "none";
+        return;
+      }
+
+      const matches = drugList.filter(d => d.name.toLowerCase().includes(value));
+      if (matches.length) {
+        matches.forEach(drug => {
+          const option = document.createElement("div");
+          option.className = "dropdown-item drug-item";
+          option.textContent = drug.name;
+
+          option.style.backgroundColor = "white";
+          option.style.color = "black";
+          option.onclick = () => {
+            input.value = drug.name;
+            dropdown.style.display = "none";
+
+            // Optional: store price or other data
+            input.dataset.price = drug.sell_price;
+          };
+          dropdown.appendChild(option);
+        });
+        dropdown.style.display = "block";
+      } else {
+        dropdown.style.display = "none";
+      }
+    });
+
+    // 🔽 Keyboard navigation
+    input.addEventListener("keydown", (e) => {
+      const items = dropdown.querySelectorAll(".dropdown-item");
+      if (!items.length || dropdown.style.display === "none") return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIndex = (activeIndex + 1) % items.length;
+        updateActive(items);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIndex = (activeIndex - 1 + items.length) % items.length;
+        updateActive(items);
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        if (currentIndex >= 0 && currentIndex < items.length) {
+          e.preventDefault();
+          const selectedName = items[currentIndex].textContent.trim();
+          drugInput.value = selectedName;
+
+          // FIX: Update the selected drug object for consistency
+          const selectedDrug = drugList.find(d => d.name === selectedName);
+          currentSelectedDrug = selectedDrug;
+
+          drugDropdown.style.display = "none";
+          drugQty.focus();
+        }
+      }
+    });
+
+    function updateActive(items) {
+      items.forEach((item, i) => {
+        item.classList.toggle("has-background-primary", i === activeIndex);
+        item.classList.toggle("has-text-white", i === activeIndex);
+      });
+    }
+
+
+
+    function updateRowNumbers() {
+      tableBody.querySelectorAll("tr").forEach((row, idx) => {
+        row.querySelector("td").textContent = idx + 1;
+      });
+    }
+
+    function recalcTotals() {
+      const rows = document.querySelectorAll("#drugTableBody tr");
+      let totalQty = 0;
+      let totalPrice = 0;
+
+      rows.forEach((row, idx) => {
+        // update row number
+        row.querySelector("td").textContent = idx + 1;
+
+        const qty = parseInt(row.querySelector(".quantity").textContent) || 0;
+        const price = parseFloat(row.dataset.price) || 0;
+
+        totalQty += qty;
+        totalPrice += qty * price;
+      });
+
+      document.getElementById("totalQuantity").textContent = totalQty;
+      document.getElementById("totalPrice").textContent = totalPrice.toLocaleString();
+    }
+
+    // Run once on page load (for prefilled exams)
+    document.addEventListener("DOMContentLoaded", recalcTotals);
+
+    // After adding a drug
+    addDrugBtn.addEventListener("click", () => {
+      // ... your existing add row code ...
+      recalcTotals();
+    });
+
+    // After removing a drug
+    document.querySelector("#drugTableBody").addEventListener("click", (e) => {
+      if (e.target.classList.contains("removeRow")) {
+        e.target.closest("tr").remove();
+        recalcTotals();
+      }
+    });
+
+    // on service_fee changes
+    document.querySelectorAll("input[name='service_fee']").forEach(radio => {
+      radio.addEventListener("change", calculateTotals);
+    });
+
+    addDrugBtn.addEventListener("click", () => {
+      const input = document.getElementById("drugInput");
+      const name = input.value.trim();
+      if (!name) return;
+
+      // Find the drug in drugList to get the price
+      // This relies on the input value, which is correctly set by selection logic
+      const drug = drugList.find(d => d.name.trim() === name.trim());
+      const price = drug ? drug.sell_price : 0;
+
+      // Optional: Stop if drug name is not valid/found in the list (if you want to enforce selection)
+      if (!drug) {
+        alert("Vui lòng chọn thuốc từ danh sách gợi ý."); // "Please select a drug from the suggestion list."
+        return;
+      }
+
+      const qty = parseInt(document.getElementById("drugQty").value) || 1;
+      const note = document.getElementById("drugNote").value || "";
+
+      const row = document.createElement("tr");
+      row.dataset.price = price;
+      row.innerHTML = `
+    <td></td>
+    <td>
+      ${name}
+      <input type="hidden" name="drug_name" value="${name}">
+    </td>
+    <td class="quantity">
+      ${qty}
+      <input type="hidden" name="drug_quantity" value="${qty}">
+    </td>
+    <td>
+      ${note}
+      <input type="hidden" name="drug_note" value="${note}">
+    </td>
+    <td hidden>
+      ${price}
+      <input type="hidden" name="drug_price" value="${price}">
+    </td>
+    <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
+  `;
+      tableBody.appendChild(row);
+      updateRowNumbers();
+      calculateTotals();
+
+      // reset inputs
+      // FIX: reset all inputs and state after a successful addition
+      input.value = "";
+      document.getElementById("drugQty").value = "";
+      document.getElementById("drugNote").value = "";
+      currentSelectedDrug = null; // Clear the selected state
+      drugDropdown.style.display = "none"; // Hide the dropdown just in case
+    });
+
+    tableBody.addEventListener("click", e => {
+      if (e.target.classList.contains("removeRow")) {
+        e.target.closest("tr").remove();
+        updateRowNumbers();
+        calculateTotals();
+      }
+    });
+  });
+
+</script>
+
+<!-- Print script -->
+<script>
+  document.getElementById("printBtn").addEventListener("click", function () {
+    // Collect patient info
+    const kidName = document.getElementById("kid_name")?.textContent || "<Lỗi tên bé>";
+    const birthday = ""; // You may need to get this from patient info
+    const weight = document.querySelector("input[name='weight']").value || "";
+    const height = document.querySelector("input[name='height']").value || "";
+    const phone = document.getElementById("phone")?.textContent || "<Lỗi sđt>";
+    const parentName = ""; // You may need to get this from patient info
+    const address = document.getElementById("address")?.textContent || "<Lỗi địa chỉ>";
+    const history = document.querySelector("textarea[name='history']")?.value || "<Lỗi nội dung khám bệnh>";
+    const ngay_kham = document.querySelector("input[name='exam_date']").value || "<lỗi lấy ngày khám>";
+    const ngay_tai_kham = document.querySelector("input[name='expected_date']").value || "<lỗi lấy ngày tái khám>";
+
+    // Collect drug rows
+    let drugRows = "";
+    let index = 1;
+    document.querySelectorAll("#drugTable tbody tr").forEach(row => {
+      const name = row.children[1]?.textContent || "";
+      const qty = row.children[2]?.textContent || "";
+      const note = row.children[3]?.textContent || "";
+      if (name) {
+        drugRows += `
+        <tr>
+          <td>${index++}</td>
+          <td>${name}</td>
+          <td>${qty}</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td colspan="2" style="font-style:italic;">${note}</td>
+        </tr>
+        <tr class="show-when-print" style="display: none;"></tr>
+    `}
+    });
+
+    // collect total price for footer
+    let totalPrice = document.getElementById("totalPrice")?.textContent || "0";
+    // Remove all non-digit characters
+    let clean = totalPrice.replace(/\D/g, "");
+    // Remove last 3 digits (if length > 3), else set to "0"
+    let totalShort = (clean.length > 3 ? clean.slice(0, -3) : "0") + "";
+
+    console.log('raw totalPrice text:', totalPrice);
+    console.log('clean:', clean);
+    console.log('clean length:', clean.length);
+
+
+    // Get print time as yymmddhhmmss
+    const now = new Date();
+    const pad = n => n.toString().padStart(2, "0");
+    const printTime =
+      pad(now.getFullYear() % 100) +
+      pad(now.getMonth() + 1) +
+      pad(now.getDate()) +
+      pad(now.getHours()) +
+      pad(now.getMinutes()) +
+      pad(now.getSeconds());
+
+    // Build print content
+    const printContent = `
+    <html>
+      <head>
+        <title>Phiếu Khám</title>
+        <style>
+          @page { size: A5 portrait; margin: 1cm; }
+          body { font-family: sans-serif; font-size: 11pt; }
+          h2 { text-align: center; margin-bottom: 1em; }
+          table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+          th, td { border: none; padding: 6px 4px; }
+          th { font-weight: bold; text-align: left; }
+          tbody tr { margin-bottom: 5px; display: table-row;}
+          tbody td { padding-top: 5px; padding-bottom: 10px }
+          @media print {
+            th, td {
+              border: none;
+            }
+            .show-when-print {
+              display: table-row;
+              height: 10px;
+            }
+            /* Tell the browser to use the running footer at the bottom of each page */
+            .footer {
+              position: fixed;
+              bottom: 1cm;
+              width: 100%;
+              text-align: left;
+              font-size: 12px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <h2>Phiếu Khám Bệnh - ${ngay_kham}</h2>
+        <p> ${kidName} &nbsp;&nbsp; ${birthday} &nbsp;&nbsp; ${weight}kg &nbsp;&nbsp; ${height}cm</p>
+        <p> ${phone} &nbsp;&nbsp; ${parentName}</p>
+        <p> ${address}</p>
+        <p><strong>Ghi chú / Khám bệnh:</strong> ${history}</p>
+        <p>Hẹn tái khám: ${ngay_tai_kham}</p>
+
+        <h3>💊 Thuốc</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên thuốc</th>
+              <th>SL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${drugRows || "<tr><td colspan='4'>Toa không thuốc</td></tr>"}
+          </tbody>
+        </table>
+        <div class="footer">
+          <span style="white-space:nowrap;">${printTime}H${totalShort}</span>
+        </div>
+      </body>
+    </html>
+  `;
+
+    // Open new window and print, then close
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+
+      // Add afterprint listener
+      printWindow.addEventListener("afterprint", () => {
+        printWindow.close();
+      });
+
+      // Fallback in case afterprint doesn't fire
+      setTimeout(() => {
+        printWindow.close();
+      }, 1000); // Adjust delay as needed
+
+      printWindow.print();
+    };
+
+  });
+</script>
+
+<!-- input hdsd thuốc -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const drugNote = document.getElementById("drugNote");
+    const suggestionsBox = document.getElementById("scheduleSuggestions");
+    const hintBtn = document.getElementById("hintBtn");
+    const hintBox = document.getElementById("hintBox");
+    const labels = ["sáng", "trưa", "chiều", "tối"];
+    let currentIndex = -1;
+
+    // Parse a 4-digit string into schedule text
+    function parseSchedule(bits) {
+      let result = [];
+      for (let i = 0; i < bits.length; i++) {
+        if (bits[i] !== "0") {
+          result.push(`${labels[i]} ${bits[i]}`);
+        }
+      }
+      return result.join(" - ");
+    }
+
+    // Generate candidate interpretations for short inputs
+    function generateCandidates(input) {
+      const results = [];
+      const len = input.length;
+
+      if (len === 4) {
+        results.push(parseSchedule(input));
+      } else if (len < 4 && len > 0) {
+        for (let shift = 0; shift <= 4 - len; shift++) {
+          let padded = "0".repeat(shift) + input + "0".repeat(4 - len - shift);
+          results.push(parseSchedule(padded));
+        }
+      }
+      return results.slice(0, 10);
+    }
+
+    // Show suggestion dropdown
+    function showSuggestions(candidates) {
+      suggestionsBox.innerHTML = "";
+      currentIndex = -1;
+
+      if (candidates.length === 0) {
+        suggestionsBox.style.display = "none";
+        return;
+      }
+
+      candidates.forEach((c, idx) => {
+        const div = document.createElement("div");
+        div.textContent = c;
+        div.className = "dropdown-item";
+        div.style.padding = "6px 10px";
+        div.style.cursor = "pointer";
+
+        div.addEventListener("click", () => {
+          drugNote.value = c;
+          suggestionsBox.style.display = "none";
+        });
+
+        suggestionsBox.appendChild(div);
+      });
+
+      suggestionsBox.style.display = "block";
+    }
+
+    // Handle typing
+    drugNote.addEventListener("input", (e) => {
+      const val = e.target.value.trim();
+
+      // If contains letters → free text mode
+      if (/[a-zA-Z]/.test(val)) {
+        suggestionsBox.style.display = "none";
+        return;
+      }
+
+      // Only allow digits 0–9
+      const clean = val.replace(/[^0-9]/g, "");
+      if (clean !== val) e.target.value = clean;
+
+      const candidates = generateCandidates(clean);
+      if (candidates.length === 1 && clean.length === 4) {
+        e.target.value = candidates[0];
+        suggestionsBox.style.display = "none";
+      } else {
+        showSuggestions(candidates);
+      }
+    });
+
+    // Keyboard navigation
+    drugNote.addEventListener("keydown", (e) => {
+      const items = suggestionsBox.querySelectorAll("div");
+      if (items.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        currentIndex = (currentIndex + 1) % items.length;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        currentIndex = (currentIndex - 1 + items.length) % items.length;
+      } else if (e.key === "Enter") {
+        if (currentIndex >= 0 && currentIndex < items.length) {
+          e.preventDefault();
+          drugNote.value = items[currentIndex].textContent;
+          suggestionsBox.style.display = "none";
+        }
+      }
+
+      items.forEach((item, idx) => {
+        item.style.background = idx === currentIndex ? "#eee" : "white";
+      });
+    });
+
+    // Toggle hint box
+    if (hintBtn && hintBox) {
+      hintBtn.addEventListener("click", () => {
+        hintBox.style.display = hintBox.style.display === "none" ? "block" : "none";
+      });
+    }
+    calculateTotals();
+  });
+</script>
+
+{% endblock %}

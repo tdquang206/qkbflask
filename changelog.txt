@@ -1,3 +1,10 @@
+#
+- favicon
+- danh sách thuốc tìm theo thứ tự
+- edit_exam ok
+- màn hình edit_drug có danh sách mua theo ngày, chỉnh giá mua và bán (đang ở app.py)
+
+
 # 2025-11-09
 - tách dc route exam
     + add_new

@@ -2,17 +2,16 @@
 {% block content %}
 <h1 class="title mb-5">Patients</h1>
 
-<div class="mb-4">
-  <a href="{{ url_for('add_patient') }}" class="button is-primary">➕ Thêm BN mới</a>
-</div>
+<div class="is-flex is-align-items-center" style="position: sticky; top: 0; z-index: 1;">
+  <div class="my-4">
+    <a href="{{ url_for('add_patient') }}" class="button is-primary">➕ Thêm BN mới</a>
+  </div>
 
-<div class="field mb-5">
-  <div class="control has-icons-left">
-    <input class="input is-medium" type="text" placeholder="🔍 Search by kid name, parent name, or phone"
-      id="searchInput" onkeyup="filterTable()">
-    <span class="icon is-left">
-      <i class="fas fa-search"></i>
-    </span>
+  <div class="field my-4 is-flex-grow-4">
+    <div class="control">
+      <input class="input is-medium" type="text" placeholder="🔍 Search by kid name, parent name, or phone"
+        id="searchInput" onkeyup="filterTable()">
+    </div>
   </div>
 </div>
 

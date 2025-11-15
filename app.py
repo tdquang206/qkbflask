@@ -5,14 +5,18 @@ from datetime import datetime
 from collections import defaultdict
 import os
 import uuid
+from rapidfuzz import fuzz
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.secret_key = b'quang0902915519'
 
 db = TinyDB('db.json', encoding='utf-8')
 patients = db.table('patients')
 drugs = db.table('drugs')
 exams = db.table('exams')
+
+
 
 # include blueprint
 from routes.mua_thuoc import mua_thuoc_bp
@@ -46,9 +50,34 @@ def manage_drugs():
     
     return render_template('drugs.html', drugs=drugs.all())
 
+# NOTE: edit drugs
 @app.route('/edit_drug/<int:drug_id>', methods=['GET', 'POST'])
 def edit_drug(drug_id):
     drug = drugs.get(doc_id=drug_id)
+
+    if request.method == 'GET':
+        drug_name = drug.get('name', '').lower()
+        # get db_mua_thuoc.jsonify
+        purchases_db = TinyDB('db_mua_thuoc.json').table('purchases')
+        print(purchases_db.all())
+
+        # find purchase history
+        purchase_history = []
+        for purchase in purchases_db.all():
+            for item in purchase.get('drugs', []):
+                item_name = item.get('name', '').lower()
+
+                # fuzzy match
+                if fuzz.partial_ratio(drug_name, item_name) > 80:
+                    purchase_history.append({
+                        "date_buy": purchase.get('date_buy'),
+                        "quantity": item.get('quantity'),
+                        "buy_price": item.get('buy_price'),
+                        "note": item.get('note', "")
+                    })
+        return render_template('edit_drug.html', drug=drug, purchase_history=purchase_history)
+
+    
     if request.method == 'POST':
         drugs.update({
             'sku': request.form['sku'],
@@ -59,7 +88,6 @@ def edit_drug(drug_id):
             'inventory': int(request.form.get('inventory', 0)) if request.form.get('inventory', '').isdigit() else ""
         }, doc_ids=[drug_id])
         return redirect(url_for('manage_drugs'))
-    return render_template('edit_drug.html', drug=drug)
 
 @app.route('/delete_drug/<int:drug_id>')
 def delete_drug(drug_id):

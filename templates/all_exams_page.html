@@ -25,8 +25,10 @@
                         <td>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên"}} --- {{ exam.parent_name }}</td>
                         <td>{{ "{:,}".format(exam.total_money) }}</td>
                         <td>
-                            <a href="{{ url_for('exam', patient_id=exam.patient_id, exam_id=exam.exam_id) }}"
-                                class="button is-info">Xem</a>
+                            <a class="button is-outline is-info"
+                                href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
+                                Edit
+                            </a>
                             {% if exam.paid_status %}
                             <button class="button is-outline is-success money_received_status" disabled>Đã nhận
                                 tiền</button>

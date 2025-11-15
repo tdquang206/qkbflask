@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash
 from datetime import datetime
 from tinydb import TinyDB, Query
 import uuid
@@ -10,21 +10,32 @@ db = TinyDB('db.json')
 Patients_db = db.table('patients')
 
 # NOTE: Read and Edit CRUD code
-@exam_bp.route("/exam/<int:patient_id>/edit_exam/<exam_id>", methods=['POST', 'GET'])
-def edit_exam(patient_id, exam_id):
-    patient = Patients_db.get(doc_id=patient_id)
-    if not patient:
-        return "Patient not found", 404
+@exam_bp.route("/exam/edit_exam/<exam_id>", methods=['POST', 'GET'])
+def edit_exam(exam_id):
+
+    exam_editting = None
+    patient_found = None
     
-    # Find exam in patient's exams list by matching id
-    exam = next((e for e in patient.get('exams', []) if e.get('id') == exam_id), None) 
-    if not exam:
-        abort(404)
-    # Print for debugging
-    print(f"Found exam: {exam}")
+    
+    for patient in Patients_db.all():
+        for exam in patient.get('exams', []):
+            if exam.get('id') == exam_id:
+                exam_editting = exam
+                patient_found = patient
+                break
+        # if exam_editting:   
+        #     return render_template('edit_exam.html', exam=exam_editting)
+
+        # # guard if exam_id not found => new exam
+        # if not exam:
+        #     flash("Could not load old exam. Please enter new exam and tell dev", "error")
+        #     return redirect(url_for('exam.new_exam', patient_id=patient.doc_id))
+            
     
     if request.method == 'GET':
-        return render_template('edit_exam.html', patient=patient, exam=exam)
+        # print(f'exam id {exam_editting}')
+        # print(f'patient id {patient_found}')
+        return render_template('edit_exam.html', patient = patient_found, exam=exam_editting)
 
     if request.method == 'POST':
         # data
@@ -57,7 +68,7 @@ def edit_exam(patient_id, exam_id):
 
         # prepair exam data
         exam_data = {
-            'patient_id': patient_id,
+            'patient_id': patient_found.doc_id,
             'exam_date': exam_date,
             'weight': weight,
             'height': height,
@@ -72,6 +83,7 @@ def edit_exam(patient_id, exam_id):
             'id': exam_id
             
         }
+        print(exam_data)
         
         
         # Handle image upload if present
@@ -92,11 +104,11 @@ def edit_exam(patient_id, exam_id):
                 break
 
         # if exam_id change: create a new one
-            if not updated:
-                exams.append(exam_data)
+        if not updated:
+            exams.append(exam_data)
 
         # Update the patient document in TinyDB
-        Patients_db.update({"exams": exams}, doc_ids=[patient_id])
+        Patients_db.update({"exams": exams, "last_visit": exam_date}, doc_ids=[patient_found.doc_id])
 
         return jsonify({
           "status": "success",
@@ -174,12 +186,16 @@ def new_exam(patient_id):
         exams.append(exam_data)
 
         # Update the patient document in TinyDB
-        Patients_db.update({"exams": exams}, doc_ids=[patient_id])
+        Patients_db.update({
+            "exams": exams,
+            "last_visit": exam_date
+            }, 
+            doc_ids=[patient_id])
 
         return jsonify({
             "status": "success",
             "message": "Dữ liệu được lưu thành công",
-            "redirect_url": url_for('exam.edit_exam', patient_id=patient_id, exam_id=exam_data['id'])
+            "redirect_url": url_for('exam.edit_exam', exam_id=exam_data['id'])
         })
 
 
@@ -189,25 +205,35 @@ def new_exam(patient_id):
     )
 
 # NOTE: Delete
-@exam_bp.route("/exam/<int:patient_id>/delete_exam/<exam_id>", methods=["POST"])
-def delete_exam(patient_id, exam_id):
+@exam_bp.route("/exam/delete_exam/<exam_id>", methods=["POST"])
+def delete_exam(exam_id):
 
     if request.method == 'POST':
-        patient = Patients_db.get(doc_id=patient_id)
-        if not patient:
-            return "Patient not found", 404
+        exam_will_be_deleted = None
+        patient_doc_id = None
         
-        exams = patient.get('exams', [])
+        for patient in Patients_db.all():
+            for exam in patient.get('exams', []):
+                if exam.get('id') == exam_id:
+                    exam_will_be_deleted = exam
+                    patient_doc_id = patient.doc_id
+                    break
+            if exam_will_be_deleted:
+                    break
+        if not exam_will_be_deleted:
+            flash("some error while delete exam, please tell dev", "error")
+            return jsonify({
+                "status": "error",
+                "message": "exam id not found"
+            }), 404
 
-        updated_exams = [e for e in exams if e['id'] != exam_id]
+        updated_exams = [e for e in patient.get('exams', []) if e['id'] != exam_id]
 
-        if len(exams) == len(updated_exams):
-            return "Not found exam_id", 404
 
-        Patients_db.update({'exams': updated_exams}, doc_ids=[patient_id])
+        Patients_db.update({'exams': updated_exams}, doc_ids=[patient_doc_id])
 
         return jsonify({
             "status": "success",
             "message": "Đã xóa toa thuốc",
-            "redirect_url": url_for('view_exams', patient_id=patient_id)
+            "redirect_url": url_for('view_exams', patient_id=patient_doc_id)
         })

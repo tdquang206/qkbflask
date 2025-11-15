@@ -32,22 +32,23 @@ def get_exam_list():
                             drug_total += price * quantity
                         except (ValueError, TypeError, AttributeError):
                             continue
-            exam_with_patient = {
-                    "kid_name": patient.get("kid_name", ""),
-                    "parent_name": patient.get("name", ""),
-                    "phone": patient.get("phone", ""),
-                    "exam_date": exam.get("exam_date", ""),
-                    "exam_id": exam.get("id", ""),
-                    "paid_status": exam.get("paid_status", False),
-                    "patient_id": patient.doc_id,
-                    "history": exam.get("history", ""),
-                    "drugs": exam.get("drugs", []),
-                    "service_fee": exam.get("service_fee", "0"),
-                    "total_money": service_fee + drug_total                       
-            }
-                
-            all_exams.append(exam_with_patient)
+                exam_with_patient = {
+                        "kid_name": patient.get("kid_name", ""),
+                        "parent_name": patient.get("name", ""),
+                        "phone": patient.get("phone", ""),
+                        "exam_date": exam.get("exam_date", ""),
+                        "exam_id": exam.get("id", ""),
+                        "paid_status": exam.get("paid_status", False),
+                        "patient_id": patient.doc_id,
+                        "history": exam.get("history", ""),
+                        "drugs": exam.get("drugs", []),
+                        "service_fee": exam.get("service_fee", "0"),
+                        "total_money": service_fee + drug_total                       
+                }
+                    
+                all_exams.append(exam_with_patient)
         all_exams = sorted(all_exams, key=lambda x: x.get('exam_date', ''), reverse=True)
+
         return render_template('all_exams_page.html', exams = all_exams)
 
 # mark paid status - toggle button

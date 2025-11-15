@@ -2,15 +2,100 @@
 {% block content %}
 <h1 class="title">Edit Drug: {{ drug.name }}</h1>
 
-<form method="POST" class="box">
-  <input type="hidden" name="id" value="{{ drug.doc_id }}">
-  <div class="field"><label class="label">SKU</label><input class="input" name="sku" value="{{ drug.sku }}"></div>
-  <div class="field"><label class="label">Name</label><input class="input" name="name" value="{{ drug.name }}"></div>
-  <div class="field"><label class="label">Sell Price</label><input class="input" name="sell_price" value="{{ drug.sell_price }}"></div>
-  <div class="field"><label class="label">Buy Price</label><input class="input" name="buy_price" value="{{ drug.buy_price }}"></div>
-  <div class="field"><label class="label">Quantity</label><input class="input" name="quantity" value="{{ drug.quantity }}"></div>
-  <div class="field"><label class="label">Inventory</label><input class="input" name="inventory" value="{{ drug.inventory }}"></div>
-  <button class="button is-success">Update</button>
-</form>
-{% endblock %}
+<div class="box">
+  <form method="POST">
+    <input type="hidden" name="id" value="{{ drug.doc_id }}">
 
+    <div class="field">
+      <label class="label">SKU</label>
+      <div class="control">
+        <input class="input" type="text" name="sku" value="{{ drug.sku }}">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label">Name</label>
+      <div class="control">
+        <input class="input" type="text" name="name" value="{{ drug.name }}">
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column">
+        <div class="field">
+          <label class="label">Sell Price</label>
+          <div class="control">
+            <input class="input" type="number" step="0.01" name="sell_price" value="{{ drug.sell_price }}">
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="field">
+          <label class="label">Buy Price</label>
+          <div class="control">
+            <input class="input" type="number" step="0.01" name="buy_price" value="{{ drug.buy_price }}">
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column">
+        <div class="field">
+          <label class="label">Quantity</label>
+          <div class="control">
+            <input class="input" type="number" name="quantity" value="{{ drug.quantity }}">
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="field">
+          <label class="label">Inventory</label>
+          <div class="control">
+            <input class="input" type="number" name="inventory" value="{{ drug.inventory }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field is-grouped">
+      <div class="control">
+        <button class="button is-success">
+          <span>Update</span>
+        </button>
+      </div>
+      <div class="control">
+        <a href=javascript:history.back() class="button is-light">Cancel</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if purchase_history %}
+<div class="box">
+  <h2 class="subtitle">Purchase History</h2>
+  <table class="table is-striped is-fullwidth">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Quantity</th>
+        <th>Buy Price</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in purchase_history | reverse %}
+      <tr>
+        <td>{{ p.date_buy }}</td>
+        <td>{{ p.quantity }}</td>
+        <td>{{ "{:,.0f}".format(p.buy_price|float) }}</td>
+        <td>{{ p.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

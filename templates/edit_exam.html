@@ -2,7 +2,7 @@
 {% block content %}
 
 <section class="section">
-  <form id="examForm" action="{{ url_for('exam.edit_exam', patient_id=patient.doc_id, exam_id=exam.id) }}" method="POST"
+  <form id="examForm" action="{{ url_for('exam.edit_exam', exam_id=exam.id) }}" method="POST"
     onsubmit="calculateTotals()">
     <div class="container">
 

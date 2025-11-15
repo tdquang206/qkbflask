@@ -13,7 +13,9 @@
 
     <div><a href="{{ url_for('exam.new_exam', patient_id=patient.doc_id) }}" class="button is-primary">
         <span>Tạo toa thuốc mới</span>
-      </a></div>
+      </a>
+      <a class="button is-info" href="javascript:history.back()">Back</a>
+    </div>
     {% if exams %}
     <div class="is-flex is-align-content-space-evenly is-flex-wrap-wrap"
       style="justify-content: space-between; align-items: center;">
@@ -36,16 +38,8 @@
         <!-- Left side: exam info -->
         <div class="column">
           <span class="is-4">📅 {{ exam.exam_date }}</span>
-          <span class="ml-4 is-4">Phí khám:
-            {% if exam.service_fee == "0" %}
-            0
-            {% elif exam.service_fee == "150000" %}
-            150k
-            {% elif exam.service_fee == "200000" %}
-            200k
-            {% else %}
-            _
-            {% endif %}
+          <span class="ml-4 is-4">Phí khám: {{ exam.service_fee|string }}
+
           </span>
           <span class="ml-4 is-4">Tái khám: {{ exam.expected_date or '_' }}</span>
         </div>
@@ -54,8 +48,7 @@
         <div class="column is-narrow">
           <div class="buttons are-small">
             <!-- Edit button -->
-            <a href="{{ url_for('exam.edit_exam', patient_id=patient.doc_id, exam_id=exam.id) }}"
-              style="display:inline;">
+            <a href="{{ url_for('exam.edit_exam', exam_id=exam.id) }}" style="display:inline;">
               <!-- <input type="hidden" name="exam_id" value="{{ exam.id }}"> -->
               <button type="submit" class="button is-link">
                 <span>Sửa</span>
@@ -63,8 +56,8 @@
             </a>
 
             <!-- Delete button -->
-            <form method="post" action="{{ url_for('exam.delete_exam', patient_id=patient.doc_id, exam_id=exam.id) }}"
-              style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
+            <form method="post" action="{{ url_for('exam.delete_exam', exam_id=exam.id) }}" style="display:inline;"
+              onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
               <input type="hidden" name="exam_id" value="{{ exam.id }}">
               <button type="submit" class="button is-danger delete-exam-btn">
                 <span>Xóa</span>

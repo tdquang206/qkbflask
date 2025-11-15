@@ -240,7 +240,7 @@
 
       <!-- Back Button -->
       <p class="control">
-        <a href="javascript:history.back()" class="button is-medium" id="backBtn">
+        <a href="/patients" class="button is-medium" id="backBtn">
           <span>Quay lại danh sách</span>
         </a>
       </p>
@@ -472,7 +472,7 @@
         matches.forEach(drug => {
           const option = document.createElement("div");
           option.className = "dropdown-item drug-item";
-          option.textContent = drug.name;
+          option.textContent = drug.name.concat("- M ", drug.buy_price);
 
           option.style.backgroundColor = "white";
           option.style.color = "black";

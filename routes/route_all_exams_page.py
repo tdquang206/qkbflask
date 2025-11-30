@@ -32,9 +32,12 @@ def get_exam_list():
                             drug_total += price * quantity
                         except (ValueError, TypeError, AttributeError):
                             continue
+                    
+                kid_name = exam.get("kid_name") or patient.get("kid_name", "")
+                parent_name = exam.get("parent_name") or patient.get("name", "")
                 exam_with_patient = {
-                        "kid_name": patient.get("kid_name", ""),
-                        "parent_name": patient.get("name", ""),
+                        "kid_name": kid_name,
+                        "parent_name": parent_name,
                         "phone": patient.get("phone", ""),
                         "exam_date": exam.get("exam_date", ""),
                         "exam_id": exam.get("id", ""),

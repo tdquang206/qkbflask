@@ -9,6 +9,13 @@ exam_bp = Blueprint('exam', __name__)
 db = TinyDB('db.json')
 Patients_db = db.table('patients')
 
+# generate filename for pdf and jpeg on server
+def generate_exam_file_name(phone, date, exam_id):
+    # phone_date_hex[:8]
+    random_part = str(exam_id)[:8]
+    return f"{phone}_{date}_{random_part}"
+
+
 # NOTE: Read and Edit CRUD code
 @exam_bp.route("/exam/edit_exam/<exam_id>", methods=['POST', 'GET'])
 def edit_exam(exam_id):
@@ -99,7 +106,7 @@ def edit_exam(exam_id):
         updated = False
         for i, exam in enumerate(exams):
             if exam.get('id') == exam_id:
-                exams[i] = exam_data
+                exams[i].update(exam_data)
                 updated=True
                 break
 
@@ -153,6 +160,7 @@ def new_exam(patient_id):
                     'note': note,
                     'price': price
                 })
+        # Filename
 
         # prepair exam data
         exam_data = {
@@ -172,7 +180,11 @@ def new_exam(patient_id):
             
         }
         
-        
+        base_filename = generate_exam_file_name(patient.get("phone"),exam_date, exam_data.get('id'))
+        pdf_storage_dir = f"files/pdf/{base_filename}"
+        os.makedirs(pdf_storage_dir, exist_ok=True)
+        jpeg_storage_dir = f"files/jpeg/{base_filename}"
+        os.makedirs(jpeg_storage_dir, exist_ok=True)
         # Handle image upload if present
         image = request.files.get('lab_image')
         if image and image.filename:

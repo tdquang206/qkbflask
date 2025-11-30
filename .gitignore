@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 db.json
 db*.json
+*.json
 .history/
 # C extensions
 *.so

@@ -1,6 +1,13 @@
 #
+- tính năng login
+- chia phòng cho pk đa khoa
+- tính năng up hình (resize)
+- change to sqlite or similar
+
+
+# 2025-11-15
 - favicon
-- danh sách thuốc tìm theo thứ tự
+- danh sách thuốc tìm theo thứ tự, có lỗi chính tả
 - edit_exam ok
 - màn hình edit_drug có danh sách mua theo ngày, chỉnh giá mua và bán (đang ở app.py)
 

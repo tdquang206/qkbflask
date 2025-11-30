@@ -16,8 +16,6 @@ patients = db.table('patients')
 drugs = db.table('drugs')
 exams = db.table('exams')
 
-
-
 # include blueprint
 from routes.mua_thuoc import mua_thuoc_bp
 app.register_blueprint(mua_thuoc_bp)
@@ -27,6 +25,22 @@ app.register_blueprint(exams_list_bp)
 
 from routes.exam import exam_bp
 app.register_blueprint(exam_bp)
+
+# weekly backup
+from utils.db_logger import weekly_backup_all, log_action
+@app.after_request
+def auto_log_and_backup(response):
+    if request.method in ['POST', 'PUT', 'DELETE']:
+        weekly_backup_all()
+
+        log_action("auto", {
+            "endpoint": request.endpoint,
+            "method": request.method,
+            "path": request.path,
+            "form": request.form.to_dict(),
+            "args": request.args.to_dict()
+        })
+    return response
 
 @app.route('/')
 def index():
@@ -235,6 +249,8 @@ def drug_sold():
 @app.route('/exams')
 def all_exams():
     return render_template('exams.html', exams=exams.all(), patients=patients)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

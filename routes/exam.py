@@ -5,16 +5,11 @@ import uuid
 from werkzeug.utils import secure_filename
 import os
 
+from utils.pdf_generator import generate_exam_file_name, build_exam_html, generate_pdf_and_jpeg, delete_exam_files
+
 exam_bp = Blueprint('exam', __name__)
-db = TinyDB('db.json')
+db = TinyDB('db.json', encoding='utf-8')
 Patients_db = db.table('patients')
-
-# generate filename for pdf and jpeg on server
-def generate_exam_file_name(phone, date, exam_id):
-    # phone_date_hex[:8]
-    random_part = str(exam_id)[:8]
-    return f"{phone}_{date}_{random_part}"
-
 
 # NOTE: Read and Edit CRUD code
 @exam_bp.route("/exam/edit_exam/<exam_id>", methods=['POST', 'GET'])
@@ -30,14 +25,9 @@ def edit_exam(exam_id):
                 exam_editting = exam
                 patient_found = patient
                 break
-        # if exam_editting:   
-        #     return render_template('edit_exam.html', exam=exam_editting)
-
-        # # guard if exam_id not found => new exam
-        # if not exam:
-        #     flash("Could not load old exam. Please enter new exam and tell dev", "error")
-        #     return redirect(url_for('exam.new_exam', patient_id=patient.doc_id))
-            
+    if not exam_editting or not patient_found:
+        flash("Unknown exam info", "error")
+        return redirect(url_for('patient.view_patients'))
     
     if request.method == 'GET':
         # print(f'exam id {exam_editting}')
@@ -102,7 +92,7 @@ def edit_exam(exam_id):
             exam_data['image_path'] = image_path
             
         # search the exam id
-        exams = patient.get("exams", [])
+        exams = patient_found.get("exams", [])
         updated = False
         for i, exam in enumerate(exams):
             if exam.get('id') == exam_id:
@@ -116,6 +106,14 @@ def edit_exam(exam_id):
 
         # Update the patient document in TinyDB
         Patients_db.update({"exams": exams, "last_visit": exam_date}, doc_ids=[patient_found.doc_id])
+        # NOTE: PDF and JPEG files, overwrite old files
+        html_content = build_exam_html(patient_found, exam_data)
+        pdf_result = generate_pdf_and_jpeg(
+            html_content,
+            patient_found.get("phone"),
+            exam_date,
+            exam_id
+        )
 
         return jsonify({
           "status": "success",
@@ -160,8 +158,6 @@ def new_exam(patient_id):
                     'note': note,
                     'price': price
                 })
-        # Filename
-
         # prepair exam data
         exam_data = {
             'patient_id': patient_id,
@@ -179,12 +175,7 @@ def new_exam(patient_id):
             'id': str(uuid.uuid4())
             
         }
-        
-        base_filename = generate_exam_file_name(patient.get("phone"),exam_date, exam_data.get('id'))
-        pdf_storage_dir = f"files/pdf/{base_filename}"
-        os.makedirs(pdf_storage_dir, exist_ok=True)
-        jpeg_storage_dir = f"files/jpeg/{base_filename}"
-        os.makedirs(jpeg_storage_dir, exist_ok=True)
+        short_exam_id = str(exam_data['id'])[:8].replace('-','')
         # Handle image upload if present
         image = request.files.get('lab_image')
         if image and image.filename:
@@ -203,6 +194,16 @@ def new_exam(patient_id):
             "last_visit": exam_date
             }, 
             doc_ids=[patient_id])
+
+        # NOTE: create PDF and JPEG files
+        
+        html_content = build_exam_html(patient, exam_data)
+        pdf_result = generate_pdf_and_jpeg(
+            html_content,
+            patient.get('phone'),
+            exam_date,
+            short_exam_id
+        )
 
         return jsonify({
             "status": "success",
@@ -223,12 +224,20 @@ def delete_exam(exam_id):
     if request.method == 'POST':
         exam_will_be_deleted = None
         patient_doc_id = None
+        # data for pdf filename
+        patient_found = None
+        patient_phone = None
+        exam_date = None
+        short_exam_id = str(exam_id)[:8].replace('-','')
         
         for patient in Patients_db.all():
             for exam in patient.get('exams', []):
                 if exam.get('id') == exam_id:
                     exam_will_be_deleted = exam
+                    patient_found = patient
                     patient_doc_id = patient.doc_id
+                    patient_phone = patient.get('phone')
+                    exam_date = exam.get('exam_date')
                     break
             if exam_will_be_deleted:
                     break
@@ -238,10 +247,12 @@ def delete_exam(exam_id):
                 "status": "error",
                 "message": "exam id not found"
             }), 404
+                
+        # ✅ Delete PDF/JPEG files
+        deleted_files = delete_exam_files(patient_phone, exam_date, short_exam_id)
 
+        # delete from database
         updated_exams = [e for e in patient.get('exams', []) if e['id'] != exam_id]
-
-
         Patients_db.update({'exams': updated_exams}, doc_ids=[patient_doc_id])
 
         return jsonify({

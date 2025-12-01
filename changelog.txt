@@ -1,8 +1,12 @@
 #
 - tính năng login
+- tao file pdf va jpeg
 - chia phòng cho pk đa khoa
 - tính năng up hình (resize)
 - change to sqlite or similar
+
+# 2025 - 11 -30
+- fix duplicated exam_id
 
 
 # 2025-11-15

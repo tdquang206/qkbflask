@@ -29,3 +29,10 @@ def weekly_backup_all():
         if not os.path.exists(backup_file):
             shutil.copy(db_path, backup_file)
             print(f"Backup created: {backup_file}")
+
+def rotate_backups(max_files=100):
+    for db_file in glob.glob(os.path.join(BACKUP_DIR, "*_backup_*.json")):
+        base = "_".join(os.path.basename(db_file).split("_backup_")[0].split("_")[:-1])
+        matching = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith(base)], reverse=True)
+        for old in matching[max_files:]:
+            os.remove(os.path.join(BACKUP_DIR, old))

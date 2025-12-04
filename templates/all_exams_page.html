@@ -1,54 +1,132 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1 class="title">Danh sách toa thuốc</h1>
+<h1 class="title has-text-centered">Danh sách toa thuốc</h1>
 
-<section class="section">
-    <div class="container">
-        <ht class="title">Toa thuốc tháng này</ht>
+<div class="container">
+    {% for month in current_months %}
+    <section class="section">
+        <div class="box">
+            <h2 class="title is-4 has-text-primary">Tháng {{ month }}</h2>
 
-        <div class="table-container">
-            <table class="table is-striped is-hoverable is-fullwidth">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Ngày</th>
-                        <th>Tên bé - Ba Mẹ</th>
-                        <th>Số tiền</th>
-                        <th>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for exam in exams %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ exam.exam_date}}</td>
-                        <td>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên"}} --- {{ exam.parent_name }}</td>
-                        <td>{{ "{:,}".format(exam.total_money) }}</td>
-                        <td>
-                            <a class="button is-outline is-info"
-                                href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
-                                Edit
-                            </a>
-                            {% if exam.paid_status %}
-                            <button class="button is-outline is-success money_received_status" disabled>Đã nhận
-                                tiền</button>
-                            {% else %}
-                            <a class="button is-warning money_received_btn" data-exam-id="{{ exam.exam_id }}"
-                                data-patient-id="{{ exam.patient_id }}">Chưa kiểm tra tiền</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <!-- Unpaid Exams -->
+            <h3 class="subtitle is-5 has-text-danger">
+                Chưa trả: {{ "{:,}".format(grouped[month].subtotal_unpaid) }}
+            </h3>
+            <div class="table-container">
+                <table class="table is-striped is-hoverable is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ngày</th>
+                            <th>Tên bé - Ba Mẹ</th>
+                            <th>Số tiền</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exam in grouped[month].unpaid %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ exam.exam_date }}</td>
+                            <td>
+                                Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}
+                                --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+                            </td>
+                            <td class="has-text-weight-semibold has-text-danger">
+                                {{ "{:,}".format(exam.total_money) }}
+                            </td>
+                            <td>
+                                <a class="button is-info is-outlined"
+                                    href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
+                                    Edit
+                                </a>
+                                <a class="button is-warning money_received_btn" data-exam-id="{{ exam.exam_id }}"
+                                    data-patient-id="{{ exam.patient_id }}">
+                                    Chưa kiểm tra tiền
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
+            <!-- Paid Exams -->
+            <h3 class="subtitle is-5 has-text-success">
+                Đã trả: {{ "{:,}".format(grouped[month].subtotal_paid) }}
+            </h3>
+            <div class="table-container">
+                <table class="table is-striped is-hoverable is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ngày</th>
+                            <th>Tên bé - Ba Mẹ</th>
+                            <th>Số tiền</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exam in grouped[month].paid %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ exam.exam_date }}</td>
+                            <td>
+                                Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}
+                                --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+                            </td>
+                            <td class="has-text-weight-semibold has-text-success">
+                                {{ "{:,}".format(exam.total_money) }}
+                            </td>
+                            <td>
+                                <a class="button is-info is-outlined"
+                                    href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
+                                    Edit
+                                </a>
+                                <button class="button is-success is-outlined money_received_status" disabled>
+                                    Đã nhận tiền
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+    </section>
+    {% endfor %}
 
-    </div>
-</section>
+    <!-- Pagination for older months -->
+    {% if older_months %}
+    <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+        {% if page > 1 %}
+        <a class="pagination-previous" href="?page={{ page - 1 }}">Trang trước</a>
+        {% else %}
+        <a class="pagination-previous" disabled>Trang trước</a>
+        {% endif %}
+
+        {% if has_next %}
+        <a class="pagination-next" href="?page={{ page + 1 }}">Trang sau</a>
+        {% else %}
+        <a class="pagination-next" disabled>Trang sau</a>
+        {% endif %}
+
+        <ul class="pagination-list">
+            {% for p in range(1, total_pages + 1) %}
+            <li>
+                <a class="pagination-link {% if p == page %}is-current{% endif %}" href="?page={{ p }}">
+                    {{ p }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
 <!-- Toast notification -->
 <div id="toast" class="notification" style="display:none; position:fixed; top:20px; right:20px; z-index:1000;"></div>
-<!-- Toast noti -->
+
 <script>
     function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
         const toast = document.getElementById("toast");
@@ -59,6 +137,7 @@
             toast.style.display = "none";
         }, 3000);
     }
+
     document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll(".money_received_btn").forEach(function (btn) {
             btn.addEventListener("click", async function () {
@@ -66,42 +145,27 @@
                     const examId = btn.getAttribute("data-exam-id");
                     const patientId = btn.getAttribute("data-patient-id");
 
-                    console.log('Sending request:', {
-                        patient_id: patientId,
-                        exam_id: examId
-                    })
-
                     const response = await fetch('/api/mark_paid', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            patient_id: patientId,
-                            exam_id: examId
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ patient_id: patientId, exam_id: examId })
                     });
 
                     const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.error || `HTTP error! status: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(data.error || `HTTP error! status: ${response.status}`);
 
                     if (data.success) {
-                        this.outerHTML = '<span class="label is-success">Đã nhận tiền</span>';
+                        this.outerHTML = '<span class="tag is-success">Đã nhận tiền</span>';
                         showToast("✅ Đã lưu thành công!", "is-success");
                     } else {
                         throw new Error(data.error || "Unknown error");
                     }
-
-                } catch (err) {
-                    console.log('Error', error);
+                } catch (error) {
+                    console.error('Error', error);
                     showToast(`Lỗi: ${error.message}`, "is-danger");
                 }
             });
         });
     });
 </script>
-
 {% endblock %}

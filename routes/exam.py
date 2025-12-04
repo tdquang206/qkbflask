@@ -95,10 +95,16 @@ def edit_exam(exam_id):
         exams = patient_found.get("exams", [])
         updated = False
         for i, exam in enumerate(exams):
-            if exam.get('id') == exam_id:
-                exams[i].update(exam_data)
-                updated=True
-                break
+            # get old exam_id
+            old_date = exam.get('exam_date')
+            short_id = str(exam_id)[:8].replace('-','')
+            # delete old physical pdf and jpeg files
+            if old_date:
+                delete_exam_files(patient_found.get('phone'), old_date, short_id)
+            # update newdata
+            exams[i].update(exam_data)
+            updated = True
+            break
 
         # if exam_id change: create a new one
         if not updated:
@@ -107,12 +113,13 @@ def edit_exam(exam_id):
         # Update the patient document in TinyDB
         Patients_db.update({"exams": exams, "last_visit": exam_date}, doc_ids=[patient_found.doc_id])
         # NOTE: PDF and JPEG files, overwrite old files
+        short_exam_id = str(exam_id)[:8].replace('-','')
         html_content = build_exam_html(patient_found, exam_data)
         pdf_result = generate_pdf_and_jpeg(
             html_content,
             patient_found.get("phone"),
             exam_date,
-            exam_id
+            short_exam_id
         )
 
         return jsonify({

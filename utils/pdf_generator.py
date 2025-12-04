@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 # generate filename for pdf and jpeg on server
 def generate_exam_file_name(phone, exam_date, exam_id):
@@ -95,10 +96,17 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
     """
     try:
         import pdfkit
+        from pdf2image import convert_from_path
 
-        filename = generate_exam_file_name(phone, date, short_exam_id)
-        pdf_dir = f"files/pdf"
-        jpeg_dir = f"files/jpeg"
+        filename = generate_exam_file_name(phone, exam_date, short_exam_id)
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # for bin inside flask app
+        wkhtml_path = os.path.join(base_dir, "wkhtmltopdf_bin", "wkhtmltopdf.exe")
+        poppler_path = os.path.join(base_dir, "poppler_bin", "bin")
+
+        pdf_dir = os.path.join(base_dir, "files", "pdf")
+        jpeg_dir = os.path.join(base_dir, "files", "jpeg")
         os.makedirs(pdf_dir, exist_ok=True)
         os.makedirs(jpeg_dir, exist_ok=True)
 
@@ -113,21 +121,20 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
             'margin-left': '1cm',
             'margin-right': '1cm',
             'no-outline': None,
+            # 'enable-local-file-access': None # Uncomment if you use local images/css
         }
-        
-        pdfkit.from_string(html_content, pdf_path, options=options)
+
+        config = pdfkit.configuration(wkhtmltopdf = wkhtml_path)
+        pdfkit.from_string(html_content, pdf_path, options=options, configuration=config)
         print(f"✅ PDF generated: {pdf_path}")
 
         # PDF → JPEG
         try:
-            from pdf2image import convert_from_path
-            images = convert_from_path(pdf_path, dpi=150, first_page=1, last_page=1)
+            images = convert_from_path(pdf_path, poppler_path=poppler_path ,dpi=150, first_page=1, last_page=1)
             if images:
                 images[0].save(jpeg_path, 'JPEG', quality=85)
                 print(f"✅ JPEG generated: {jpeg_path}")
-        except ImportError:
-            print("⚠️ pdf2image not installed - JPEG skipped")
-            jpeg_path = None
+
         except Exception as e:
             print(f"⚠️ Error converting to JPEG: {e}")
             jpeg_path = None
@@ -154,9 +161,10 @@ def delete_exam_files(phone, exam_date, short_exam_id):
     import shutil
     
     filename = generate_exam_file_name(phone, exam_date, short_exam_id)
-    
-    pdf_path = os.path.join("files/pdf", f"{filename}.pdf")
-    jpeg_path = os.path.join("files/jpeg", f"{filename}.jpg")
+    # Calculate absolute paths (same as above)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pdf_path = os.path.join(base_dir, "files", "pdf", f"{filename}.pdf")
+    jpeg_path = os.path.join(base_dir, "files", "jpeg", f"{filename}.jpg")
     
     deleted = []
     

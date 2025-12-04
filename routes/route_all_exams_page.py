@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from datetime import datetime
 from tinydb import TinyDB, Query
+from collections import defaultdict
 
 #  the database
 
@@ -46,13 +47,51 @@ def get_exam_list():
                         "history": exam.get("history", ""),
                         "drugs": exam.get("drugs", []),
                         "service_fee": exam.get("service_fee", "0"),
-                        "total_money": service_fee + drug_total                       
+                        "total_money": service_fee + drug_total,
+                        "address": patient.get("address", "unknown address")                       
                 }
                     
                 all_exams.append(exam_with_patient)
-        all_exams = sorted(all_exams, key=lambda x: x.get('exam_date', ''), reverse=True)
+        # all_exams = sorted(all_exams, key=lambda x: x.get('exam_date', ''), reverse=True)
 
-        return render_template('all_exams_page.html', exams = all_exams)
+        # group all_exams to year-month, split paid/unpaid
+        # 1. convert exam_date to datetime
+        for exam in all_exams:
+            try:
+                exam["exam_dt"] = datetime.strptime(exam["exam_date"], "%Y-%m-%d")
+            except Exception:
+                exam["exam_dt"] = datetime.min
+        # 2. group by year-month
+        grouped = defaultdict(lambda: {"paid": [], "unpaid": [], "subtotal_paid": 0, "subtotal_unpaid": 0})
+
+        for exam in all_exams:
+            ym = exam["exam_dt"].strftime("%Y-%m")
+            if exam["paid_status"]:
+                grouped[ym]["paid"].append(exam)
+                grouped[ym]["subtotal_paid"] += exam["total_money"]
+            else:
+                grouped[ym]["unpaid"].append(exam)
+                grouped[ym]["subtotal_unpaid"] += exam["total_money"]
+        # 3. sort months Z - A
+        # After grouping
+        for ym, data in grouped.items():
+            data["paid"] = sorted(data["paid"], key=lambda x: x["exam_dt"], reverse=True)
+            data["unpaid"] = sorted(data["unpaid"], key=lambda x: x["exam_dt"], reverse=True)
+        sorted_months = sorted(grouped.keys(), reverse=True)
+        # 4. Keep 3, the rest is paged
+        current_months = sorted_months[:3]
+        older_months = sorted_months[3:]
+        # paging
+        PAGE_SIZE = 1
+        page = int(request.args.get("page", 1))
+        start = (page - 1) * PAGE_SIZE
+        end = start + PAGE_SIZE
+
+        older_months_page = older_months[start:end]
+        total_pages = (len(older_months) + PAGE_SIZE - 1) // PAGE_SIZE
+        has_next = page < total_pages
+
+        return render_template('all_exams_page.html', grouped=grouped, exams = all_exams, current_months = current_months, older_months=older_months_page, page=page, total_pages=total_pages,has_next=has_next)
 
 # mark paid status - toggle button
 @exams_list_bp.route('/api/mark_paid', methods=['POST'])

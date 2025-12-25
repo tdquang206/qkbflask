@@ -4,14 +4,14 @@ from datetime import datetime
 # generate filename for pdf and jpeg on server
 def generate_exam_file_name(phone, exam_date, exam_id):
     # phone_date_hex[:8]
-    random_part = str(exam_id)[:8].replace('-','')
-    date = str(exam_date).replace('-', '')
+    random_part = str(exam_id)[:8].replace('-', '')
+    date_str = str(exam_date).replace('-', '')  # ✅ Renamed for clarity
     
-    return f"{phone}_{date}_{random_part}"
+    return f"{phone}_{date_str}_{random_part}"
 
 def build_exam_html(patient, exam_data):
     # reuse pdf template in print
-        # Build drug rows
+    # Build drug rows
     drug_rows = ""
     for idx, drug in enumerate(exam_data.get('drugs', []), 1):
         drug_rows += f"""
@@ -30,11 +30,14 @@ def build_exam_html(patient, exam_data):
     html = f"""
     <html>
       <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <title>Phiếu Khám</title>
         <style>
           @page {{ size: A5 portrait; margin: 1cm; }}
-          body {{ font-family: sans-serif; font-size: 11pt; }}
-          h2 {{ text-align: center; margin-bottom: 1em; }}
+          * {{ font-family: Arial, Helvetica, sans-serif; }}
+          body {{ font-family: Arial, Helvetica, sans-serif; font-size: 11pt; }}
+          h2 {{ text-align: center; margin: 0.5em 0; font-size: 14pt }}
           table {{ width: 100%; border-collapse: collapse; margin-top: 1em; }}
           th, td {{ border: none; padding: 6px 4px; }}
           th {{ font-weight: bold; text-align: left; }}
@@ -84,6 +87,12 @@ def build_exam_html(patient, exam_data):
 def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
     """
     Generate PDF and JPEG from HTML
+
+    Args:
+      html_content: HTML string (must be UTF-8)
+      phone: Patient phone (e.g., '0988014887')
+      exam_date: Exam date (e.g., '2025-11-29')
+      short_exam_id: Short exam ID (e.g., '99dcb620')
     
     Returns:
         dict: {
@@ -120,35 +129,50 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
             'margin-bottom': '1cm',
             'margin-left': '1cm',
             'margin-right': '1cm',
+            'encoding': 'UTF-8',
             'no-outline': None,
             # 'enable-local-file-access': None # Uncomment if you use local images/css
+            'quiet': '',  # Suppress wkhtmltopdf warnings
         }
 
-        config = pdfkit.configuration(wkhtmltopdf = wkhtml_path)
-        pdfkit.from_string(html_content, pdf_path, options=options, configuration=config)
-        print(f"✅ PDF generated: {pdf_path}")
+        # Write HTML to temp file with UTF-8 encoding
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+            f.write(html_content)
+            temp_html_path = f.name
 
-        # PDF → JPEG
         try:
-            images = convert_from_path(pdf_path, poppler_path=poppler_path ,dpi=150, first_page=1, last_page=1)
+            # ✅ Create config with wkhtmltopdf path
+            config = pdfkit.configuration(wkhtmltopdf=wkhtml_path)
+            # ✅ Pass config to pdfkit.from_file()
+            pdfkit.from_file(temp_html_path, pdf_path, options=options, configuration=config)
+            print(f"✅ PDF generated: {pdf_path}")
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_html_path):
+                os.remove(temp_html_path)
+        # PDF → JPEG
+        jpeg_result = None
+        try:
+            images = convert_from_path(pdf_path, poppler_path=poppler_path, dpi=150, first_page=1, last_page=1)
             if images:
                 images[0].save(jpeg_path, 'JPEG', quality=85)
+                jpeg_result = jpeg_path
                 print(f"✅ JPEG generated: {jpeg_path}")
 
         except Exception as e:
             print(f"⚠️ Error converting to JPEG: {e}")
-            jpeg_path = None
-        
+
         return {
             'success': True,
             'exam_id': short_exam_id,
             'filename': filename,
             'pdf_path': pdf_path,
-            'jpeg_path': jpeg_path
+            'jpeg_path': jpeg_result
         }
     
     except Exception as e:
-        print(f"Error generating PDF: {e}")
+        print(f"❌ Error generating PDF: {e}")
         return {
             "success": False,
             "error": str(e)
@@ -158,9 +182,8 @@ def delete_exam_files(phone, exam_date, short_exam_id):
     """
     Delete PDF and JPEG files for an exam
     """
-    import shutil
-    
     filename = generate_exam_file_name(phone, exam_date, short_exam_id)
+    
     # Calculate absolute paths (same as above)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     pdf_path = os.path.join(base_dir, "files", "pdf", f"{filename}.pdf")

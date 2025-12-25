@@ -3,7 +3,8 @@ from datetime import datetime
 from tinydb import TinyDB, Query
 import uuid
 from werkzeug.utils import secure_filename
-import os
+import os, io
+from PIL import Image
 
 from utils.pdf_generator import generate_exam_file_name, build_exam_html, generate_pdf_and_jpeg, delete_exam_files
 
@@ -11,6 +12,9 @@ exam_bp = Blueprint('exam', __name__)
 db = TinyDB('db.json', encoding='utf-8')
 Patients_db = db.table('patients')
 
+# for image
+MAX_SIZE = (2000, 2000)
+MAX_FILE_SIZE = 1 * 1024 * 1024
 # NOTE: Read and Edit CRUD code
 @exam_bp.route("/exam/edit_exam/<exam_id>", methods=['POST', 'GET'])
 def edit_exam(exam_id):
@@ -184,12 +188,47 @@ def new_exam(patient_id):
         }
         short_exam_id = str(exam_data['id'])[:8].replace('-','')
         # Handle image upload if present
-        image = request.files.get('lab_image')
-        if image and image.filename:
-            filename = secure_filename(image.filename)
-            image_path = os.path.join('uploads', filename)  # Changed to direct path
-            image.save(image_path)
-            exam_data['image_path'] = image_path
+        image_list = []
+        images = request.files.getlist('lab_image')
+
+        if images and images[0].filename:
+            folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
+            os.makedirs(folder, exist_ok=True)
+            folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
+            os.makedirs(folder, exist_ok=True)
+
+            for idx, image_file in enumerate(images, start=1):
+                # ✅ Renamed loop variable to 'image_file' to avoid conflict
+                if image_file and image_file.filename:
+                    safe_name = secure_filename(image_file.filename)
+                    ext = os.path.splitext(safe_name)[1].lower()
+                    new_name = f"{patient.get('phone')}_{exam_date}_image_{idx}{ext}"
+                    image_path = os.path.join(folder, new_name)
+
+                    # Resize
+                    img = Image.open(image_file)
+                    img.thumbnail(MAX_SIZE, Image.Resampling.LANCZOS)
+                    
+                    # Save to buffer to check size
+                    buffer = io.BytesIO()
+                    img.save(buffer, format=img.format or "JPEG", optimize=True, quality=85)
+                    
+                    # If too large, reduce quality
+                    if buffer.tell() > MAX_FILE_SIZE:
+                        buffer = io.BytesIO()
+                        img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
+                    
+                    # Write to disk
+                    with open(image_path, "wb") as f:
+                        f.write(buffer.getvalue())
+                    
+                    image_list.append({
+                        "filename": new_name,
+                        "path": image_path
+                    })
+        
+        if image_list:    
+            exam_data['images'] = image_list
             
         # Append to patient's exams list
         exams = patient.get("exams", [])
@@ -267,3 +306,42 @@ def delete_exam(exam_id):
             "message": "Đã xóa toa thuốc",
             "redirect_url": url_for('view_exams', patient_id=patient_doc_id)
         })
+
+@exam_bp.route('/exam/<int:patient_id>/upload_images', methods=['POST'])
+def upload_images(patient_id):
+    patient = Patients_db.get(doc_id=patient_id)
+    exam_date = datetime.now().strftime("%Y-%m-%d")
+
+    images = request.files.getlist('lab_images')
+    image_list = []
+
+    folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
+    os.makedirs(folder, exist_ok=True)
+
+    for idx, image in enumerate(images, start=1):
+        if image and image.filename:
+            safe_name = secure_filename(image.filename)
+            ext = os.path.splitext(safe_name)[1].lower()
+            new_name = f"{patient.get('phone')}_{exam_date}_image_{idx}{ext}"
+            image_path = os.path.join(folder, new_name)
+
+            # Resize with Pillow
+            img = Image.open(image)
+            img.thumbnail((2000, 2000), Image.ANTIALIAS)
+
+            buffer = io.BytesIO()
+            img.save(buffer, format=img.format or "JPEG", optimize=True, quality=85)
+            if buffer.tell() > 1 * 1024 * 1024:  # >1MB
+                buffer = io.BytesIO()
+                img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
+
+            with open(image_path, "wb") as f:
+                f.write(buffer.getvalue())
+
+            # Return URL for frontend thumbnail
+            image_list.append({
+                "filename": new_name,
+                "url": f"/{image_path}"  # adjust if you serve uploads differently
+            })
+
+    return jsonify({"status": "success", "images": image_list})

@@ -1,6 +1,5 @@
 Project Summary: QKBFlask
-This is a Flask-based Clinic/Pharmacy Management System, likely tailored for a pediatric clinic (references to "kid_name"). It uses TinyDB for data storage (JSON files).
-
+This is a Flask-based Clinic/Pharmacy Management System
 # Key Features:
 Patient Management: Track patient details (name, birthdate, address) and history.
 Exam/Visit Management:

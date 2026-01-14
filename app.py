@@ -215,23 +215,40 @@ def drug_sold():
     # Parse dates if provided
     start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
     end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
-
-    # Aggregate drug quantities
+    # Aggregate drug quantities from patients -> exams
     totals = defaultdict(int)
-    for exam in exams.all():
-        try:
-            exam_date = datetime.strptime(exam.get('exam_date', ''), "%Y-%m-%d")
-        except Exception:
-            continue
+    
+    # Iterate over all patients
+    for patient in patients.all():
+        # Iterate over each exam for the patient
+        for exam in patient.get('exams', []):
+            try:
+                # Parse exam date
+                # Support both YYYY-MM-DD and potentially other formats if needed, 
+                # but standardized on YYYY-MM-DD based on other files
+                date_str = exam.get('exam_date', '')
+                if not date_str:
+                    continue
+                exam_date = datetime.strptime(date_str, "%Y-%m-%d")
+            except Exception:
+                continue
 
-        if start and exam_date < start:
-            continue
-        if end and exam_date > end:
-            continue
+            # Date filtering
+            if start and exam_date < start:
+                continue
+            if end and exam_date > end:
+                continue
 
-        for drug in exam.get('drugs', []):
-            qty = int(drug.get('quantity', 0) or 0)
-            totals[drug.get('name', 'Unknown')] += qty
+            # Sum up drugs
+            for drug in exam.get('drugs', []):
+                # Ensure quantity is an integer
+                try:
+                    qty = int(float(drug.get('quantity', 0) or 0))
+                except ValueError:
+                    qty = 0
+                    
+                if qty > 0:
+                    totals[drug.get('name', 'Unknown')] += qty
 
     # Convert to list of dicts for template
     drug_totals = [{"name": name, "quantity": qty} for name, qty in totals.items()]

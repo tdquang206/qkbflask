@@ -94,3 +94,10 @@ pytype/
 cython_debug/
 # PyCharm
 idea/
+
+# Custom Project Directories (Excluded)
+uploads/
+files/
+backups/
+logs/
+.venv/

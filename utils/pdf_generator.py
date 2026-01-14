@@ -26,7 +26,25 @@ def build_exam_html(patient, exam_data):
         </tr>
         """
     
-    # Your existing HTML template
+    # Calculate footer data
+    # 1. Total Money Code (e.g., 50000 -> 50)
+    total_money = str(exam_data.get('total_money', '0'))
+    # Clean non-digit characters just in case
+    total_money = ''.join(filter(str.isdigit, total_money))
+    if len(total_money) > 3:
+        total_short = total_money[:-3]
+    else:
+        total_short = "0"
+        
+    # 2. Print Time Code (YYMMDDHHMMSS)
+    # Use submit_time if available, else current time
+    submit_time = exam_data.get('submit_time')
+    if not submit_time:
+        submit_time = datetime.now().strftime('%y%m%d%H%M%S')
+        
+    # Format: YYMMDDHHMMSS + "H" + PriceCode
+    footer_code = f"{submit_time}H{total_short}"
+
     html = f"""
     <html>
       <head>
@@ -77,7 +95,7 @@ def build_exam_html(patient, exam_data):
           </tbody>
         </table>
         <div class="footer">
-          <span style="white-space:nowrap;">{datetime.now().strftime('%H:%M')}</span>
+          <span style="white-space:nowrap;">{footer_code}</span>
         </div>
       </body>
     </html>

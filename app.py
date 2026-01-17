@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, Blueprint
-from tinydb import TinyDB, Query, where
+from tinydb import Query, where
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from collections import defaultdict
@@ -11,10 +11,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = b'quang0902915519'
 
-db = TinyDB('db.json', encoding='utf-8')
-patients = db.table('patients')
-drugs = db.table('drugs')
-exams = db.table('exams')
+from shared_db import db, patients_table as patients, drugs_table as drugs, exams_table as exams
 
 # include blueprint
 from routes.mua_thuoc import mua_thuoc_bp

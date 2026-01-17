@@ -2,7 +2,7 @@ from tinydb import TinyDB
 from uuid import uuid4
 
 # open your DB file (adjust path if needed)
-db = TinyDB("db.json")
+db = TinyDB("db.json", encoding='utf-8')
 patients = db.table("patients")
 
 migrated_count = 0

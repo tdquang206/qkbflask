@@ -1,25 +1,24 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from datetime import datetime
-from tinydb import TinyDB, Query
+from tinydb import Query
 from collections import defaultdict
 
 #  the database
 
 exams_list_bp = Blueprint('route_all_exams_page', __name__)
-db = TinyDB('db.json')
+from shared_db import db, patients_table as patients
 
 @exams_list_bp.route('/danh_sach_kham_benh', methods = ['GET', 'POST'])
 def get_exam_list():
     if request.method == 'GET':
         # get patients table
-        patients = db.table('patients')
         all_patients = patients.all()
         
         all_exams = []
         for patient in all_patients:
             for exam in patient.get('exams', []):
                 try:
-                    service_fee = int(exam.get("service_fee", "0") or 0)
+                    service_fee = int(float(exam.get("service_fee") or 0))
                 except (ValueError, TypeError):
                     service_fee = 0
 
@@ -28,8 +27,9 @@ def get_exam_list():
                 if isinstance(drugs, list):
                     for drug in drugs:
                         try:
-                            price = int(drug.get("price", "0") or 0)
-                            quantity = int(drug.get("quantity", "0") or 0)
+                            # Use float first to handle cases like "1000.0"
+                            price = int(float(drug.get("price") or 0))
+                            quantity = int(float(drug.get("quantity") or 0))
                             drug_total += price * quantity
                         except (ValueError, TypeError, AttributeError):
                             continue

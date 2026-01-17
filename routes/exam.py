@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash
 from datetime import datetime
-from tinydb import TinyDB, Query
+from tinydb import Query
 import uuid
 from werkzeug.utils import secure_filename
 import os, io
@@ -9,8 +9,7 @@ from PIL import Image
 from utils.pdf_generator import generate_exam_file_name, build_exam_html, generate_pdf_and_jpeg, delete_exam_files
 
 exam_bp = Blueprint('exam', __name__)
-db = TinyDB('db.json', encoding='utf-8')
-Patients_db = db.table('patients')
+from shared_db import db, patients_table as Patients_db
 
 # for image
 MAX_SIZE = (2000, 2000)
@@ -99,16 +98,17 @@ def edit_exam(exam_id):
         exams = patient_found.get("exams", [])
         updated = False
         for i, exam in enumerate(exams):
-            # get old exam_id
-            old_date = exam.get('exam_date')
-            short_id = str(exam_id)[:8].replace('-','')
-            # delete old physical pdf and jpeg files
-            if old_date:
-                delete_exam_files(patient_found.get('phone'), old_date, short_id)
-            # update newdata
-            exams[i].update(exam_data)
-            updated = True
-            break
+            if exam.get('id') == exam_id:
+                # get old exam_id
+                old_date = exam.get('exam_date')
+                short_id = str(exam_id)[:8].replace('-','')
+                # delete old physical pdf and jpeg files
+                if old_date:
+                    delete_exam_files(patient_found.get('phone'), old_date, short_id)
+                # update newdata
+                exams[i].update(exam_data)
+                updated = True
+                break
 
         # if exam_id change: create a new one
         if not updated:

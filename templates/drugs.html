@@ -1,9 +1,225 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1 class="title">Manage Drugs</h1>
+<style>
+  :root {
+    --primary-color: #00d1b2;
+    --dark-bg: #1a1a1a;
+    --card-bg: #242424;
+    --text-color: #f5f5f5;
+    --border-color: #333;
+  }
 
-<div class="is-flex is-justify-content-center" style="position: sticky; top: 0;"><button class="button is-primary m-4"
-    id="addDrugModalBtn">Add New Drug</button>
+  body {
+    background-color: var(--dark-bg);
+    color: var(--text-color);
+  }
+
+  .title {
+    color: var(--text-color) !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+  }
+
+  .controls-container {
+    background: var(--card-bg);
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    position: sticky;
+    top: 1rem;
+    z-index: 10;
+    border: 1px solid var(--border-color);
+  }
+
+  .search-wrapper {
+    position: relative;
+    flex-grow: 1;
+    max-width: 400px;
+    margin-left: auto;
+  }
+
+  .search-wrapper .input::placeholder {
+    color: rgba(255, 255, 255, 0.6) !important;
+    opacity: 1;
+  }
+
+  .search-wrapper .input {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-color);
+    color: var(--text-color);
+    border-radius: 8px;
+    padding-left: 2.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .search-wrapper .input:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.125em rgba(0, 209, 178, 0.25);
+  }
+
+  .search-wrapper::before {
+    content: "🔍";
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.5;
+    font-size: 0.9rem;
+  }
+
+  .table-container {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+  }
+
+  .table {
+    background-color: transparent !important;
+    color: var(--text-color) !important;
+  }
+
+  .table thead th {
+    color: #999 !important;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    border-bottom: 2px solid var(--border-color) !important;
+    padding: 1rem;
+  }
+
+  .table tbody td {
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 1rem;
+    vertical-align: middle;
+    color: var(--text-color);
+  }
+
+  .table tbody tr {
+    transition: background-color 0.2s ease;
+  }
+
+  .table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+  }
+
+  /* Price styling */
+  .price-tag {
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-weight: 600;
+    color: var(--primary-color);
+  }
+
+  .cost-tag {
+    font-family: 'Monaco', 'Consolas', monospace;
+    color: #888;
+  }
+
+  .button.is-small {
+    height: 2.25em;
+    padding: 0 1rem;
+    font-weight: 500;
+  }
+
+  .button.is-info {
+    background-color: #3e8ed0;
+    border: none;
+  }
+
+  .button.is-info:hover {
+    background-color: #3482c3;
+  }
+
+  .button.is-danger {
+    background-color: #f14668;
+    border: none;
+  }
+
+  .button.is-danger:hover {
+    background-color: #ef2e55;
+  }
+
+  .button.is-primary {
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .button.is-info,
+  .button.is-danger {
+    border-radius: 6px;
+  }
+
+  /* Modal Enhancements */
+  .modal-card {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .modal-card-head {
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .modal-card-title {
+    color: var(--text-color);
+  }
+
+  .modal-card-body {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+  }
+
+  .modal-card-body .label {
+    color: #ececec;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .modal-card-body .input {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-color);
+    color: var(--text-color);
+  }
+
+  .modal-card-foot {
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+    justify-content: flex-end;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-actions .button,
+  .header-actions .input {
+    height: 40px;
+    margin: 0;
+    box-sizing: border-box;
+  }
+</style>
+
+<div class="controls-container">
+  <h1 class="title is-4" style="letter-spacing: -0.5px;">Manage Drugs</h1>
+  <div class="header-actions">
+    <button class="button is-primary" id="addDrugModalBtn">
+      <span class="icon">➕</span>
+      <span>Add New Drug</span>
+    </button>
+
+    <div class="search-wrapper">
+      <input class="input" type="text" placeholder="Search by name or SKU..." id="searchInput" onkeyup="filterTable()">
+    </div>
+  </div>
 
   <!-- add drug modal -->
   <div class="modal" id="addDrugModal">
@@ -15,84 +231,93 @@
       </header>
       <section class="modal-card-body">
         <form method="POST" id="drug-form" aria-label="drug-form">
-          <div class="field is-horizontal">
-            <div class="field-label is-normal"><label class="label">SKU</label></div>
-            <div class="field-body"><input class="input" type="text" name="sku" id="sku_input" required readonly></div>
+          <div class="field">
+            <label class="label">SKU (Auto-generated)</label>
+            <div class="control">
+              <input class="input" type="text" name="sku" id="sku_input" required readonly
+                placeholder="Will be generated...">
+            </div>
           </div>
 
-          <div class="field is-horizontal">
-            <div class="field-label is-normal"><label class="label">Drug Name</label></div>
-            <div class="field-body"><input class="input" type="text" name="name" id="drug_name_input" required></div>
+          <div class="field">
+            <label class="label">Drug Name</label>
+            <div class="control">
+              <input class="input" type="text" name="name" id="drug_name_input" required
+                placeholder="e.g. Paracetamol 500mg">
+            </div>
           </div>
 
-          <div class="field is-horizontal">
-            <div class="field-label is-normal"><label class="label">Sell Price</label></div>
-            <div class="field-body"><input class="input" type="number" step="0.01" name="sell_price"></div>
+          <div class="columns">
+            <div class="column">
+              <div class="field">
+                <label class="label">Sell Price</label>
+                <div class="control">
+                  <input class="input" type="number" step="0.01" name="sell_price" placeholder="0.00">
+                </div>
+              </div>
+            </div>
+            <div class="column">
+              <div class="field">
+                <label class="label">Cost (Buy Price)</label>
+                <div class="control">
+                  <input class="input" type="number" step="0.01" name="buy_price" placeholder="0.00">
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="field is-horizontal">
-            <div class="field-label is-normal"><label class="label">Buy Price</label></div>
-            <div class="field-body"><input class="input" type="number" step="0.01" name="buy_price"></div>
+          <div class="field">
+            <label class="label">Initial Quantity</label>
+            <div class="control">
+              <input class="input" type="number" name="quantity" placeholder="0">
+            </div>
           </div>
-
-          <div class="field is-horizontal m-4 is-flex-grow-4">
-            <div class="field-label is-normal"><label class="label">Quantity</label></div>
-            <div class="field-body"><input class="input" type="number" name="quantity"></div>
-          </div>
-
-          <!-- <div class="field is-horizontal">
-            <div class="field-label is-normal"><label class="label">Trong kho</label></div>
-            <div class="field-body"><input class="input" type="text" name="inventory"></div>
-        </div> -->
-
         </form>
       </section>
       <footer class="modal-card-foot">
-        <button class="button is-success" type="submit" form="drug-form">Add Drug</button>
         <button class="button" id="cancelBtn">Cancel</button>
+        <button class="button is-primary" type="submit" form="drug-form">Create Drug</button>
       </footer>
-    </div>
-  </div>
-
-  <!-- search field -->
-  <div class="field">
-    <div class="control">
-      <input class="input" type="text" placeholder="Search by name or SKU" id="searchInput" onkeyup="filterTable()">
     </div>
   </div>
 </div>
 
-<table class="table is-striped is-fullwidth" id="drugTable">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>SKU</th>
-      <th>Name</th>
-      <th>Sell Price</th>
-      <th>Cost</th>
-      <th>Quantity</th>
-      <th>Inventory</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for drug in drugs %}
-    <tr>
-      <td>{{ drug.doc_id }}</td>
-      <td>{{ drug.sku }}</td>
-      <td>{{ drug.name }}</td>
-      <td>{{ "{:,.0f}".format(drug.sell_price|float) }}</td>
-      <td>{{ "{:,.0f}".format(drug.buy_price|float) }}</td>
-      <td>{{ drug.quantity }}</td>
-      <td>{{ drug.inventory }}</td>
-      <td>
-        <a href="/edit_drug/{{ drug.doc_id }}" class="button is-small is-info">Edit</a>
-        <a href="/delete_drug/{{ drug.doc_id }}" class="button is-small is-danger">Delete</a>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="table-container">
+
+  <table class="table is-striped is-fullwidth" id="drugTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>SKU</th>
+        <th>Name</th>
+        <th>Sell Price</th>
+        <th>Cost</th>
+        <th>Quantity</th>
+        <th>Inventory</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for drug in drugs %}
+      <tr>
+        <td>{{ drug.doc_id }}</td>
+        <td><span class="tag is-dark">{{ drug.sku }}</span></td>
+        <td><strong>{{ drug.name }}</strong></td>
+        <td class="price-tag">{{ "{:,.0f}".format(drug.sell_price|float) if drug.sell_price else "0" }}</td>
+        <td class="cost-tag">{{ "{:,.0f}".format(drug.buy_price|float) if drug.buy_price else "0" }}</td>
+        <td>{{ drug.quantity if drug.quantity else "0" }}</td>
+        <td>{{ drug.inventory if drug.inventory else "0" }}</td>
+        <td>
+          <div class="buttons are-small">
+            <a href="/edit_drug/{{ drug.doc_id }}" class="button is-info">Edit</a>
+            <a href="/delete_drug/{{ drug.doc_id }}" class="button is-danger">Delete</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 <script>
   // Function for filtering the table (unchanged)

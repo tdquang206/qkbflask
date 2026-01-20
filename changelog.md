@@ -1,3 +1,19 @@
+# Version 0.3.170126 (2026-01-17)
+
+## Project Analysis & Summary
+- Integrated Discord notifications directly into the exam workflow.
+- Centralized configuration in a new Settings page.
+- Polished UI with toast notifications and improved defaults.
+
+## New Features
+- **Discord Integration**:
+  - Global "Settings" page to configure Webhook URL and content preferences.
+  - "Auto-send" checkbox in `New Exam` and `Edit Exam` pages (checked by default).
+  - Backend helper to format and send detailed exam reports to Discord (Date, Name, Drugs, Image, etc.).
+- **UI Polish**:
+  - Added global Toast Notifications for better feedback.
+  - "Send to Discord" is now enabled by default.
+
 # Version 0.2.260116 (2026-01-16)
 
 ## Project Analysis & Summary

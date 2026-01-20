@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<button onclick="history.back()" class="button is-small mb-4">⬅ Quay lại</button>
+
+<div class="box">
+    <div class="content">
+        {{ content | safe }}
+    </div>
+</div>
+{% endblock %}

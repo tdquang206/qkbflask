@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <section class="section">
   <form id="examForm" action="{{ url_for('exam.edit_exam', exam_id=exam.id) }}" method="POST"
@@ -273,6 +274,16 @@
     </div>
 
 
+    <!-- Discord Notification Section -->
+    <!-- Discord Option -->
+    <div class="box has-text-centered">
+      <label class="checkbox is-size-5">
+        <input type="checkbox" name="send_discord" checked>
+        🔔 Gửi thông báo Discord
+      </label>
+    </div>
+
+
     <!-- Save, Print, Back to patient list-->
     <div class=" field is-grouped is-grouped-centered no-print mt-5">
       <!-- Print Button -->
@@ -301,10 +312,7 @@
     </div>
   </form>
 </section>
-<div id="toast" class="notification is-success"
-  style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">
-  ✅ Đã lưu thành công!
-</div>
+
 
 <script>
   function calculateTotals() {
@@ -330,15 +338,7 @@
 
 <!-- Toast noti -->
 <script>
-  function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
-    const toast = document.getElementById("toast");
-    toast.textContent = message;
-    toast.className = `notification ${type}`;
-    toast.style.display = "block";
-    setTimeout(() => {
-      toast.style.display = "none";
-    }, 3000);
-  }
+
   // toggle paid_status
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("paid_status_toggle_btn").addEventListener("click", async function () {
@@ -854,9 +854,8 @@
         </div>
       </body>
     </html>
-  `;
+    `;
 
-    // Open new window and print, then close
     const printWindow = window.open("", "_blank");
     printWindow.document.write(printContent);
     printWindow.document.close();
@@ -1001,5 +1000,7 @@
     calculateTotals();
   });
 </script>
+
+
 
 {% endblock %}

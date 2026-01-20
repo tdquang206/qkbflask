@@ -23,6 +23,9 @@ app.register_blueprint(exams_list_bp)
 from routes.exam import exam_bp
 app.register_blueprint(exam_bp)
 
+from routes.settings import settings_bp
+app.register_blueprint(settings_bp)
+
 # weekly backup
 from utils.db_logger import weekly_backup_all, log_action
 @app.after_request

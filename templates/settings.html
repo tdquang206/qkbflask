@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+    <div class="container">
+        <h1 class="title">Cài đặt</h1>
+
+        <form method="POST" action="/settings">
+            <div class="box">
+                <h2 class="subtitle">Cấu hình Discord</h2>
+
+                <div class="field">
+                    <label class="label">Webhook URL</label>
+                    <div class="control">
+                        <input class="input" type="text" name="discord_webhook_url"
+                            value="{{ settings.discord_webhook_url }}"
+                            placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label">Mặc định gửi kèm:</label>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_date" {% if settings.include_date %}checked{% endif %}>
+                            Ngày khám
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_kid_name" {% if settings.include_kid_name %}checked{%
+                                endif %}> Tên bé
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_parent_name" {% if settings.include_parent_name
+                                %}checked{% endif %}> Phụ huynh
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_phone" {% if settings.include_phone %}checked{% endif
+                                %}> SĐT
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_address" {% if settings.include_address %}checked{%
+                                endif %}> Địa chỉ
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_total_money" {% if settings.include_total_money
+                                %}checked{% endif %}> Tổng tiền
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_table" {% if settings.include_table %}checked{% endif
+                                %}> 💊 Kèm bảng thuốc (text)
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="attach_image" {% if settings.attach_image %}checked{% endif %}>
+                            🖼️ Đính kèm ảnh đơn thuốc
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-link">Lưu cài đặt</button>
+                </div>
+                <div class="control">
+                    <a href="/" class="button is-light">Hủy</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

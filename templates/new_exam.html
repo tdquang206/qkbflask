@@ -231,6 +231,14 @@
         </div>
       </div>
     </div>
+    <!-- Discord Option -->
+    <div class="box has-text-centered">
+      <label class="checkbox is-size-5">
+        <input type="checkbox" name="send_discord" checked>
+        🔔 Gửi thông báo Discord
+      </label>
+    </div>
+
     <!-- Save, Print, Back to patient list-->
     <div class=" field is-grouped is-grouped-centered no-print mt-5">
       <!-- Print Button -->
@@ -259,10 +267,7 @@
     </div>
   </form>
 </section>
-<div id="toast" class="notification is-success"
-  style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">
-  ✅ Đã lưu thành công!
-</div>
+
 <!-- back to patient list buton -->
 <script>
   document.getElementById("backBtn").addEventListener("click", function () {
@@ -294,15 +299,7 @@
 
 <!-- Toast noti -->
 <script>
-  function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
-    const toast = document.getElementById("toast");
-    toast.textContent = message;
-    toast.className = `notification ${type}`;
-    toast.style.display = "block";
-    setTimeout(() => {
-      toast.style.display = "none";
-    }, 3000);
-  }
+
   document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("examForm");
     const saveBtn = document.getElementById("saveBtn");

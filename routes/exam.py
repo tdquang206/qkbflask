@@ -3,8 +3,9 @@ from datetime import datetime
 from tinydb import Query
 import uuid
 from werkzeug.utils import secure_filename
-import os, io
+import os, io, json
 from PIL import Image
+import requests
 
 from utils.pdf_generator import generate_exam_file_name, build_exam_html, generate_pdf_and_jpeg, delete_exam_files
 
@@ -14,6 +15,89 @@ from shared_db import db, patients_table as Patients_db
 # for image
 MAX_SIZE = (2000, 2000)
 MAX_FILE_SIZE = 1 * 1024 * 1024
+SETTINGS_FILE = 'user_settings.json'
+
+def send_discord_helper(patient, exam_data):
+    # Load settings
+    if not os.path.exists(SETTINGS_FILE):
+        return
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            settings = json.load(f)
+    except:
+        return
+
+    webhook_url = settings.get('discord_webhook_url')
+    if not webhook_url:
+        return
+
+    # Build Message based on settings
+    fields = []
+    
+    if settings.get('include_date'):
+        fields.append(f"**Ngày khám:** {exam_data.get('exam_date')}")
+    
+    if settings.get('include_kid_name'):
+        fields.append(f"**Bé:** {patient.get('kid_name')} ({patient.get('kid_birthday')})")
+        
+    if settings.get('include_parent_name'):
+        fields.append(f"**Phụ huynh:** {patient.get('name')}")
+        
+    if settings.get('include_phone'):
+        fields.append(f"**SĐT:** {patient.get('phone')}")
+        
+    if settings.get('include_address'):
+        fields.append(f"**Địa chỉ:** {patient.get('address')}")
+        
+    if settings.get('include_total_money'):
+        fields.append(f"**Tổng tiền:** {exam_data.get('total_money')}")
+
+    message_content = "\n".join(fields)
+    
+    if settings.get('include_table'):
+        # Build text table
+        table_str = "```\n"
+        table_str += f"{'Tên thuốc':<20} | {'SL':<5} | {'Ghi chú'}\n"
+        table_str += "-"*40 + "\n"
+        for drug in exam_data.get('drugs', []):
+            name = drug.get('name', '')[:20]
+            qty = str(drug.get('quantity', ''))
+            note = drug.get('note', '')
+            table_str += f"{name:<20} | {qty:<5} | {note}\n"
+        table_str += "```"
+        message_content += "\n\n**Toa thuốc:**\n" + table_str
+
+    payload = {
+        "content": message_content
+    }
+    
+    files = {}
+    if settings.get('attach_image'):
+        phone = patient.get('phone')
+        exam_date = exam_data.get('exam_date')
+        short_id = str(exam_data.get('id'))[:8].replace('-', '')
+        
+        filename = generate_exam_file_name(phone, exam_date, short_id)
+        
+        base_dir = os.path.dirname(os.path.abspath(__file__)) # routes/
+        app_root = os.path.dirname(base_dir)
+        jpeg_path = os.path.join(app_root, "files", "jpeg", f"{filename}.jpg")
+        
+        if os.path.exists(jpeg_path):
+            files["file"] = (f"{filename}.jpg", open(jpeg_path, "rb"))
+        else:
+            payload["content"] += "\n\n(⚠️ Không tìm thấy file ảnh đơn thuốc)"
+
+    try:
+        if files:
+            requests.post(webhook_url, data=payload, files=files)
+            files["file"][1].close()
+        else:
+            requests.post(webhook_url, json=payload)
+    except Exception as e:
+        print(f"Error sending to Discord: {e}")
+
+
 # NOTE: Read and Edit CRUD code
 @exam_bp.route("/exam/edit_exam/<exam_id>", methods=['POST', 'GET'])
 def edit_exam(exam_id):
@@ -33,8 +117,6 @@ def edit_exam(exam_id):
         return redirect(url_for('patient.view_patients'))
     
     if request.method == 'GET':
-        # print(f'exam id {exam_editting}')
-        # print(f'patient id {patient_found}')
         return render_template('edit_exam.html', patient = patient_found, exam=exam_editting)
 
     if request.method == 'POST':
@@ -54,6 +136,7 @@ def edit_exam(exam_id):
         drug_notes = request.form.getlist('drug_note')
         drug_prices = request.form.getlist('drug_price')
         total_money = request.form.get('total_money') 
+        send_discord_flag = request.form.get('send_discord')
 
         # try to discard empty name when receiving data
         drugs = []
@@ -126,6 +209,9 @@ def edit_exam(exam_id):
             short_exam_id
         )
 
+        if send_discord_flag:
+            send_discord_helper(patient_found, exam_data)
+
         return jsonify({
           "status": "success",
           "message": "Exam updated"  
@@ -158,6 +244,7 @@ def new_exam(patient_id):
         drug_notes = request.form.getlist('drug_note')
         drug_prices = request.form.getlist('drug_price')
         total_money = request.form.get('total_money') 
+        send_discord_flag = request.form.get('send_discord')
 
         # try to discard empty name when receiving data
         drugs = []
@@ -250,6 +337,9 @@ def new_exam(patient_id):
             exam_date,
             short_exam_id
         )
+
+        if send_discord_flag:
+            send_discord_helper(patient, exam_data)
 
         return jsonify({
             "status": "success",

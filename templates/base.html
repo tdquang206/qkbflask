@@ -34,6 +34,8 @@
         <a class="navbar-item" href="/">Tổng quan</a>
         <a class="navbar-item" href="/patients">Danh sách BN</a>
         <a class="navbar-item" href="/danh_sach_kham_benh">Danh sách toa thuốc</a>
+        <a class="navbar-item" href="/settings">Cài đặt</a>
+        <a class="navbar-item" href="/changelog">Changelog</a>
         <!-- <a class="navbar-item" href="/drugs">Danh sách thuốc</a>
       <a class="navbar-item" href="/drug_sold">Báo cáo dùng thuốc</a> -->
         <div class="navbar-item has-dropdown is-hoverable">
@@ -61,11 +63,11 @@
     <div>
       {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-      <ul class=flashes>
+      <div id="flash-messages" style="display:none;">
         {% for category, message in messages %}
-        <li class="{{ category }}">{{ message }}</li>
+        <div data-category="{{ category }}" data-message="{{ message }}"></div>
         {% endfor %}
-      </ul>
+      </div>
       {% endif %}
       {% endwith %}
     </div>
@@ -91,6 +93,38 @@
   </div>
 
 
+  <!-- Toast Notification HTML -->
+  <div id="toast" class="notification is-success"
+    style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 3000;">
+    ✅ Đã lưu thành công!
+  </div>
+
+  <script>
+    function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      // Map common flask categories to bulma colors if needed, though usually strict mapping is better
+      let bulmaClass = type;
+      if (type === 'error') bulmaClass = 'is-danger';
+      if (type === 'success') bulmaClass = 'is-success';
+      if (type === 'message') bulmaClass = 'is-info';
+
+      toast.className = `notification ${bulmaClass}`;
+      toast.style.display = "block";
+      setTimeout(() => {
+        toast.style.display = "none";
+      }, 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const flashes = document.querySelectorAll('#flash-messages div');
+      flashes.forEach(f => {
+        const msg = f.dataset.message;
+        const cat = f.dataset.category;
+        showToast(msg, cat);
+      });
+    });
+  </script>
 </body>
 <!-- Menubar js -->
 <script>

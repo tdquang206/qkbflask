@@ -230,12 +230,6 @@ def drug_sold():
     start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
     end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
 
-    # Calculate number of days in range for Avg Daily Usage
-    if start and end:
-        num_days = (end - start).days + 1
-    else:
-        num_days = 30 # fallback
-
     # --- MATCHING LOGIC START ---
     # Load purchases for history lookup
     try:
@@ -249,41 +243,20 @@ def drug_sold():
     drug_purchases_map = defaultdict(list)
     from unicodedata import normalize
     
-    # Store purchase data in range for logical union
-    purchased_in_range_qty = defaultdict(int)
-
     for p in all_purchases:
-        p_date_str = p.get('date_buy')
-        p_date = None
-        if p_date_str:
-             try: 
-                 p_date = datetime.strptime(p_date_str, "%Y-%m-%d")
-             except: pass
-
-        # Filter for "In Range" purchases to show in list even if not sold
-        in_range = False
-        if start and end and p_date:
-             if start <= p_date <= end:
-                 in_range = True
-
+        p_date = p.get('date_buy')
         for d in p.get('drugs', []):
             d_name = d.get('name', '').strip()
             if d_name:
                 # Normalize key
                 d_key = normalize('NFC', d_name)
                 record = {
-                    'date': p_date_str,
+                    'date': p_date,
                     'quantity': d.get('quantity'),
                     'ppu': d.get('ppu'),
                     'buy_price': d.get('buy_price')
                 }
                 drug_purchases_map[d_key].append(record)
-                
-                if in_range:
-                    try:
-                        qty = int(d.get('quantity', 0))
-                        purchased_in_range_qty[d_key] += qty
-                    except: pass
     
     # Sort each drug's purchase history by date descending
     for d_name in drug_purchases_map:
@@ -292,7 +265,6 @@ def drug_sold():
 
     # Aggregate drug quantities from patients -> exams
     totals = defaultdict(int)
-    daily_sales = defaultdict(lambda: defaultdict(int)) # drug -> date -> qty
     
     # Iterate over all patients
     for patient in patients.all():
@@ -324,46 +296,24 @@ def drug_sold():
                     # Normalize key for consistency
                     key = normalize('NFC', d_name.strip())
                     totals[key] += qty
-                    daily_sales[key][date_str] += qty
 
     # Convert to list of dicts for template
     drug_totals = []
     unmatched_drugs = []
 
-    # Union of all drugs involved (sold OR purchased in range)
-    all_drug_names = set(totals.keys()) | set(purchased_in_range_qty.keys())
-
-    for name in all_drug_names:
-        qty_sold = totals.get(name, 0)
+    for name, qty in totals.items():
         history = drug_purchases_map.get(name, [])
-        
-        # Check for Unmatched Warning (Sold but NEVER purchased ever)
-        if qty_sold > 0 and not history and name != 'Unknown':
+        if not history and name != 'Unknown':
              unmatched_drugs.append(name)
         
-        # Safety Stock Calculation
-        # Formula: (Max Daily Usage * Max Lead Time) - (Avg Daily Usage * Avg Lead Time)
-        # Avg Lead Time = 3, Max Lead Time = 5 (Requested variation)
-        
-        max_daily_usage = 0
-        if daily_sales.get(name):
-             max_daily_usage = max(daily_sales[name].values())
-        
-        avg_daily_usage = qty_sold / num_days if num_days > 0 else 0
-        
-        safety_stock = (max_daily_usage * 5) - (avg_daily_usage * 3)
-        safety_stock = max(0, int(safety_stock)) # Ensure non-negative integer
-
         drug_totals.append({
             "name": name, 
-            "quantity": qty_sold if qty_sold > 0 else 0, # Pass 0 if no sales
-            "last_purchases": history[:3],
-            "purchased_in_range": purchased_in_range_qty.get(name, 0), # Optional: show bought qty too?
-            "safety_stock": safety_stock
+            "quantity": qty,
+            "last_purchases": history[:3]
         })
 
-    # Sort totals by quantity desc, then by safety stock
-    drug_totals.sort(key=lambda x: (x['quantity'], x['safety_stock']), reverse=True)
+    # Sort totals by quantity desc
+    drug_totals.sort(key=lambda x: x['quantity'], reverse=True)
 
     return render_template(
         'drug_sold.html',

@@ -1,4 +1,27 @@
-# Version 0.3.170126 (2026-01-17)
+# Version 0.4.200121 (2026-01-21)
+==================================================
+
+## Project Analysis & Summary
+- Overhauled the "/drug_sold" page to provide accurate sales vs. purchase comparisons.
+- Introduced Safety Stock analysis to help with inventory planning.
+- Fixed file locking issues on Windows by using a shared database instance.
+- Polished visuals with a cleaner, dark-mode friendly table design.
+
+## New Features
+- **Drug Sold Page Overhaul**:
+  - **Union View**: Displays all drugs that were either sold OR purchased in the selected period.
+  - **Safety Stock**: New column calculating suggested stock levels based on max/avg daily usage and lead time (3-5 days).
+  - **Purchase History**: Improved mini-table layout (Date | Qty | Price) directly within the report row.
+  - **Data Clarity**: Explicit "- no data -" markers for missing sales or purchase history.
+
+## Fix
+- **System Stability**: 
+  - Fixed `TinyDB` concurrency error where `app.py` and `routes/mua_thuoc.py` conflicted over `db_mua_thuoc.json` access.
+- **UI**: 
+  - Removed white background artifacts in purchase history tags for better dark mode compatibility.
+  - Removed unnecessary icons from "Filter" and "Refresh" buttons for a cleaner look.
+
+# Version 0.3.260117 (2026-01-17)
 
 ## Project Analysis & Summary
 - Integrated Discord notifications directly into the exam workflow.

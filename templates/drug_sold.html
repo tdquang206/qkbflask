@@ -4,6 +4,20 @@
   <div class="container">
     <h1 class="title">💊 Báo cáo thuốc đã bán</h1>
 
+    {% if unmatched_drugs %}
+    <div class="notification is-warning">
+      <button class="delete"></button>
+      <strong>⚠️ Không tìm thấy lịch sử mua hàng cho các thuốc sau:</strong>
+      <div class="content is-small mt-2">
+        <ul>
+          {% for name in unmatched_drugs %}
+          <li>{{ name }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
     <form method="get" class="box mb-5">
       <div class="columns is-multiline">
         <div class="column is-4">
@@ -15,47 +29,98 @@
           <input class="input" type="text" id="end_date" name="end_date" value="{{ end_date or '' }}">
         </div>
         <div class="column is-4 is-flex is-align-items-end">
-          <button class="button is-primary" type="submit">
-            <span class="icon"><i class="fas fa-filter"></i></span>
+          <button class="button is-primary mr-2" type="submit">
             <span>Lọc</span>
           </button>
+          <a class="button is-light" href="{{ url_for('drug_sold') }}">
+            <span>Xem tháng này</span>
+          </a>
         </div>
       </div>
     </form>
 
 
-    {% set valid_drug_totals = drug_totals | selectattr("name") | list %}
-    {% if valid_drug_totals %}
-      <div class="table-container">
-        <table class="table is-striped is-hoverable is-fullwidth">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Tên thuốc</th>
-              <th>Tổng số lượng</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for drug in valid_drug_totals %}
-            <tr>
-              <td>{{ loop.index }}</td>
-              <td>{{ drug.name }}</td>
-              <td>{{ drug.quantity }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+    {% if drug_totals %}
+    <div class="table-container">
+      <table class="table is-striped is-hoverable is-fullwidth is-bordered">
+        <thead>
+          <tr>
+            <th style="width: 5%;">#</th>
+            <th style="width: 25%;">Tên thuốc</th>
+            <th style="width: 15%;">Tổng bán</th>
+            <th style="width: 15%;">Nên trữ</th>
+            <th>Lịch sử nhập</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for drug in drug_totals %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td class="has-text-weight-bold">{{ drug.name }}</td>
+            <td>
+              {% if drug.quantity > 0 %}
+              {{ drug.quantity }}
+              {% else %}
+              <span class="has-text-grey-light is-size-7">- no data -</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if drug.safety_stock > 0 %}
+              {{ drug.safety_stock }}
+              {% else %}
+              <span class="has-text-grey-light is-size-7">-</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if drug.last_purchases %}
+              <table class="table is-narrow is-bordered mb-0"
+                style="font-size: 0.85rem; width: 100%; background-color: transparent;">
+                <thead>
+                  <tr>
+                    <th>Ngày</th>
+                    <th>SL</th>
+                    <th>Tổng / Đơn giá nhập</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for p in drug.last_purchases %}
+                  <tr>
+                    <td style="white-space: nowrap;">{{ p.date }}</td>
+                    <td>{{ p.quantity }}</td>
+                    <td>{{ "{:,.0f}".format(p.buy_price) }} / {{ "{:,.0f}".format(p.ppu) }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% else %}
+              <span class="has-text-grey-light is-size-7">- no data -</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
-      <p class="has-text-grey">Không có dữ liệu trong khoảng thời gian này.</p>
+    <div class="notification is-info is-light">
+      Không có dữ liệu trong khoảng thời gian này.
+    </div>
     {% endif %}
   </div>
 </section>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  flatpickr("#start_date", { dateFormat: "Y-m-d" });
-  flatpickr("#end_date", { dateFormat: "Y-m-d" });
-});
+  document.addEventListener("DOMContentLoaded", function () {
+    flatpickr("#start_date", { dateFormat: "Y-m-d" });
+    flatpickr("#end_date", { dateFormat: "Y-m-d" });
+
+    (document.querySelectorAll('.notification .delete') || []).forEach(($delete) => {
+      const $notification = $delete.parentNode;
+
+      $delete.addEventListener('click', () => {
+        $notification.parentNode.removeChild($notification);
+      });
+    });
+  });
 </script>
 {% endblock %}

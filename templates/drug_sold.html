@@ -32,7 +32,7 @@
           <button class="button is-primary mr-2" type="submit">
             <span>Lọc</span>
           </button>
-          <a class="button is-light" href="{{ url_for('drug_sold') }}">
+          <a class="button is-light" href="{{ url_for('reports.drug_sold') }}">
             <span>Xem tháng này</span>
           </a>
         </div>
@@ -87,7 +87,7 @@
                   <tr>
                     <td style="white-space: nowrap;">{{ p.date }}</td>
                     <td>{{ p.quantity }}</td>
-                    <td>{{ "{:,.0f}".format(p.buy_price) }} / {{ "{:,.0f}".format(p.ppu) }}</td>
+                    <td>{{ "{:,.0f}".format(p.buy_price|float(0)) }} / {{ "{:,.0f}".format(p.ppu|float(0)) }}</td>
                   </tr>
                   {% endfor %}
                 </tbody>

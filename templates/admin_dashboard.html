@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+<!-- Fallback if base_generic not available or compatible, but trying to reuse styles -->
+<!-- Assuming a base layout exists. If not, will add simple structure -->
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <h1 class="title">Admin Dashboard</h1>
+
+        <div class="columns">
+            <div class="column is-one-third">
+                <div class="box">
+                    <h2 class="subtitle">Add New User</h2>
+                    <form action="{{ url_for('admin.add_user') }}" method="POST">
+                        <div class="field">
+                            <label class="label">Username</label>
+                            <div class="control">
+                                <input class="input" type="text" name="username" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label">Password</label>
+                            <div class="control">
+                                <input class="input" type="password" name="password" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label">Role</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select name="role">
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <button class="button is-primary is-fullwidth">Add User</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="column">
+                <div class="box">
+                    <h2 class="subtitle">Existing Users</h2>
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>
+                                    <span class="tag {{ 'is-danger' if user.role == 'admin' else 'is-info' }}">
+                                        {{ user.role }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if user.username != 'admin' and user.username != current_user.username %}
+                                    <form action="{{ url_for('admin.delete_user', username=user.username) }}"
+                                        method="POST" onsubmit="return confirm('Are you sure?');">
+                                        <button class="button is-small is-danger">Delete</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

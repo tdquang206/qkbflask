@@ -9,10 +9,18 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 def log_action(action, payload, db_name="db.json"):
     now = datetime.datetime.now()
     month_file = os.path.join(LOG_DIR, f"db_{now.strftime('%Y_%m')}.log")
+    
+    # Redact sensitive info
+    safe_payload = payload.copy() if isinstance(payload, dict) else payload
+    if isinstance(safe_payload, dict):
+        for key in ['password', 'confirm_password', 'secret', 'token']:
+            if key in safe_payload:
+                safe_payload[key] = '[REDACTED]'
+
     entry = {
         "action": action,
         "timestamp": now.isoformat(),
-        "payload": payload
+        "payload": safe_payload
     }
     with open(month_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")

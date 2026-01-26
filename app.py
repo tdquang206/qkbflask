@@ -6,9 +6,12 @@ import os
 import uuid
 # from rapidfuzz import fuzz # Moved to routes/drugs.py
 
+from dotenv import load_dotenv
+load_dotenv()
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.secret_key = b'quang0902915519'
+app.secret_key = os.getenv('SECRET_KEY', 'default_dev_key')
 
 from shared_db import db, patients_table as patients, drugs_table as drugs, exams_table as exams
 
@@ -33,6 +36,34 @@ app.register_blueprint(patients_bp)
 
 from routes.reports import reports_bp
 app.register_blueprint(reports_bp)
+
+from flask_login import LoginManager, current_user
+from routes.auth import auth_bp, setup_default_admin, User
+from routes.admin import admin_bp
+
+app.register_blueprint(auth_bp)
+app.register_blueprint(admin_bp)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
+
+# Setup default admin on startup
+setup_default_admin()
+
+@app.before_request
+def require_login():
+    # Allow static resources and auth endpoints
+    if request.endpoint and (request.endpoint.startswith('static') or request.endpoint.startswith('auth.')):
+        return
+        
+    # Redirect to login if not authenticated
+    if not current_user.is_authenticated:
+        return redirect(url_for('auth.login', next=request.url))
 
 # weekly backup
 from utils.db_logger import weekly_backup_all, log_action

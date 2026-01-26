@@ -1,3 +1,28 @@
+# Version 0.5.260126 (2026-01-26)
+==================================================
+
+## Project Analysis & Summary
+- Implemented a comprehensive security overhaul including database encryption and session-based authentication.
+- Centralized user management with a new Admin Dashboard.
+- Hardened the application infrastructure by securing logs and environment configurations.
+
+## New Features
+- **Security System**:
+  - **AES-GCM Database Encryption**: Encrypted all TinyDB files at rest to protect patient data.
+  - **Authentication System**: Integrated `Flask-Login` for secure user sessions.
+  - **Admin Dashboard**: New route (`/admin`) for managing system users, resetting passwords, and controlling access roles.
+  - **Environment Configuration**: Moved sensitive keys (Secret Key, Encryption Key) to a `.env` file (Git ignored).
+- **Maintenance Tools**:
+  - **Restore Utility**: Created `restore_db.py` for safe database recovery from encrypted backups.
+  - **Log Redaction**: Automatic masking of passwords and secrets in system logs.
+
+## Fix
+- **System Stability**: 
+  - Cleaned up `requirements.txt` to resolve dependency conflicts and remove unused libraries (Kivy, Django).
+  - Fixed `base_generic.html` template reference in Admin Dashboard.
+- **UI**: 
+  - Added user identifier and dynamic Login/Logout links to the navigation bar.
+
 # Version 0.4.200121 (2026-01-21)
 ==================================================
 

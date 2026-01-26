@@ -100,4 +100,4 @@ uploads/
 files/
 backups/
 logs/
-.venv/
+.venv/.env

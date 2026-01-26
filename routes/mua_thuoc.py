@@ -4,7 +4,9 @@ from tinydb import TinyDB, Query
 import uuid
 
 mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
-db = TinyDB('db_mua_thuoc.json', encoding='utf-8')
+mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
+from utils.storage import EncryptedJSONStorage
+db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
 purchases_table = db.table('purchases')
 
 Drug = Query()

@@ -50,10 +50,25 @@
 
       <div class="navbar-end">
         <div class="navbar-item">
-
           <div class="buttons">
-            <a class="button is-light">Log in</a>
-            <a class="button is-link">Sign up</a>
+            {% if current_user.is_authenticated %}
+            <div class="navbar-item has-dropdown is-hoverable">
+              <a class="navbar-link">
+                👤 {{ current_user.username }}
+              </a>
+              <div class="navbar-dropdown is-right">
+                {% if current_user.role == 'admin' %}
+                <a class="navbar-item" href="{{ url_for('admin.index') }}">Admin Dashboard</a>
+                <hr class="navbar-divider">
+                {% endif %}
+                <a class="navbar-item" href="{{ url_for('auth.logout') }}">Logout</a>
+              </div>
+            </div>
+            {% else %}
+            <a class="button is-primary" href="{{ url_for('auth.login') }}">
+              <strong>Log in</strong>
+            </a>
+            {% endif %}
           </div>
         </div>
       </div>

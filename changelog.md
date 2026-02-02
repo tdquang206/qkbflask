@@ -1,3 +1,16 @@
+# Version 0.6.260128 (2026-01-28)
+==================================================
+
+## Project Analysis & Summary
+- Fixed critical database access issues in the refactored drug management routes.
+- Ensured proper use of encrypted storage layer for sensitive purchase data.
+
+## Fix
+- **Drug Management Routes**:
+  - Fixed `UnicodeDecodeError` in `/drugs` endpoint caused by attempting to read encrypted `db_mua_thuoc.json` without proper decryption.
+  - Updated `routes/drugs.py` to use `EncryptedJSONStorage` for all `db_mua_thuoc.json` access in both `manage_drugs()` and `edit_drug()` functions.
+  - Ensured consistency with existing encrypted storage implementation in `routes/mua_thuoc.py`.
+
 # Version 0.5.260126 (2026-01-26)
 ==================================================
 

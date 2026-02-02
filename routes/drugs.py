@@ -21,7 +21,50 @@ def manage_drugs():
         })
         return redirect(url_for('drugs.manage_drugs'))
     
-    return render_template('drugs.html', drugs=drugs.all())
+    
+    # Pre-process purchases for history lookup
+    # Normalize and group by drug name
+    from unicodedata import normalize
+    from collections import defaultdict
+    
+    # Load purchases - using encrypted storage
+    from utils.storage import EncryptedJSONStorage
+    purchases_db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
+    purchases_table = purchases_db.table('purchases')
+    all_purchases = purchases_table.all()
+
+    drug_purchases_map = defaultdict(list)
+
+    for p in all_purchases:
+        p_date = p.get('date_buy')
+        for d in p.get('drugs', []):
+            d_name = d.get('name', '').strip()
+            if d_name:
+                key = normalize('NFC', d_name.lower())
+                record = {
+                    'date': p_date,
+                    'quantity': d.get('quantity'),
+                    'ppu': d.get('ppu'),
+                    'buy_price': d.get('buy_price')
+                }
+                drug_purchases_map[key].append(record)
+    
+    # Sort history by date descending
+    for key in drug_purchases_map:
+        drug_purchases_map[key].sort(key=lambda x: x['date'] if x['date'] else '', reverse=True)
+
+    all_drugs = drugs.all()
+    # Attach history to drugs
+    for drug in all_drugs:
+        name = drug.get('name', '').strip()
+        if name:
+            key = normalize('NFC', name.lower())
+            # Get top 3
+            drug['last_purchases'] = drug_purchases_map.get(key, [])[:3]
+        else:
+            drug['last_purchases'] = []
+
+    return render_template('drugs.html', drugs=all_drugs)
 
 # NOTE: edit drugs
 @drugs_bp.route('/edit_drug/<int:drug_id>', methods=['GET', 'POST'])
@@ -30,8 +73,9 @@ def edit_drug(drug_id):
 
     if request.method == 'GET':
         drug_name = drug.get('name', '').lower()
-        # get db_mua_thuoc.jsonify
-        purchases_db = TinyDB('db_mua_thuoc.json').table('purchases')
+        # get db_mua_thuoc.json with encrypted storage
+        from utils.storage import EncryptedJSONStorage
+        purchases_db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage).table('purchases')
         # print(purchases_db.all())
 
         # find purchase history

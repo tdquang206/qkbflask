@@ -287,26 +287,46 @@
   <table class="table is-striped is-fullwidth" id="drugTable">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>SKU</th>
+        <th>Index</th>
         <th>Name</th>
         <th>Sell Price</th>
         <th>Cost</th>
-        <th>Quantity</th>
-        <th>Inventory</th>
+        <th>History</th>
         <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for drug in drugs %}
       <tr>
-        <td>{{ drug.doc_id }}</td>
-        <td><span class="tag is-dark">{{ drug.sku }}</span></td>
+        <td>{{ loop.index }}</td>
         <td><strong>{{ drug.name }}</strong></td>
         <td class="price-tag">{{ "{:,.0f}".format(drug.sell_price|float) if drug.sell_price else "0" }}</td>
         <td class="cost-tag">{{ "{:,.0f}".format(drug.buy_price|float) if drug.buy_price else "0" }}</td>
-        <td>{{ drug.quantity if drug.quantity else "0" }}</td>
-        <td>{{ drug.inventory if drug.inventory else "0" }}</td>
+        <td>
+          {% if drug.last_purchases %}
+          <table class="table is-narrow is-bordered mb-0"
+            style="font-size: 0.75rem; background: transparent; width: 100%;">
+            <thead>
+              <tr>
+                <th class="p-1">Date</th>
+                <th class="p-1">Qty</th>
+                <th class="p-1">PPU</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in drug.last_purchases %}
+              <tr>
+                <td class="p-1" style="white-space:nowrap;">{{ p.date }}</td>
+                <td class="p-1">{{ p.quantity }}</td>
+                <td class="p-1 has-text-right">{{ "{:,.0f}".format(p.ppu|float(0)) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <span class="has-text-grey-light is-size-7">&lt;no data&gt;</span>
+          {% endif %}
+        </td>
         <td>
           <div class="buttons are-small">
             <a href="/edit_drug/{{ drug.doc_id }}" class="button is-info">Edit</a>
@@ -386,19 +406,16 @@
 
     // Collect matches with scores
     const scoredRows = rows.map(row => {
-      const sku = row.cells[1].textContent.toLowerCase();
-      const name = row.cells[2].textContent.toLowerCase();
+      const name = row.cells[1].textContent.toLowerCase();
 
       let score = 0;
 
       // Substring match gets max score
-      if (sku.includes(input) || name.includes(input)) {
+      if (name.includes(input)) {
         score = 1;
       } else if (input.length >= 3) {
         // Use your fuzzy function (Jaro-Winkler or Levenshtein)
-        const scoreSku = jaroWinklerSimilarity(input, sku);
-        const scoreName = jaroWinklerSimilarity(input, name);
-        score = Math.max(scoreSku, scoreName);
+        score = jaroWinklerSimilarity(input, name);
       }
 
       return { row, score, label: name };

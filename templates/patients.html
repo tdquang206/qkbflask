@@ -52,7 +52,7 @@
 
 <script>
   function filterTable() {
-    const input = document.getElementById("searchInput").value.toLowerCase();
+    const input = document.getElementById("searchInput").value.trim().toLowerCase();
     const rows = document.querySelectorAll("#patientTable tbody tr");
 
     rows.forEach(row => {

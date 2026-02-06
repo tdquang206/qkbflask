@@ -8,6 +8,7 @@ trigger: always_on
 - no hard-code white background for text field
 - optimize for desktop, offline use
 - do not use icon
+- add encoding='utf-8' or similar param when possible
 - make sure to comment on non-trivial code
 - add function to new files, do not add directly to app.py
 - for debug files, put them inside debug folder

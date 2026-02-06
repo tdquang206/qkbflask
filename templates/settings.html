@@ -69,16 +69,28 @@
                     </div>
                 </div>
             </div>
+    </div>
 
-            <div class="field is-grouped">
-                <div class="control">
-                    <button class="button is-link">Lưu cài đặt</button>
-                </div>
-                <div class="control">
-                    <a href="/" class="button is-light">Hủy</a>
-                </div>
+    <div class="box">
+        <h2 class="subtitle">Danh sách Khoa / Loại khám</h2>
+        <div class="field">
+            <label class="label">Nhập mỗi dòng một tên khoa (Ví dụ: Nhi khoa, Da liễu, ...)</label>
+            <div class="control">
+                <textarea class="textarea" name="departments"
+                    rows="5">{{ settings.departments | join('\n') }}</textarea>
             </div>
-        </form>
+        </div>
+    </div>
+
+    <div class="field is-grouped">
+        <div class="control">
+            <button class="button is-link">Lưu cài đặt</button>
+        </div>
+        <div class="control">
+            <a href="/" class="button is-light">Hủy</a>
+        </div>
+    </div>
+    </form>
     </div>
 </section>
 {% endblock %}

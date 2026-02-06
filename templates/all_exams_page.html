@@ -27,10 +27,23 @@
                         {% for exam in grouped[month].unpaid %}
                         <tr>
                             <td>{{ loop.index }}</td>
-                            <td>{{ exam.exam_date }}</td>
                             <td>
-                                Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}
-                                --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+                                {{ exam.exam_date }}
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
+                                    --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+
+                                </div>
+                                <div class="mt-1 tags">
+                                    {% if exam.department %}
+                                    <span class="tag is-warning">{{ exam.department }}</span>
+                                    {% endif %}
+                                    {% if exam.created_by_name %}
+                                    <span class="tag is-warning">{{ exam.created_by_name }}</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td class="has-text-weight-semibold has-text-danger">
                                 {{ "{:,}".format(exam.total_money) }}
@@ -74,8 +87,16 @@
                             <td>{{ loop.index }}</td>
                             <td>{{ exam.exam_date }}</td>
                             <td>
-                                Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}
-                                --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+                                <div>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}
+                                    --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}</div>
+                                <div class="mt-1 tags">
+                                    {% if exam.department %}
+                                    <span class="tag is-info">{{ exam.department }}</span>
+                                    {% endif %}
+                                    {% if exam.created_by_name %}
+                                    <span class="tag is-info">{{ exam.created_by_name }}</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td class="has-text-weight-semibold has-text-success">
                                 {{ "{:,}".format(exam.total_money) }}

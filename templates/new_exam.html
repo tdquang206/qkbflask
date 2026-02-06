@@ -89,6 +89,22 @@
               <label class="label">💵 Loại khám</label>
             </div>
 
+            <!-- Column 1.5: Department Selection (New) -->
+            <div class="column is-3">
+              <div class="field">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select name="department">
+                      {% for dept in departments %}
+                      <option value="{{ dept }}" {% if current_user.department==dept %}selected{% endif %}>{{ dept }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Column 2: Free -->
             <div class="column is-3">
               <label class="radio is-large">

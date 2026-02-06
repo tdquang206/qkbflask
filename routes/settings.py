@@ -20,15 +20,15 @@ def load_settings():
             "attach_image": True
         }
     try:
-        with open(SETTINGS_FILE, 'r') as f:
+        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception:
         return {}
 
 def save_settings(settings):
     try:
-        with open(SETTINGS_FILE, 'w') as f:
-            json.dump(settings, f, indent=2)
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, indent=2, ensure_ascii=False)
         return True
     except Exception as e:
         print(f"Error saving settings: {e}")
@@ -49,8 +49,37 @@ def index():
         settings['include_table'] = 'include_table' in request.form
         settings['attach_image'] = 'attach_image' in request.form
         
+        # Handle departments (textarea, one per line)
+        departments_raw = request.form.get('departments', '')
+        
+        # Logic to handle cascading delete/reset
+        old_departments = set(settings.get('departments', []))
+        new_departments_list = [line.strip() for line in departments_raw.split('\n') if line.strip()]
+        new_departments = set(new_departments_list)
+        
+        settings['departments'] = new_departments_list
+
+        removed_departments = old_departments - new_departments
+        
         if save_settings(settings):
             flash("Đã lưu cài đặt thành công", "success")
+            
+            # Cascading update for removed departments
+            if removed_departments:
+                from shared_db import users_table
+                from tinydb import Query
+                UserQuery = Query()
+                
+                # Find users with removed departments
+                users_to_update = users_table.search(UserQuery.department.one_of(list(removed_departments)))
+                count = 0
+                for user in users_to_update:
+                    users_table.update({'department': 'Chưa có PK'}, doc_ids=[user.doc_id])
+                    count += 1
+                
+                if count > 0:
+                    flash(f"Đã cập nhật {count} người dùng về trạng thái 'Chưa có PK' do xóa phòng khám.", "warning")
+
         else:
             flash("Lỗi khi lưu cài đặt", "error")
             

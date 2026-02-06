@@ -47,8 +47,11 @@ def get_exam_list():
                         "history": exam.get("history", ""),
                         "drugs": exam.get("drugs", []),
                         "service_fee": exam.get("service_fee", "0"),
+                        "service_fee": exam.get("service_fee", "0"),
                         "total_money": service_fee + drug_total,
-                        "address": patient.get("address", "unknown address")                       
+                        "address": patient.get("address", "unknown address"),
+                        "department": exam.get("department", "PK Nhi"),
+                        "created_by_name": exam.get("created_by_name", "")                        
                 }
                     
                 all_exams.append(exam_with_patient)

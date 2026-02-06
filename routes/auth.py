@@ -7,11 +7,13 @@ from shared_db import users_table
 auth_bp = Blueprint('auth', __name__)
 
 class User(UserMixin):
-    def __init__(self, doc_id, username, password_hash, role='user'):
+    def __init__(self, doc_id, username, password_hash, role='user', department='Chưa có PK', display_name=None):
         self.id = str(doc_id)
         self.username = username
         self.password_hash = password_hash
         self.role = role
+        self.department = department
+        self.display_name = display_name if display_name else username
 
     @staticmethod
     def get(user_id):
@@ -21,7 +23,9 @@ class User(UserMixin):
                 doc_id=user_data.doc_id,
                 username=user_data['username'],
                 password_hash=user_data['password_hash'],
-                role=user_data.get('role', 'user')
+                role=user_data.get('role', 'user'),
+                department=user_data.get('department', 'Nhi'),
+                display_name=user_data.get('display_name')
             )
         return None
 
@@ -34,7 +38,9 @@ class User(UserMixin):
                 doc_id=user_data.doc_id,
                 username=user_data['username'],
                 password_hash=user_data['password_hash'],
-                role=user_data.get('role', 'user')
+                role=user_data.get('role', 'user'),
+                department=user_data.get('department', 'Chưa có PK'),
+                display_name=user_data.get('display_name')
             )
         return None
 
@@ -75,6 +81,8 @@ def setup_default_admin():
         users_table.insert({
             'username': 'admin',
             'password_hash': generate_password_hash(default_password),
-            'role': 'admin'
+            'role': 'admin',
+            'department': 'Chưa có PK',
+            'display_name': 'Admin'
         })
         print(f"Default admin created. Username: admin, Password: {default_password}")

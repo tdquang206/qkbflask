@@ -1,5 +1,29 @@
-# Version 0.6.260205 (2026-02-05)
+# Version 0.6.260206 (2026-02-06)
 ==================================================
+
+## Project Analysis & Summary
+- Refined department ("Phòng Khám") management with cascading updates and better admin tools.
+- Enhanced traceability by assigning legacy exams to specific users ("BS. TTKH") and displaying creator tags across the UI.
+- Improved the "Danh sách toa thuốc" interface for better readability.
+
+## New Features
+- **Refined PK Management**:
+  - **Settings**: Renamed "Khoa / Loại khám" to "Danh sách Phòng Khám (PK)".
+  - **Cascading Updates**: Removing a PK automatically resets assigned users to "Chưa có PK".
+  - **Admin Dashboard**: Added PK selection dropdowns for "Add User" and a new "Edit User" modal.
+- **Creator Assignment & Tags**:
+  - **Migration**: Assigned all legacy exams to user 'hue' (displayed as "**BS. TTKH**").
+  - **UI Tags**: Added tags for Department (e.g., "PK Nhi") and Creator (e.g., "BS. TTKH") to:
+    - **Exam History** (`/patient/<id>/exams`)
+    - **Exam List** (`/danh_sach_kham_benh`): Tags moved to a new line below patient info for clarity.
+    - **Edit Exam**: Displayed "Bác sĩ khám" info.
+
+## UI Improvements
+- **Exam List (`/danh_sach_kham_benh`)**:
+  - Moved tags (Department/Creator) to a dedicated line for better layout.
+  - Used distinct colors (`is-warning` for Department, `is-info` for Creator) to distinguish metadata.
+
+
 
 ## UI & UX Enhancements
 - **Exam List (`/danh_sach_kham_benh`)**:

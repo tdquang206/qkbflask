@@ -38,8 +38,16 @@
         <!-- Left side: exam info -->
         <div class="column">
           <span class="is-4">📅 {{ exam.exam_date }}</span>
-          <span class="ml-4 is-4">Phí khám: {{ exam.service_fee|string }}
 
+          {% if exam.department %}
+          <span class="tag is-info is-light ml-2">{{ exam.department }}</span>
+          {% endif %}
+
+          {% if exam.created_by_name %}
+          <span class="tag is-success is-light ml-2">{{ exam.created_by_name }}</span>
+          {% endif %}
+
+          <span class="ml-4 is-4">Phí khám: {{ exam.service_fee|string }}
           </span>
           <span class="ml-4 is-4">Tái khám: {{ exam.expected_date or '_' }}</span>
         </div>

@@ -1,9 +1,11 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash
+from flask_login import current_user
 from datetime import datetime
 from tinydb import Query
 import uuid
 from werkzeug.utils import secure_filename
 import os, io, json
+from routes.settings import load_settings
 from PIL import Image
 import requests
 
@@ -117,7 +119,9 @@ def edit_exam(exam_id):
         return redirect(url_for('patient.view_patients'))
     
     if request.method == 'GET':
-        return render_template('edit_exam.html', patient = patient_found, exam=exam_editting)
+        settings = load_settings()
+        departments = settings.get('departments', ["Nhi khoa", "Khám Da liễu"])
+        return render_template('edit_exam.html', patient=patient_found, exam=exam_editting, departments=departments)
 
     if request.method == 'POST':
         # data
@@ -150,6 +154,11 @@ def edit_exam(exam_id):
                 })
 
         # prepair exam data
+        if request.form.get('department'):
+            new_department = request.form.get('department')
+        else:
+            new_department = exam_editting.get('department', 'Nhi khoa')
+
         exam_data = {
             'patient_id': patient_found.doc_id,
             'exam_date': exam_date,
@@ -163,8 +172,11 @@ def edit_exam(exam_id):
             'total_money': total_money,
             # get submit time # YYMMDDHHMMSS
             'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
-            'id': exam_id
-            
+            'id': exam_id,
+            # Preserve existing creator info
+            'department': new_department,
+            'created_by_id': exam_editting.get('created_by_id'),
+            'created_by_name': exam_editting.get('created_by_name', 'Admin')
         }
         print(exam_data)
         
@@ -228,7 +240,9 @@ def new_exam(patient_id):
     patient = Patients_db.get(doc_id = patient_id)
 
     if request.method == 'GET':
-        return render_template('new_exam.html', patient = patient)
+        settings = load_settings()
+        departments = settings.get('departments', ["Nhi khoa", "Khám Da liễu"])
+        return render_template('new_exam.html', patient=patient, departments=departments)
     
     if request.method == 'POST':
         # data
@@ -260,6 +274,11 @@ def new_exam(patient_id):
                     'price': price
                 })
         # prepair exam data
+        if request.form.get('department'):
+            selected_department = request.form.get('department')
+        else:
+            selected_department = current_user.department if current_user.is_authenticated else 'Nhi khoa'
+
         exam_data = {
             'patient_id': patient_id,
             'exam_date': exam_date,
@@ -273,8 +292,10 @@ def new_exam(patient_id):
             'total_money': total_money,
             # get submit time # YYMMDDHHMMSS
             'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
-            'id': str(uuid.uuid4())
-            
+            'id': str(uuid.uuid4()),
+            'department': selected_department,
+            'created_by_id': current_user.id if current_user.is_authenticated else None,
+            'created_by_name': current_user.display_name if current_user.is_authenticated else 'Admin'
         }
         short_exam_id = str(exam_data['id'])[:8].replace('-','')
         # Handle image upload if present
@@ -383,7 +404,7 @@ def api_generate_files():
 
     # Generate
     short_exam_id = str(exam_id)[:8].replace('-','')
-    html_content = build_exam_html(patient, exam_found)
+    html_content = build_exam_html(patient, exam_found, doctor_name=exam_found.get('created_by_name'))
     pdf_result = generate_pdf_and_jpeg(
         html_content,
         patient.get('phone'),

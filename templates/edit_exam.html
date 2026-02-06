@@ -23,6 +23,9 @@
         <p id="kid_name"><strong>👶 Bé:</strong> {{ patient.kid_name }} - SN {{ patient.kid_birthday }}</p>
         <p id="phone"><strong>📞 Số điện thoại:</strong> {{ patient.phone }} - {{ patient.name }}</p>
         <p id="address"><strong>🏠 Địa chỉ:</strong> {{ patient.address }}</p>
+        {% if exam.created_by_name %}
+        <p><strong>🩺 Bác sĩ khám:</strong> <span class="tag is-success is-light">{{ exam.created_by_name }}</span></p>
+        {% endif %}
       </div>
       <!-- Exam Info -->
       <div class="box">
@@ -83,6 +86,21 @@
             <!-- Column 1: Label -->
             <div class="column is-3">
               <label class="label">💵 Loại khám</label>
+            </div>
+
+            <!-- Column 1.5: Department Selection (New) -->
+            <div class="column is-3">
+              <div class="field">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select name="department">
+                      {% for dept in departments %}
+                      <option value="{{ dept }}" {% if exam.department==dept %}selected{% endif %}>{{ dept }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Column 2: Free -->

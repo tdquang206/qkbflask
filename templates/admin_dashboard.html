@@ -37,6 +37,24 @@
                             </div>
                         </div>
                         <div class="field">
+                            <label class="label">Phòng Khám (PK)</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select name="department">
+                                        {% for dept in departments %}
+                                        <option value="{{ dept }}">{{ dept }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label">Display Name</label>
+                            <div class="control">
+                                <input class="input" type="text" name="display_name" placeholder="e.g. BS. Name">
+                            </div>
+                        </div>
+                        <div class="field">
                             <button class="button is-primary is-fullwidth">Add User</button>
                         </div>
                     </form>
@@ -50,6 +68,8 @@
                         <thead>
                             <tr>
                                 <th>Username</th>
+                                <th>Display Name</th>
+                                <th>Dept</th>
                                 <th>Role</th>
                                 <th>Action</th>
                             </tr>
@@ -58,6 +78,8 @@
                             {% for user in users %}
                             <tr>
                                 <td>{{ user.username }}</td>
+                                <td>{{ user.get('display_name', '') }}</td>
+                                <td>{{ user.get('department', '') }}</td>
                                 <td>
                                     <span class="tag {{ 'is-danger' if user.role == 'admin' else 'is-info' }}">
                                         {{ user.role }}
@@ -65,10 +87,15 @@
                                 </td>
                                 <td>
                                     {% if user.username != 'admin' and user.username != current_user.username %}
-                                    <form action="{{ url_for('admin.delete_user', username=user.username) }}"
-                                        method="POST" onsubmit="return confirm('Are you sure?');">
-                                        <button class="button is-small is-danger">Delete</button>
-                                    </form>
+                                    <div class="buttons are-small">
+                                        <button class="button is-info" data-user='{{ user | tojson }}'
+                                            onclick='openEditModalFromBtn(this)'>Edit</button>
+                                        <form action="{{ url_for('admin.delete_user', username=user.username) }}"
+                                            method="POST" onsubmit="return confirm('Are you sure?');"
+                                            style="display:inline;">
+                                            <button class="button is-danger">Delete</button>
+                                        </form>
+                                    </div>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -80,4 +107,85 @@
         </div>
     </div>
 </section>
+
+<!-- Edit User Modal -->
+<div class="modal" id="editUserModal">
+    <div class="modal-background" onclick="closeEditModal()"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Edit User</p>
+            <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
+        </header>
+        <section class="modal-card-body">
+            <form id="editUserForm" method="POST">
+                <div class="field">
+                    <label class="label">Username</label>
+                    <div class="control">
+                        <input class="input" type="text" id="edit_username" readonly disabled>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Display Name</label>
+                    <div class="control">
+                        <input class="input" type="text" name="display_name" id="edit_display_name">
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Role</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select name="role" id="edit_role">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Phòng Khám (PK)</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select name="department" id="edit_department">
+                                <option value="Chưa có PK">Chưa có PK</option>
+                                {% for dept in departments %}
+                                <option value="{{ dept }}">{{ dept }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <button class="button is-success is-fullwidth">Save Changes</button>
+            </form>
+        </section>
+    </div>
+</div>
+
+<script>
+    function openEditModalFromBtn(btn) {
+        try {
+            const user = JSON.parse(btn.getAttribute('data-user'));
+            openEditModal(user);
+        } catch (e) {
+            console.error("Error parsing user data", e);
+        }
+    }
+
+    function openEditModal(user) {
+        const modal = document.getElementById('editUserModal');
+        const form = document.getElementById('editUserForm');
+
+        form.action = "{{ url_for('admin.index') }}/users/edit/" + encodeURIComponent(user.username);
+
+        document.getElementById('edit_username').value = user.username;
+        document.getElementById('edit_display_name').value = user.display_name || '';
+        document.getElementById('edit_role').value = user.role || 'user';
+        document.getElementById('edit_department').value = user.department || 'Chưa có PK';
+
+        modal.classList.add('is-active');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editUserModal').classList.remove('is-active');
+    }
+</script>
 {% endblock %}

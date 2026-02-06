@@ -1,11 +1,10 @@
 from tinydb import TinyDB
-
-# Shared database instance with UTF-8 encoding
-# Shared database instance with UTF-8 encoding
 from utils.storage import EncryptedJSONStorage
+
+# Initialize the database with encrypted storage
 db = TinyDB('db.json', storage=EncryptedJSONStorage)
 
-# Common tables
+# Define tables
 patients_table = db.table('patients')
 drugs_table = db.table('drugs')
 exams_table = db.table('exams')

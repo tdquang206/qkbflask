@@ -9,7 +9,7 @@ def generate_exam_file_name(phone, exam_date, exam_id):
     
     return f"{phone}_{date_str}_{random_part}"
 
-def build_exam_html(patient, exam_data):
+def build_exam_html(patient, exam_data, doctor_name=None):
     # reuse pdf template in print
     # Build drug rows
     drug_rows = ""
@@ -44,6 +44,9 @@ def build_exam_html(patient, exam_data):
         
     # Format: YYMMDDHHMMSS + "H" + PriceCode
     footer_code = f"{submit_time}H{total_short}"
+
+    # Doctor Name Signature
+    signature_text = f"Bác sĩ khám: {doctor_name}" if doctor_name else "Bác sĩ khám: BS. Quang"
 
     html = f"""
     <html>
@@ -95,6 +98,7 @@ def build_exam_html(patient, exam_data):
           </tbody>
         </table>
         <div class="footer">
+          <p>{signature_text}</p>
           <span style="white-space:nowrap;">{footer_code}</span>
         </div>
       </body>

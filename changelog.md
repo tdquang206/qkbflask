@@ -1,3 +1,14 @@
+# Version 0.6.260205 (2026-02-05)
+==================================================
+
+## UI & UX Enhancements
+- **Exam List (`/danh_sach_kham_benh`)**:
+  - Resized "Hành động" column to ensure better button alignment.
+  - Action buttons (Edit and Payment Status) are now displayed side-by-side on desktop with improved responsive spacing for mobile.
+- **Drug Sold Report (`/drug_sold`)**:
+  - Added an informative notification box explaining the "Suggested Stock" (Nên trữ) calculation logic in Vietnamese.
+  - Introduced price trend indicators (↑/↓) in the purchase history table to visualize price per unit (PPU) changes between consecutive restocks.
+
 # Version 0.6.260128 (2026-01-28)
 ==================================================
 

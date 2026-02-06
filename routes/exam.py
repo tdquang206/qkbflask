@@ -201,20 +201,23 @@ def edit_exam(exam_id):
         Patients_db.update({"exams": exams, "last_visit": exam_date}, doc_ids=[patient_found.doc_id])
         # NOTE: PDF and JPEG files, overwrite old files
         short_exam_id = str(exam_id)[:8].replace('-','')
-        html_content = build_exam_html(patient_found, exam_data)
-        pdf_result = generate_pdf_and_jpeg(
-            html_content,
-            patient_found.get("phone"),
-            exam_date,
-            short_exam_id
-        )
+        # html_content = build_exam_html(patient_found, exam_data)
+        # pdf_result = generate_pdf_and_jpeg(
+        #     html_content,
+        #     patient_found.get("phone"),
+        #     exam_date,
+        #     short_exam_id
+        # )
 
         if send_discord_flag:
-            send_discord_helper(patient_found, exam_data)
+            # We will send discord in a separate request
+            pass
 
         return jsonify({
           "status": "success",
-          "message": "Exam updated"  
+          "message": "Exam updated",
+          "exam_id": exam_data['id'],
+          "patient_id": patient_found.doc_id
         })
 
 # NOTE: Create
@@ -330,21 +333,23 @@ def new_exam(patient_id):
 
         # NOTE: create PDF and JPEG files
         
-        html_content = build_exam_html(patient, exam_data)
-        pdf_result = generate_pdf_and_jpeg(
-            html_content,
-            patient.get('phone'),
-            exam_date,
-            short_exam_id
-        )
+        # html_content = build_exam_html(patient, exam_data)
+        # pdf_result = generate_pdf_and_jpeg(
+        #     html_content,
+        #     patient.get('phone'),
+        #     exam_date,
+        #     short_exam_id
+        # )
 
-        if send_discord_flag:
-            send_discord_helper(patient, exam_data)
+        # if send_discord_flag:
+        #     send_discord_helper(patient, exam_data)
 
         return jsonify({
             "status": "success",
             "message": "Dữ liệu được lưu thành công",
-            "redirect_url": url_for('exam.edit_exam', exam_id=exam_data['id'])
+            "redirect_url": url_for('exam.edit_exam', exam_id=exam_data['id']),
+            "exam_id": exam_data['id'],
+            "patient_id": patient_id
         })
 
 
@@ -353,12 +358,78 @@ def new_exam(patient_id):
         patient=patient
     )
 
+# NOTE: API for Generate Files
+@exam_bp.route('/api/exam/generate_files', methods=['POST'])
+def api_generate_files():
+    data = request.json
+    exam_id = data.get('exam_id')
+    patient_id = data.get('patient_id')
+    
+    if not exam_id or not patient_id:
+        return jsonify({"status": "error", "message": "Missing info"}), 400
+
+    patient = Patients_db.get(doc_id=int(patient_id))
+    if not patient:
+        return jsonify({"status": "error", "message": "Patient not found"}), 404
+        
+    exam_found = None
+    for e in patient.get('exams', []):
+        if e.get('id') == exam_id:
+            exam_found = e
+            break
+            
+    if not exam_found:
+        return jsonify({"status": "error", "message": "Exam not found"}), 404
+
+    # Generate
+    short_exam_id = str(exam_id)[:8].replace('-','')
+    html_content = build_exam_html(patient, exam_found)
+    pdf_result = generate_pdf_and_jpeg(
+        html_content,
+        patient.get('phone'),
+        exam_found.get('exam_date'),
+        short_exam_id
+    )
+    
+    if pdf_result.get('success'):
+         return jsonify({"status": "success"})
+    else:
+         return jsonify({"status": "error", "message": pdf_result.get('error')}), 500
+
+
+# NOTE: API for Discord
+@exam_bp.route('/api/exam/send_discord', methods=['POST'])
+def api_send_discord():
+    data = request.json
+    exam_id = data.get('exam_id')
+    patient_id = data.get('patient_id')
+
+    if not exam_id or not patient_id:
+        return jsonify({"status": "error", "message": "Missing info"}), 400
+
+    patient = Patients_db.get(doc_id=int(patient_id))
+    if not patient:
+        return jsonify({"status": "error", "message": "Patient not found"}), 404
+        
+    exam_found = None
+    for e in patient.get('exams', []):
+        if e.get('id') == exam_id:
+            exam_found = e
+            break
+            
+    if not exam_found:
+        return jsonify({"status": "error", "message": "Exam not found"}), 404
+        
+    try:
+        send_discord_helper(patient, exam_found)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # NOTE: Delete
 @exam_bp.route("/exam/delete_exam/<exam_id>", methods=["POST"])
 def delete_exam(exam_id):
 
-    if request.method == 'POST':
-        exam_will_be_deleted = None
         patient_doc_id = None
         # data for pdf filename
         patient_found = None

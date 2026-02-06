@@ -336,7 +336,34 @@
   }
 </script>
 
-<!-- Toast noti -->
+<!-- Progress Modal -->
+<div class="modal" id="progressModal">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Đang lưu dữ liệu...</p>
+    </header>
+    <section class="modal-card-body">
+      <div class="content">
+        <p class="step-item" id="stepSave">
+          <span class="icon is-medium">⏳</span>
+          <span>Lưu thông tin khám</span>
+        </p>
+        <p class="step-item" id="stepPdf">
+          <span class="icon is-medium">⏳</span>
+          <span>Tạo PDF & Ảnh</span>
+        </p>
+        <p class="step-item" id="stepDiscord">
+          <span class="icon is-medium">⏳</span>
+          <span>Gửi thông báo Discord</span>
+        </p>
+      </div>
+      <!-- Error message container -->
+      <div class="notification is-danger is-hidden" id="errorMsg"></div>
+    </section>
+  </div>
+</div>
+
 <script>
 
   // toggle paid_status
@@ -387,37 +414,119 @@
   document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("examForm");
     const saveBtn = document.getElementById("saveBtn");
-    const saveBtnText = document.getElementById("saveBtnText");
+    const modal = document.getElementById("progressModal");
+    const errorMsg = document.getElementById("errorMsg");
 
-    form.addEventListener("submit", function (e) {
-      e.preventDefault(); // stop normal form submit
+    // Helper to update status
+    function updateStatus(elementId, status) {
+      const el = document.getElementById(elementId);
+      const iconSpan = el.querySelector(".icon");
+      if (status === 'working') {
+        iconSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        el.style.color = 'black';
+      } else if (status === 'success') {
+        iconSpan.innerHTML = '✅';
+        el.style.color = 'green';
+      } else if (status === 'error') {
+        iconSpan.innerHTML = '❌';
+        el.style.color = 'red';
+      }
+    }
+
+    // Helper to call API
+    async function callStep(url, data) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return await res.json();
+    }
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
 
       const examId = document.querySelector("input[name='exam_id']").value;
       const patientId = document.querySelector("input[name='patient_id']").value;
-      console.log(examId, patientId)
 
-      fetch(this.action, {
-        method: "POST",
-        body: new FormData(this)
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === "success") {
-            // update button UI
-            saveBtn.dataset.saved = "true";
-            saveBtn.classList.add("is-outlined");
-            saveBtn.textContent = "Đã cập nhật";
+      // 1. Show Modal & Reset
+      modal.classList.add("is-active");
+      errorMsg.classList.add("is-hidden");
+      updateStatus("stepSave", "working");
+      updateStatus("stepPdf", "⏳");
+      updateStatus("stepDiscord", "⏳");
 
-            showToast("✅ Đã lưu", "is-success");
+      try {
+        // STEP 1: Save Data
+        const formData = new FormData(this);
+        const res1 = await fetch(this.action, {
+          method: "POST",
+          body: formData
+        });
+        const data1 = await res1.json();
 
+        if (data1.status !== "success") {
+          throw new Error(data1.message || "Lỗi lưu dữ liệu");
+        }
+        updateStatus("stepSave", "success");
+
+        const payload = {
+          exam_id: data1.exam_id,
+          patient_id: data1.patient_id
+        };
+
+        // STEP 2: Generate Files
+        updateStatus("stepPdf", "working");
+        try {
+          const res2 = await callStep('/api/exam/generate_files', payload);
+          if (res2.status === 'success') {
+            updateStatus("stepPdf", "success");
           } else {
-            showToast("❌ Lỗi khi lưu dữ liệu", "is-danger");
+            console.error(res2);
+            updateStatus("stepPdf", "error");
           }
 
-        }).catch(err => {
-          console.error(err);
-          showToast("❌ Có lỗi chưa xác định", "is-danger");
-        });
+        } catch (errPdf) {
+          console.error(errPdf);
+          updateStatus("stepPdf", "error");
+        }
+
+        // STEP 3: Discord
+        const discordCheckbox = document.querySelector("input[name='send_discord']");
+        if (discordCheckbox && discordCheckbox.checked) {
+          updateStatus("stepDiscord", "working");
+          try {
+            const res3 = await callStep('/api/exam/send_discord', payload);
+            if (res3.status === 'success') {
+              updateStatus("stepDiscord", "success");
+            } else {
+              console.error(res3);
+              updateStatus("stepDiscord", "error");
+            }
+          } catch (errDis) {
+            console.error(errDis);
+            updateStatus("stepDiscord", "error");
+          }
+        } else {
+          document.getElementById("stepDiscord").innerHTML = '<span class="icon">⏭️</span> <span>Gửi Discord (Bỏ qua)</span>';
+        }
+
+        // DONE: Close Modal
+        setTimeout(() => {
+          modal.classList.remove("is-active");
+          // Update Button
+          saveBtn.dataset.saved = "true";
+          saveBtn.classList.add("is-outlined");
+          saveBtn.textContent = "Đã cập nhật";
+          showToast("✅ Đã lưu xong!", "is-success");
+        }, 500);
+
+      } catch (err) {
+        console.error(err);
+        updateStatus("stepSave", "error");
+        errorMsg.textContent = err.message;
+        errorMsg.classList.remove("is-hidden");
+      }
     });
   });
 </script>

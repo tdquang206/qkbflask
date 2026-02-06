@@ -86,7 +86,27 @@ def drug_sold():
     
     # Sort each drug's purchase history by date descending
     for d_name in drug_purchases_map:
-        drug_purchases_map[d_name].sort(key=lambda x: x['date'] if x['date'] else '', reverse=True)
+        history = drug_purchases_map[d_name]
+        history.sort(key=lambda x: x['date'] if x['date'] else '', reverse=True)
+        
+        # Calculate Trend
+        for i in range(len(history)):
+            current = history[i]
+            # default
+            current['trend'] = 'same'
+            
+            if i + 1 < len(history):
+                prev = history[i+1]
+                try:
+                    c_price = float(current.get('ppu') or 0)
+                    p_price = float(prev.get('ppu') or 0)
+                    
+                    if c_price > p_price:
+                        current['trend'] = 'up'
+                    elif c_price < p_price:
+                        current['trend'] = 'down'
+                except Exception:
+                    pass
     # --- MATCHING LOGIC END ---
 
     # Aggregate drug quantities from patients -> exams

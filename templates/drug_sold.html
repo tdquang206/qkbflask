@@ -18,6 +18,22 @@
     </div>
     {% endif %}
 
+    <div class="notification is-info is-light">
+      <button class="delete"></button>
+      <div class="content is-small">
+        <p><strong>ℹ️ Công thức tính Nên trữ (Safety Stock)</strong></p>
+        <p>
+          <code>Nên trữ = (Max dùng/ngày × 5) - (Trung bình dùng/ngày × 3)</code>
+        </p>
+        <ul style="margin-top: 5px;">
+          <li><em>Max dùng/ngày</em>: Số lượng bán nhiều nhất trong 1 ngày (trong khoảng thời gian lọc).</li>
+          <li><em>Trung bình dùng/ngày</em>: Tổng bán chia cho số ngày.</li>
+          <li><em>5</em>: Thời gian nhập hàng tối đa (ngày).</li>
+          <li><em>3</em>: Thời gian nhập hàng trung bình (ngày).</li>
+        </ul>
+      </div>
+    </div>
+
     <form method="get" class="box mb-5">
       <div class="columns is-multiline">
         <div class="column is-4">
@@ -87,7 +103,14 @@
                   <tr>
                     <td style="white-space: nowrap;">{{ p.date }}</td>
                     <td>{{ p.quantity }}</td>
-                    <td>{{ "{:,.0f}".format(p.buy_price|float(0)) }} / {{ "{:,.0f}".format(p.ppu|float(0)) }}</td>
+                    <td>
+                      {{ "{:,.0f}".format(p.buy_price|float(0)) }} / {{ "{:,.0f}".format(p.ppu|float(0)) }}
+                      {% if p.trend == 'up' %}
+                      <span class="has-text-danger" title="Giá tăng">↑</span>
+                      {% elif p.trend == 'down' %}
+                      <span class="has-text-success" title="Giá giảm">↓</span>
+                      {% endif %}
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>

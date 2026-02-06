@@ -20,7 +20,7 @@
                             <th>Ngày</th>
                             <th>Tên bé - Ba Mẹ</th>
                             <th>Số tiền</th>
-                            <th>Hành động</th>
+                            <th style="width: 200px;">Hành động</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -36,14 +36,16 @@
                                 {{ "{:,}".format(exam.total_money) }}
                             </td>
                             <td>
-                                <a class="button is-info is-outlined"
-                                    href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
-                                    Edit
-                                </a>
-                                <a class="button is-warning money_received_btn" data-exam-id="{{ exam.exam_id }}"
-                                    data-patient-id="{{ exam.patient_id }}">
-                                    Chưa kiểm tra tiền
-                                </a>
+                                <div class="buttons">
+                                    <a class="button is-info is-outlined"
+                                        href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
+                                        Edit
+                                    </a>
+                                    <a class="button is-warning money_received_btn" data-exam-id="{{ exam.exam_id }}"
+                                        data-patient-id="{{ exam.patient_id }}">
+                                        Chưa kiểm tra tiền
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -63,7 +65,7 @@
                             <th>Ngày</th>
                             <th>Tên bé - Ba Mẹ</th>
                             <th>Số tiền</th>
-                            <th>Hành động</th>
+                            <th style="width: 200px;">Hành động</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,13 +81,15 @@
                                 {{ "{:,}".format(exam.total_money) }}
                             </td>
                             <td>
-                                <a class="button is-info is-outlined"
-                                    href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
-                                    Edit
-                                </a>
-                                <button class="button is-success is-outlined money_received_status" disabled>
-                                    Đã nhận tiền
-                                </button>
+                                <div class="buttons">
+                                    <a class="button is-info is-outlined"
+                                        href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
+                                        Edit
+                                    </a>
+                                    <button class="button is-success is-outlined money_received_status" disabled>
+                                        Đã nhận tiền
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

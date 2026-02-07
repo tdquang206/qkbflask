@@ -16,8 +16,10 @@ def manage_patients():
         phone = request.form.get('phone', '')
         address = request.form.get('address', '')
 
+        import uuid
         # put to database
         patients.insert({
+            'id': str(uuid.uuid4()), # Generate UUID for new patients
             'kid_name' : kid_name, 
             'kid_birthday' : kid_birthdate,
             'name': name, 
@@ -29,19 +31,26 @@ def manage_patients():
         return redirect(url_for('patients.manage_patients'))
     return render_template('patients.html', patients=patients.all())
 
-@patients_bp.route('/patient/<int:patient_id>')
+@patients_bp.route('/patient/<patient_id>')
 def exam_patient(patient_id):
-    patient = patients.get(doc_id=patient_id)
-    if not patient:
-        return "Lỗi kết nối /patient/<int: patient_id>"
+    # Find patient by UUID
+    results = patients.search(Query().id == patient_id)
+    if not results:
+        return "Lỗi kết nối /patient/<patient_id>: Not Found", 404
+    patient = results[0]
+    
     # Later: redirect to exam screen
     return render_template('exam.html', patient=patient)
     
 
 # edit patients info
-@patients_bp.route('/edit_patient/<int:patient_id>', methods=['GET', 'POST'])
+@patients_bp.route('/edit_patient/<patient_id>', methods=['GET', 'POST'])
 def edit_patient(patient_id):
-    patient = patients.get(doc_id=patient_id)
+    results = patients.search(Query().id == patient_id)
+    if not results:
+        return "Patient not found", 404
+    patient = results[0]
+    
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'update':
@@ -51,9 +60,9 @@ def edit_patient(patient_id):
                 'name': request.form.get('name', ''),
                 'phone': request.form.get('phone', ''),
                 'address': request.form.get('address', '')
-            }, doc_ids=[patient_id])
+            }, Query().id == patient_id)
         elif action == 'delete':
-            patients.remove(doc_ids=[patient_id])
+            patients.remove(Query().id == patient_id)
         return redirect(url_for('patients.manage_patients'))
     return render_template('edit_patient.html', patient=patient)
 
@@ -65,7 +74,10 @@ def add_patient():
         name = request.form.get('name', '')
         phone = request.form.get('phone', '')
         address = request.form.get('address', '')
+        
+        import uuid
         patients.insert({
+            'id': str(uuid.uuid4()),
             'kid_name': kid_name,
             'kid_birthday': kid_birthday,
             'name': name,
@@ -77,17 +89,15 @@ def add_patient():
         return redirect(url_for('patients.manage_patients'))
     return render_template('add_patient.html')
 
-@patients_bp.route('/patient/<int:patient_id>/exams')
+@patients_bp.route('/patient/<patient_id>/exams')
 def view_exams(patient_id):
-    Patient = Query()
-    patient = patients.get(doc_id=patient_id)
-    if not patient:
+    results = patients.search(Query().id == patient_id)
+    if not results:
         return "Patient not found", 404
+    patient = results[0]
 
     # Get all exams for this patient
     patient_exams = patient.get("exams", [])
-
-    # patient_exams = exams.search(Query().patient_id == patient_id)
     
     def exam_sort_key(e):
         return (

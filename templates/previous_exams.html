@@ -11,7 +11,7 @@
       <p class="h1">Ba / Mẹ {{ patient.name }} {{ patient.phone }} - {{ patient.address }}</p>
     </div>
 
-    <div><a href="{{ url_for('exam.new_exam', patient_id=patient.doc_id) }}" class="button is-primary">
+    <div><a href="{{ url_for('exam.new_exam', patient_id=patient.id) }}" class="button is-primary">
         <span>Tạo toa thuốc mới</span>
       </a>
       <a class="button is-info" href="javascript:history.back()">Back</a>

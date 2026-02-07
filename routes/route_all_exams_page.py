@@ -43,7 +43,7 @@ def get_exam_list():
                         "exam_date": exam.get("exam_date", ""),
                         "exam_id": exam.get("id", ""),
                         "paid_status": exam.get("paid_status", False),
-                        "patient_id": patient.doc_id,
+                        "patient_id": patient.get("id"), # UUID
                         "history": exam.get("history", ""),
                         "drugs": exam.get("drugs", []),
                         "service_fee": exam.get("service_fee", "0"),
@@ -101,14 +101,23 @@ def get_exam_list():
 def mark_paid():
     try:
         data = request.get_json()
-        patient_id = int(data.get('patient_id'))
+        patient_id = data.get('patient_id') # UUID String
         # print(patient_id)
         exam_id = data.get('exam_id')
         # print(exam_id)
         patients = db.table('patients')
-        patient = patients.get(doc_id=patient_id)
-        if not patient:
+        
+        # Find patient by UUID
+        # results = patients.search(Query().id == patient_id) # Using shared_db instance
+        # Actually in this file we imported 'patients' as 'patients_table' alias 'patients'
+        # But look at line 9: `from shared_db import db, patients_table as patients`
+        
+        results = patients.search(Query().id == patient_id)
+
+        if not results:
             return jsonify({"success": False, "error": "Patient_id not foud"}), 404
+        
+        patient = results[0]
 
         updated = False
         new_status = None
@@ -122,7 +131,7 @@ def mark_paid():
                 break
 
         if updated:
-            patients.update({'exams': patient['exams']}, doc_ids=[patient_id])
+            patients.update({'exams': patient['exams']}, doc_ids=[patient.doc_id])
             return jsonify({
                 "success": True,
                 "message": "Payment updated",

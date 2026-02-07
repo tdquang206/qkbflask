@@ -39,9 +39,12 @@
         <td>{{ patient.last_visit or '—' }}</td>
         <td class="has-text-centered">
           <div class="buttons are-small is-centered">
-            <a href="/exam/{{ patient.doc_id }}/new_exam" class="button is-link">Tới màn hình khám bệnh</a>
-            <a href="/edit_patient/{{ patient.doc_id }}" class="button is-warning">Sửa thông tin</a>
-            <a href="/patient/{{ patient.doc_id }}/exams" class="button is-info">Lịch sử khám bệnh</a>
+            <a href="{{ url_for('exam.new_exam', patient_id=patient.id) }}" class="button is-link">Tới màn hình khám
+              bệnh</a>
+            <a href="{{ url_for('patients.edit_patient', patient_id=patient.id) }}" class="button is-warning">Sửa thông
+              tin</a>
+            <a href="{{ url_for('patients.view_exams', patient_id=patient.id) }}" class="button is-info">Lịch sử khám
+              bệnh</a>
           </div>
         </td>
       </tr>

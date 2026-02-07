@@ -3,14 +3,18 @@
 <h1 class="title">Edit Patients</h1>
 
 <form method="POST" class="box">
-  <input type="hidden" name="id" value="{{ patient.doc_id }}">
-  <div class="field"><label class="label">Tên bé</label><input class="input" name="kid_name" value="{{ patient.kid_name }}"></div>
-  <div class="field"><label class="label">Ngày sinh bé</label><input class="input" name="kid_birthday" value="{{ patient.kid_birthday }}"></div>
-  <div class="field"><label class="label">Tên Ba Mẹ</label><input class="input" name="name" value="{{ patient.name }}"></div>
-  <div class="field"><label class="label">SĐT</label><input class="input" name="phone" value="{{ patient.phone }}"></div>
-  <div class="field"><label class="label">Địa chỉ</label><input class="input" name="address" value="{{ patient.address }}"></div>
+  <input type="hidden" name="id" value="{{ patient.id }}">
+  <div class="field"><label class="label">Tên bé</label><input class="input" name="kid_name"
+      value="{{ patient.kid_name }}"></div>
+  <div class="field"><label class="label">Ngày sinh bé</label><input class="input" name="kid_birthday"
+      value="{{ patient.kid_birthday }}"></div>
+  <div class="field"><label class="label">Tên Ba Mẹ</label><input class="input" name="name" value="{{ patient.name }}">
+  </div>
+  <div class="field"><label class="label">SĐT</label><input class="input" name="phone" value="{{ patient.phone }}">
+  </div>
+  <div class="field"><label class="label">Địa chỉ</label><input class="input" name="address"
+      value="{{ patient.address }}"></div>
   <button class="button is-success" name="action" value="update">Update</button>
   <button class="button is-danger" name="action" value="delete">Delete (Xóa)</button>
 </form>
 {% endblock %}
-

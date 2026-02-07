@@ -2,7 +2,7 @@
 {% block content %}
 
 <section class="section">
-  <form id="examForm" action="/exam/{{ patient.doc_id }}/new_exam" method="POST" onsubmit="calculateTotals()">
+  <form id="examForm" action="/exam/{{ patient.id }}/new_exam" method="POST" onsubmit="calculateTotals()">
     <div class="container">
 
       <!-- Patient Info -->
@@ -11,7 +11,7 @@
       {% else %}
       <h1 class="title is-3">Khám bệnh cho: con Ba/Mẹ {{ patient.name }} - {{ patient.phone }}</h1>
       {% endif %}
-      <div><input type="hidden" name="patient_id" value="{{ patient.doc_id }}"></div>
+      <div><input type="hidden" name="patient_id" value="{{ patient.id }}"></div>
 
 
       <div class="box">

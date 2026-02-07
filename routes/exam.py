@@ -107,7 +107,8 @@ def edit_exam(exam_id):
     exam_editting = None
     patient_found = None
     
-    
+    # In TinyDB with nested exams, we still have to iterate patients or search exams if we had a separate table.
+    # Since structure is nested:
     for patient in Patients_db.all():
         for exam in patient.get('exams', []):
             if exam.get('id') == exam_id:
@@ -116,7 +117,8 @@ def edit_exam(exam_id):
                 break
     if not exam_editting or not patient_found:
         flash("Unknown exam info", "error")
-        return redirect(url_for('patient.view_patients'))
+        # return redirect(url_for('patient.view_patients')) # logic error in original code too?
+        return redirect(url_for('patients.manage_patients'))
     
     if request.method == 'GET':
         settings = load_settings()
@@ -160,7 +162,7 @@ def edit_exam(exam_id):
             new_department = exam_editting.get('department', 'Nhi khoa')
 
         exam_data = {
-            'patient_id': patient_found.doc_id,
+            'patient_id': patient_found.get('id'), # Use UUID
             'exam_date': exam_date,
             'weight': weight,
             'height': height,
@@ -178,7 +180,7 @@ def edit_exam(exam_id):
             'created_by_id': exam_editting.get('created_by_id'),
             'created_by_name': exam_editting.get('created_by_name', 'Admin')
         }
-        print(exam_data)
+        # print(exam_data)
         
         
         # Handle image upload if present
@@ -210,6 +212,7 @@ def edit_exam(exam_id):
             exams.append(exam_data)
 
         # Update the patient document in TinyDB
+        # We must use doc_ids to update specific record found by earlier iteration
         Patients_db.update({"exams": exams, "last_visit": exam_date}, doc_ids=[patient_found.doc_id])
         # NOTE: PDF and JPEG files, overwrite old files
         short_exam_id = str(exam_id)[:8].replace('-','')
@@ -229,15 +232,19 @@ def edit_exam(exam_id):
           "status": "success",
           "message": "Exam updated",
           "exam_id": exam_data['id'],
-          "patient_id": patient_found.doc_id
+          "patient_id": patient_found.get('id') # UUID
         })
 
 # NOTE: Create
 # Create new exam
-@exam_bp.route('/exam/<int:patient_id>/new_exam', methods=['GET', 'POST'])
+@exam_bp.route('/exam/<patient_id>/new_exam', methods=['GET', 'POST'])
 def new_exam(patient_id):
 
-    patient = Patients_db.get(doc_id = patient_id)
+    # Find patient by UUID
+    results = Patients_db.search(Query().id == patient_id)
+    if not results:
+        return "Patient not found", 404
+    patient = results[0]
 
     if request.method == 'GET':
         settings = load_settings()
@@ -280,7 +287,7 @@ def new_exam(patient_id):
             selected_department = current_user.department if current_user.is_authenticated else 'Nhi khoa'
 
         exam_data = {
-            'patient_id': patient_id,
+            'patient_id': patient_id, # UUID
             'exam_date': exam_date,
             'weight': weight,
             'height': height,
@@ -346,11 +353,12 @@ def new_exam(patient_id):
         exams.append(exam_data)
 
         # Update the patient document in TinyDB
+        # Use doc_ids here because we already found the patient object and its doc_id
         Patients_db.update({
             "exams": exams,
             "last_visit": exam_date
             }, 
-            doc_ids=[patient_id])
+            doc_ids=[patient.doc_id])
 
         # NOTE: create PDF and JPEG files
         
@@ -389,9 +397,11 @@ def api_generate_files():
     if not exam_id or not patient_id:
         return jsonify({"status": "error", "message": "Missing info"}), 400
 
-    patient = Patients_db.get(doc_id=int(patient_id))
-    if not patient:
+    # Find patient by UUID
+    results = Patients_db.search(Query().id == patient_id)
+    if not results:
         return jsonify({"status": "error", "message": "Patient not found"}), 404
+    patient = results[0]
         
     exam_found = None
     for e in patient.get('exams', []):
@@ -428,9 +438,11 @@ def api_send_discord():
     if not exam_id or not patient_id:
         return jsonify({"status": "error", "message": "Missing info"}), 400
 
-    patient = Patients_db.get(doc_id=int(patient_id))
-    if not patient:
+    # Find patient by UUID
+    results = Patients_db.search(Query().id == patient_id)
+    if not results:
         return jsonify({"status": "error", "message": "Patient not found"}), 404
+    patient = results[0]
         
     exam_found = None
     for e in patient.get('exams', []):
@@ -452,6 +464,7 @@ def api_send_discord():
 def delete_exam(exam_id):
 
         patient_doc_id = None
+        patient_uuid = None
         # data for pdf filename
         patient_found = None
         patient_phone = None
@@ -464,12 +477,14 @@ def delete_exam(exam_id):
                     exam_will_be_deleted = exam
                     patient_found = patient
                     patient_doc_id = patient.doc_id
+                    patient_uuid = patient.get('id')
                     patient_phone = patient.get('phone')
                     exam_date = exam.get('exam_date')
                     break
-            if exam_will_be_deleted:
-                    break
-        if not exam_will_be_deleted:
+            if patient_found: # Optimized break
+                break
+                
+        if not patient_found:
             flash("some error while delete exam, please tell dev", "error")
             return jsonify({
                 "status": "error",
@@ -480,18 +495,24 @@ def delete_exam(exam_id):
         deleted_files = delete_exam_files(patient_phone, exam_date, short_exam_id)
 
         # delete from database
-        updated_exams = [e for e in patient.get('exams', []) if e['id'] != exam_id]
+        updated_exams = [e for e in patient_found.get('exams', []) if e['id'] != exam_id]
         Patients_db.update({'exams': updated_exams}, doc_ids=[patient_doc_id])
 
         return jsonify({
             "status": "success",
             "message": "Đã xóa toa thuốc",
-            "redirect_url": url_for('view_exams', patient_id=patient_doc_id)
+            # "redirect_url": url_for('view_exams', patient_id=patient_doc_id) # Was wrong?
+            "redirect_url": url_for('patients.view_exams', patient_id=patient_uuid)
         })
 
-@exam_bp.route('/exam/<int:patient_id>/upload_images', methods=['POST'])
+@exam_bp.route('/exam/<patient_id>/upload_images', methods=['POST'])
 def upload_images(patient_id):
-    patient = Patients_db.get(doc_id=patient_id)
+    # Find patient by UUID
+    results = Patients_db.search(Query().id == patient_id)
+    if not results:
+        return jsonify({"status": "error", "message": "Patient not found"}), 404
+    patient = results[0]
+    
     exam_date = datetime.now().strftime("%Y-%m-%d")
 
     images = request.files.getlist('lab_images')

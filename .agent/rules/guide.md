@@ -11,4 +11,4 @@ trigger: always_on
 - add encoding='utf-8' or similar param when possible
 - make sure to comment on non-trivial code
 - add function to new files, do not add directly to app.py
-- for debug files, put them inside debug folder
+- for debug files, put them inside debug folder, and use load_dotenv()

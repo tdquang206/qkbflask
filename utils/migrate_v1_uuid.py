@@ -3,6 +3,10 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load environment variables before importing shared_db
+from dotenv import load_dotenv
+load_dotenv()
+
 from shared_db import db, patients_table
 import uuid
 import shutil

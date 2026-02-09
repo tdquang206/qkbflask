@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, Blueprint
+from flask import Flask, render_template, request, redirect, url_for, jsonify, Blueprint, send_from_directory
 from tinydb import Query, where
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -90,6 +90,12 @@ def index():
 def all_exams():
     return render_template('exams.html', exams=exams.all(), patients=patients)
 
+
+# Serve uploaded files
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    """Serve uploaded images from the uploads folder"""
+    return send_from_directory('uploads', filename)
 
 
 if __name__ == '__main__':

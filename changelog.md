@@ -1,3 +1,29 @@
+# Version 0.7.260902 (2026-02-09)
+==================================================
+
+## Project Analysis & Summary
+- Major overhaul of image management in Exam Edit mode, including robust upload/delete functionality and image previews.
+- Fixed critical data persistence issues where deleted images would reappear.
+- Optimized UI layout for better usability.
+
+## New Features
+- **Image Management (Edit Exam)**:
+  - **Upload Improvements**: Added ability to upload multiple images with auto-resize (max 1MB).
+  - **Previews**: Added immediate image thumbnails upon file selection.
+  - **Gallery**: Display of existing images with "Click to enlarge" and "Delete" actions.
+  - **Modal**: integrated full-size image viewer.
+- **UI Refinements**:
+  - **Service Type Layout**: Moved "Loại khám" radio buttons to a new line for better visibility.
+  - **Path Normalization**: Fixed broken image links on Windows by normalizing file paths.
+
+## Fix
+- **Data Persistence**:
+  - Fixed a race condition where the "Delete Image" button triggered a form submission, causing deleted images to be resurrected in the database.
+  - Refactored backend logic (`upload_images`, `delete_exam_image`) to explicitly update list indices for reliability.
+- **Bug Fixes**:
+  - Fixed `lab_images` field name mismatch preventing uploads.
+  - Fixed 404 errors for deleted images.
+
 # Version 0.6.260206 (2026-02-06)
 ==================================================
 

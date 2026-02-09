@@ -505,23 +505,42 @@ def delete_exam(exam_id):
             "redirect_url": url_for('patients.view_exams', patient_id=patient_uuid)
         })
 
-@exam_bp.route('/exam/<patient_id>/upload_images', methods=['POST'])
-def upload_images(patient_id):
+# NOTE: Upload images to existing exam
+@exam_bp.route('/exam/<patient_id>/<exam_id>/upload_images', methods=['POST'])
+def upload_images(patient_id, exam_id):
     # Find patient by UUID
     results = Patients_db.search(Query().id == patient_id)
     if not results:
         return jsonify({"status": "error", "message": "Patient not found"}), 404
     patient = results[0]
     
-    exam_date = datetime.now().strftime("%Y-%m-%d")
+    # Find the exam index
+    exam_index = -1
+    exams = patient.get('exams', [])
+    for i, exam in enumerate(exams):
+        if exam.get('id') == exam_id:
+            exam_index = i
+            break
+            
+    if exam_index == -1:
+        return jsonify({"status": "error", "message": "Exam not found"}), 404
 
-    images = request.files.getlist('lab_images')
+    exam_found = exams[exam_index]
+    
+    # Get exam date for filename
+    exam_date = exam_found.get('exam_date', datetime.now().strftime("%Y-%m-%d"))
+
+    images = request.files.getlist('lab_image')
     image_list = []
 
     folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
     os.makedirs(folder, exist_ok=True)
 
-    for idx, image in enumerate(images, start=1):
+    # Get existing image count to continue numbering
+    existing_images = exam_found.get('images', [])
+    start_idx = len(existing_images) + 1
+
+    for idx, image in enumerate(images, start=start_idx):
         if image and image.filename:
             safe_name = secure_filename(image.filename)
             ext = os.path.splitext(safe_name)[1].lower()
@@ -530,21 +549,81 @@ def upload_images(patient_id):
 
             # Resize with Pillow
             img = Image.open(image)
-            img.thumbnail((2000, 2000), Image.ANTIALIAS)
+            img.thumbnail(MAX_SIZE, Image.Resampling.LANCZOS)
 
             buffer = io.BytesIO()
             img.save(buffer, format=img.format or "JPEG", optimize=True, quality=85)
-            if buffer.tell() > 1 * 1024 * 1024:  # >1MB
+            if buffer.tell() > MAX_FILE_SIZE:  # >1MB
                 buffer = io.BytesIO()
                 img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
 
             with open(image_path, "wb") as f:
                 f.write(buffer.getvalue())
 
-            # Return URL for frontend thumbnail
+            # Add to image list
             image_list.append({
                 "filename": new_name,
-                "url": f"/{image_path}"  # adjust if you serve uploads differently
+                "path": image_path
             })
 
+    # Update exam with new images
+    if image_list:
+        if 'images' not in exams[exam_index]:
+            exams[exam_index]['images'] = []
+        exams[exam_index]['images'].extend(image_list)
+        
+        # Update the patient document in TinyDB with explicit exams list
+        Patients_db.update({'exams': exams}, doc_ids=[patient.doc_id])
+
     return jsonify({"status": "success", "images": image_list})
+
+# NOTE: Delete image from exam
+@exam_bp.route('/exam/<patient_id>/<exam_id>/delete_image/<filename>', methods=['DELETE'])
+def delete_exam_image(patient_id, exam_id, filename):
+    # Find patient by UUID
+    results = Patients_db.search(Query().id == patient_id)
+    if not results:
+        return jsonify({"status": "error", "message": "Patient not found"}), 404
+    patient = results[0]
+    
+    # Find the exam index
+    exam_index = -1
+    exams = patient.get('exams', [])
+    for i, exam in enumerate(exams):
+        if exam.get('id') == exam_id:
+            exam_index = i
+            break
+    
+    if exam_index == -1:
+        return jsonify({"status": "error", "message": "Exam not found"}), 404
+    
+    # Get current images
+    current_images = exams[exam_index].get('images', [])
+    
+    # Find image to remove
+    image_to_remove = None
+    for img in current_images:
+        if img.get('filename') == filename:
+            image_to_remove = img
+            break
+    
+    if not image_to_remove:
+        return jsonify({"status": "error", "message": "Image not found in exam"}), 404
+    
+    # Remove image from list
+    new_images = [img for img in current_images if img.get('filename') != filename]
+    exams[exam_index]['images'] = new_images
+    
+    # Delete physical file
+    try:
+        if os.path.exists(image_to_remove['path']):
+            os.remove(image_to_remove['path'])
+        else:
+             print(f"File not found on disk: {image_to_remove['path']}")
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+    
+    # Update database with explicit exams list
+    Patients_db.update({'exams': exams}, doc_ids=[patient.doc_id])
+    
+    return jsonify({"status": "success", "message": "Image deleted"})

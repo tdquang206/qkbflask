@@ -78,6 +78,35 @@
         </div>
       </div>
 
+      <!-- Image Upload and Gallery -->
+      <div class="box">
+        <label class="label">📷 Hình ảnh, kết quả xét nghiệm</label>
+
+        <!-- Upload controls -->
+        <div class="field is-grouped">
+          <div class="control">
+            <input type="file" id="lab_images" multiple accept="image/*" style="display:none;">
+            <button type="button" class="button is-info" onclick="document.getElementById('lab_images').click()">
+              <span>Chọn ảnh</span>
+            </button>
+          </div>
+          <div class="control">
+            <button type="button" class="button is-primary" id="uploadImagesBtn">
+              <span>Tải lên</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <progress id="uploadProgress" class="progress is-info" value="0" max="100"
+          style="display:none; margin-top:10px;"></progress>
+
+        <!-- Thumbnail gallery -->
+        <div id="imageGallery" style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+          <!-- Existing images load here via JavaScript -->
+        </div>
+      </div>
+
       <!-- Service Options -->
       <!-- Service Options -->
       <div class="box">
@@ -102,6 +131,9 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="columns is-vcentered">
 
             <!-- Column 2: Free -->
             <div class="column is-3">
@@ -1128,6 +1160,193 @@
   });
 </script>
 
+<!-- Image Modal -->
+<div class="modal" id="imageModal">
+  <div class="modal-background" onclick="closeImageModal()"></div>
+  <div class="modal-content" style="max-width:90vw; max-height:90vh;">
+    <p class="image">
+      <img id="modalImage" src="" alt="Full size" style="max-width:100%; max-height:90vh; object-fit:contain;">
+    </p>
+  </div>
+  <button class="modal-close is-large" onclick="closeImageModal()"></button>
+</div>
+
+<!-- Image Management JavaScript -->
+<script>
+  // Load existing images on page load
+  document.addEventListener('DOMContentLoaded', async function () {
+    const examImages = {{ exam.images | tojson | safe if exam.images else '[]' | safe
+  }};
+  const imageGallery = document.getElementById('imageGallery');
+
+  if (examImages && examImages.length > 0) {
+    examImages.forEach(img => {
+      addThumbnail(img.filename, img.path);
+    });
+  }
+  });
+
+  // Preview images when selected
+  document.getElementById("lab_images").addEventListener("change", function () {
+    const files = this.files;
+
+    if (!files.length) return;
+
+    Array.from(files).forEach((file, idx) => {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const gallery = document.getElementById('imageGallery');
+        const wrapper = document.createElement("div");
+        wrapper.className = 'image-thumbnail-wrapper pending-upload';
+        wrapper.style.cssText = "position:relative; display:inline-block; opacity: 0.7;";
+
+        wrapper.innerHTML = `
+          <img src="${e.target.result}" 
+               style="height:150px; width:150px; object-fit:cover; border-radius:4px; border: 2px dashed #3298dc;"
+               title="${file.name} (Chờ tải lên)">
+          <div style="position:absolute; bottom:5px; left:0; right:0; text-align:center;">
+            <span class="tag is-info is-light is-small">Chờ tải lên</span>
+          </div>
+        `;
+        gallery.appendChild(wrapper);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // Add thumbnail to gallery
+  function addThumbnail(filename, path) {
+    // Normalize path just in case
+    path = path.replace(/\\/g, '/');
+    const gallery = document.getElementById('imageGallery');
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-thumbnail-wrapper';
+    wrapper.style.cssText = 'position:relative; display:inline-block;';
+    wrapper.dataset.filename = filename;
+
+    wrapper.innerHTML = `
+    <img src="/${path}" 
+         style="height:150px; width:150px; object-fit:cover; cursor:pointer; border-radius:4px;"
+         onclick="openImageModal('/${path}')"
+         title="Click to enlarge">
+    <button type="button" class="delete is-small" 
+            style="position:absolute; top:5px; right:5px;"
+            onclick="event.stopPropagation(); removeImage('${filename}')"
+            title="Remove image"></button>
+  `;
+
+    gallery.appendChild(wrapper);
+  }
+
+  // Upload new images
+  document.getElementById('uploadImagesBtn').addEventListener('click', async function () {
+    const fileInput = document.getElementById('lab_images');
+    const files = fileInput.files;
+
+    if (!files.length) {
+      alert('Vui lòng chọn ảnh trước');
+      return;
+    }
+
+    // Debug URL parameters
+    const patientId = '{{ patient.id }}';
+    const examId = '{{ exam.id }}';
+    if (!patientId || !examId) {
+      alert(`Lỗi: Thiếu ID (Patient: ${patientId}, Exam: ${examId})`);
+      return;
+    }
+
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('lab_image', file));
+
+    const progressBar = document.getElementById('uploadProgress');
+    progressBar.style.display = 'block';
+    progressBar.value = 0;
+
+    const uploadUrl = `/exam/${patientId}/${examId}/upload_images`;
+
+    try {
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formData
+      });
+
+      progressBar.value = 50;
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        progressBar.value = 100;
+
+        // Remove pending previews
+        document.querySelectorAll('.pending-upload').forEach(el => el.remove());
+
+        // Add new thumbnails
+        data.images.forEach(img => {
+          addThumbnail(img.filename, img.path);
+        });
+
+        // Clear file input
+        fileInput.value = '';
+
+        setTimeout(() => {
+          progressBar.style.display = 'none';
+          progressBar.value = 0;
+        }, 1000);
+      } else {
+        throw new Error(data.message || 'Upload failed');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('❌ Lỗi upload: ' + error.message);
+      progressBar.style.display = 'none';
+    }
+  });
+
+  // Remove image
+  async function removeImage(filename) {
+    if (!confirm('Xóa ảnh này?')) return;
+
+    const patientId = '{{ patient.id }}';
+    const examId = '{{ exam.id }}';
+    const deleteUrl = `/exam/${patientId}/${examId}/delete_image/${filename}`;
+
+    try {
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        // Remove thumbnail from DOM
+        const wrapper = document.querySelector(`[data-filename="${filename}"]`);
+        if (wrapper) wrapper.remove();
+      } else {
+        throw new Error(data.message || 'Delete failed');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('❌ Lỗi xóa ảnh: ' + error.message);
+    }
+  }
+
+  // Modal functions
+  function openImageModal(imagePath) {
+    document.getElementById('modalImage').src = imagePath;
+    document.getElementById('imageModal').classList.add('is-active');
+  }
+
+  function closeImageModal() {
+    document.getElementById('imageModal').classList.remove('is-active');
+  }
+
+  // Close modal on ESC key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeImageModal();
+  });
+</script>
 
 
 {% endblock %}

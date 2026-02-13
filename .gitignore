@@ -100,4 +100,7 @@ uploads/
 files/
 backups/
 logs/
-.venv/.env
+.venv/
+.env
+.env.local
+.env.*.local

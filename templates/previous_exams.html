@@ -1,6 +1,34 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="section">
+  <!-- Viewer.js (Local Bundle v1.11.7) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='viewerjs/viewer.min.css') }}">
+  <script src="{{ url_for('static', filename='viewerjs/viewer.min.js') }}"></script>
+  <style>
+    .exam-thumbnail-container {
+      position: relative;
+      display: inline-block;
+      margin: 5px;
+    }
+
+    .exam-thumbnail {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid #dbdbdb;
+    }
+
+    .compare-checkbox {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      transform: scale(1.5);
+      z-index: 10;
+      cursor: pointer;
+    }
+  </style>
   <div class="container">
 
     <div class="box">
@@ -84,6 +112,21 @@
           '')|replace('\r\n', '') }}</div>
       </div>
 
+      <!-- Images Grid -->
+      {% if exam.images %}
+      <div class="field is-grouped is-grouped-multiline mb-4 images-gallery" id="gallery-{{ exam.id }}">
+        {% for img in exam.images %}
+        <div class="exam-thumbnail-container">
+          <img src="/{{ img.path | replace('\\', '/') }}" alt="{{ img.filename }}" class="exam-thumbnail"
+            data-original-url="/{{ img.path | replace('\\', '/') }}" data-date="{{ exam.exam_date }}"
+            data-filename="{{ img.filename }}">
+          <input type="checkbox" class="compare-checkbox" data-url="/{{ img.path | replace('\\', '/') }}"
+            data-date="{{ exam.exam_date }}">
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       {% set valid_drugs = exam.drugs | selectattr("name") | list %}
       {% if valid_drugs %}
       <div class="table-container mt-3">
@@ -131,6 +174,33 @@
     {% endif %}
 
   </div>
+  </div>
+
+  <!-- Compare Controls -->
+  <div id="compareControls" style="display:none; position: fixed; bottom: 20px; right: 80px; z-index: 2000; gap: 10px;">
+    <button id="clearSelectionBtn" class="button is-danger is-light is-rounded is-medium shadow-lg mr-2">
+      <span class="icon">✕</span>
+      <span>Xóa chọn</span>
+    </button>
+    <button id="compareBtn" class="button is-warning is-rounded is-medium shadow-lg">
+      <span class="icon">🔍</span>
+      <span>So sánh (<span id="compareCount">0</span>)</span>
+    </button>
+  </div>
+
+  <!-- Compare Modal -->
+  <div id="compareModal" class="modal">
+    <div class="modal-background" onclick="closeCompareModal()"></div>
+    <div class="modal-content" style="width: 90%; max-width: 1200px;">
+      <div class="box has-background-white">
+        <h2 class="title is-4 mb-4 has-text-centered" style="color: black;">So sánh hình ảnh</h2>
+        <div id="compareGrid" class="columns is-multiline">
+          <!-- JS will populate this -->
+        </div>
+      </div>
+    </div>
+    <button class="modal-close is-large" aria-label="close" onclick="closeCompareModal()"></button>
+  </div>
 </section>
 <div id="toast" class="notification is-success"
   style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">
@@ -174,4 +244,114 @@
     });
   });
 </script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // 1. Initialize Viewer for each exam gallery (Quick View)
+    document.querySelectorAll('.images-gallery').forEach(gallery => {
+      new Viewer(gallery, {
+        url: 'data-original-url',
+        toolbar: {
+          zoomIn: 1,
+          zoomOut: 1,
+          oneToOne: 1,
+          reset: 1,
+          prev: 1,
+          play: {
+            show: 1,
+            size: 'large',
+          },
+          next: 1,
+          rotateLeft: 1,
+          rotateRight: 1,
+          flipHorizontal: 1,
+          flipVertical: 1,
+        },
+        title: function (image) {
+          return image.getAttribute('data-date');
+        },
+      });
+    });
+
+    // 2. Comparison Logic
+    const checkboxes = document.querySelectorAll('.compare-checkbox');
+    const compareControls = document.getElementById('compareControls'); // Changed ID
+    const compareBtn = document.getElementById('compareBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+    const compareCount = document.getElementById('compareCount');
+    const compareModal = document.getElementById('compareModal');
+    const compareGrid = document.getElementById('compareGrid');
+
+    function updateCompareButton() {
+      const checked = document.querySelectorAll('.compare-checkbox:checked');
+      if (checked.length > 0) {
+        compareControls.style.display = 'flex';
+        compareCount.textContent = checked.length;
+      } else {
+        compareControls.style.display = 'none';
+      }
+    }
+
+    checkboxes.forEach(cb => {
+      cb.addEventListener('change', updateCompareButton);
+    });
+
+    // Clear Selection
+    if (clearSelectionBtn) {
+      clearSelectionBtn.addEventListener('click', function () {
+        checkboxes.forEach(cb => cb.checked = false);
+        updateCompareButton();
+      });
+    }
+
+    // Open Compare Modal
+    if (compareBtn) {
+      compareBtn.addEventListener('click', function () {
+        compareGrid.innerHTML = '';
+        const checked = document.querySelectorAll('.compare-checkbox:checked');
+
+        checked.forEach(cb => {
+          const col = document.createElement('div');
+          col.className = 'column is-one-quarter-desktop is-half-tablet';
+          col.innerHTML = `
+            <div class="card" style="height: 100%;">
+              <div class="card-image">
+                <figure class="image">
+                  <img src="${cb.dataset.url}" alt="${cb.dataset.date}" style="cursor:pointer; object-fit: contain; max-height: 300px;" onclick="viewImageGlobal(this)">
+                </figure>
+              </div>
+              <div class="card-content p-2">
+                <p class="subtitle is-6 has-text-centered mb-0">${cb.dataset.date}</p>
+              </div>
+            </div>
+          `;
+          compareGrid.appendChild(col);
+        });
+
+        compareModal.classList.add('is-active');
+      });
+    }
+
+    // Global viewer helper for modal images
+    window.viewImageGlobal = function (img) {
+      const viewer = new Viewer(img, {
+        hidden: function () {
+          viewer.destroy();
+        },
+        toolbar: {
+          zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1,
+          rotateLeft: 1, rotateRight: 1, flipHorizontal: 1, flipVertical: 1,
+        },
+        title: false, // Don't show title in single view modal to be cleaner
+        navbar: false,
+      });
+      viewer.show();
+    };
+
+    window.closeCompareModal = function () {
+      compareModal.classList.remove('is-active');
+    };
+  });
+</script>
+
 {% endblock %}

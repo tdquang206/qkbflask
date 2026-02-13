@@ -11,7 +11,7 @@
   - **Upload Improvements**: Added ability to upload multiple images with auto-resize (max 1MB).
   - **Previews**: Added immediate image thumbnails upon file selection.
   - **Gallery**: Display of existing images with "Click to enlarge" and "Delete" actions.
-  - **Modal**: integrated full-size image viewer.
+  - **Modal**: integrated full-size image viewer and compare
 - **UI Refinements**:
   - **Service Type Layout**: Moved "Loại khám" radio buttons to a new line for better visibility.
   - **Path Normalization**: Fixed broken image links on Windows by normalizing file paths.

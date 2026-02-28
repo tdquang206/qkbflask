@@ -1,3 +1,40 @@
+# Version 0.8.260228 (2026-02-28)
+==================================================
+
+## Project Analysis & Summary
+- Added database encryption/decryption management tools for admins.
+- Implemented secure decrypt and export functionality with browser downloads.
+- Added placeholder for future import functionality.
+
+## New Features
+- **Database Management Tools**:
+  - **Decrypt & Export**: New admin-only page to decrypt all `.json` database files.
+  - **Export Function**: One-click decryption of all databases (`db.json`, `db_mua_thuoc.json`, and any future DB files).
+  - **Browser Downloads**: Users can download decrypted files via browser with proper file validation.
+  - **Auto-detection**: System automatically detects all `.json` files in root directory for export.
+  - **Dynamic File Handling**: Supports current and future database files without code changes.
+- **Security & Admin Dashboard**:
+  - **Admin Restricted**: All decrypt/export features require admin login.
+  - **Decrypted Exports Directory**: Unencrypted files stored in `decrypted_exports/` folder with clear naming.
+  - **Security Notice**: UI warns about unencrypted file handling and data sensitivity.
+  - **Admin Menu Integration**: New "Database Management" section in Admin Dashboard.
+- **Import Placeholder**:
+  - **Dedicated Page**: Placeholder for future import functionality.
+  - **Planned Features**: Documented future import capabilities (file upload, validation, merge options, backup creation).
+
+## Technical Details
+- **Utility Functions** (`utils/storage.py`):
+  - `get_encryption_key()`: Retrieve encryption key from environment.
+  - `decrypt_file()`: Decrypt single encrypted JSON file.
+  - `get_json_database_files()`: Auto-detect all `.json` database files.
+  - `export_decrypted_databases()`: Batch decrypt and save all databases.
+- **Routes** (`routes/admin.py`):
+  - `/admin/database/decrypt`: Display decrypt/export page.
+  - `/admin/database/export` (POST): Trigger decryption of all files.
+  - `/admin/database/download/<filename>`: Secure file download with validation.
+  - `/admin/database/import-page`: Import placeholder page.
+  - `/admin/database/import` (POST): Import placeholder endpoint.
+
 # Version 0.7.260902 (2026-02-09)
 ==================================================
 

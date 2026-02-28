@@ -105,6 +105,30 @@
                 </div>
             </div>
         </div>
+
+        <!-- Database Management Section -->
+        <div class="columns mt-5">
+            <div class="column">
+                <div class="box">
+                    <h2 class="subtitle">Database Management</h2>
+                    <p class="mb-4">Export and import database files with encryption/decryption capabilities.</p>
+                    <div class="buttons">
+                        <a href="{{ url_for('admin.decrypt_database_page') }}" class="button is-info is-fullwidth">
+                            <span class="icon">
+                                <i class="fas fa-unlock"></i>
+                            </span>
+                            <span>Decrypt & Export Databases</span>
+                        </a>
+                        <a href="{{ url_for('admin.import_database_page') }}" class="button is-warning is-fullwidth">
+                            <span class="icon">
+                                <i class="fas fa-upload"></i>
+                            </span>
+                            <span>Import Databases</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 

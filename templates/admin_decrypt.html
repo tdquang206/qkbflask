@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+	<div class="container">
+		<h1 class="title">Database Decrypt & Export</h1>
+
+		<div class="columns">
+			<!-- Export Section -->
+			<div class="column is-half">
+				<div class="box">
+					<h2 class="subtitle">Decrypt & Export Databases</h2>
+					<p class="mb-4">
+						<strong>Available Database Files:</strong>
+					</p>
+
+					{% if json_files %}
+					<div class="block">
+						<ul>
+							{% for filename in json_files %}
+							<li>
+								<span class="tag">{{ filename }}</span>
+							</li>
+							{% endfor %}
+						</ul>
+					</div>
+
+					<p class="mb-3 has-text-info">
+						<small><i>Click the button below to decrypt all database files and prepare them for
+								download.</i></small>
+					</p>
+
+					<form action="{{ url_for('admin.export_databases') }}" method="POST"
+						onsubmit="return confirm('Are you sure you want to decrypt and export all database files?');">
+						<button class="button is-warning is-fullwidth">
+							<span class="icon">
+								<i class="fas fa-unlock"></i>
+							</span>
+							<span>Decrypt & Export All</span>
+						</button>
+					</form>
+					{% else %}
+					<div class="notification is-info">
+						<p>No database files found.</p>
+					</div>
+					{% endif %}
+				</div>
+			</div>
+
+			<!-- Download Section -->
+			<div class="column is-half">
+				<div class="box">
+					<h2 class="subtitle">Available Downloads</h2>
+
+					{% if exported_files %}
+					<div class="block">
+						<div class="content">
+							<table class="table is-fullwidth is-striped">
+								<thead>
+									<tr>
+										<th>Filename</th>
+										<th>Size</th>
+										<th>Action</th>
+									</tr>
+								</thead>
+								<tbody>
+									{% for file in exported_files %}
+									<tr>
+										<td>
+											<code>{{ file.filename }}</code>
+										</td>
+										<td>
+											{{ (file.size / 1024) | round(2) }} KB
+										</td>
+										<td>
+											<a href="{{ url_for('admin.download_decrypted_file', filename=file.filename) }}"
+												class="button is-small is-info">
+												<span class="icon">
+													<i class="fas fa-download"></i>
+												</span>
+												<span>Download</span>
+											</a>
+										</td>
+									</tr>
+									{% endfor %}
+								</tbody>
+							</table>
+						</div>
+					</div>
+					{% else %}
+					<div class="notification is-warning">
+						<p>No decrypted files available. Click "Decrypt & Export All" to generate downloadable files.
+						</p>
+					</div>
+					{% endif %}
+
+					<p class="mt-4 has-text-info">
+						<small><i>Decrypted files are stored in the <code>{{ export_dir }}</code> directory.</i></small>
+					</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Import Section (Placeholder) -->
+		<div class="columns mt-5">
+			<div class="column">
+				<div class="box">
+					<h2 class="subtitle">Import Databases</h2>
+					<p class="mb-4">
+						This feature allows you to import decrypted database files back into the system.
+					</p>
+
+					<div class="notification is-info">
+						<p><strong>Coming Soon:</strong> Import functionality is under development.</p>
+					</div>
+
+					<a href="{{ url_for('admin.import_database_page') }}" class="button is-info is-fullwidth" disabled>
+						<span class="icon">
+							<i class="fas fa-upload"></i>
+						</span>
+						<span>Go to Import (Placeholder)</span>
+					</a>
+				</div>
+			</div>
+		</div>
+
+		<!-- Security Notice -->
+		<div class="columns mt-5">
+			<div class="column">
+				<div class="notification is-warning">
+					<button class="delete"></button>
+					<h4 class="title is-5">Security Notice</h4>
+					<ul>
+						<li>Decrypted files are stored in the <code>{{ export_dir }}</code> directory</li>
+						<li>These files are not encrypted and contain sensitive data</li>
+						<li>Only authorized administrators should access these files</li>
+						<li>Ensure proper security measures are in place before sharing any decrypted data</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+
+		<!-- Back to Admin -->
+		<div class="mt-5">
+			<a href="{{ url_for('admin.index') }}" class="button is-light">
+				<span class="icon">
+					<i class="fas fa-arrow-left"></i>
+				</span>
+				<span>Back to Admin Dashboard</span>
+			</a>
+		</div>
+	</div>
+</section>
+
+<script>
+	// Close notification when delete button is clicked
+	document.querySelectorAll('.notification .delete').forEach(button => {
+		button.addEventListener('click', () => {
+			button.parentElement.style.display = 'none';
+		});
+	});
+</script>
+{% endblock %}

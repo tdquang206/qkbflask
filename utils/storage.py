@@ -66,3 +66,127 @@ class EncryptedJSONStorage(Storage):
 
     def close(self):
         pass
+
+def get_encryption_key():
+    """Get the encryption key from environment variable"""
+    key_b64 = os.getenv('DB_ENCRYPTION_KEY')
+    if not key_b64:
+        raise ValueError("DB_ENCRYPTION_KEY environment variable is not set.")
+    try:
+        return base64.b64decode(key_b64)
+    except Exception as e:
+        raise ValueError(f"Invalid DB_ENCRYPTION_KEY: {e}")
+
+
+def decrypt_file(encrypted_file_path):
+    """
+    Decrypt an encrypted JSON file and return the decrypted data
+    
+    Args:
+        encrypted_file_path: Path to the encrypted JSON file
+        
+    Returns:
+        dict: Decrypted JSON data
+        
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        ValueError: If decryption fails
+    """
+    if not os.path.exists(encrypted_file_path):
+        raise FileNotFoundError(f"File not found: {encrypted_file_path}")
+    
+    key = get_encryption_key()
+    
+    with open(encrypted_file_path, 'rb') as f:
+        data = f.read()
+    
+    if not data:
+        raise ValueError("File is empty")
+    
+    if len(data) < 32:
+        raise ValueError("File is corrupted or not encrypted")
+    
+    try:
+        nonce = data[:16]
+        tag = data[16:32]
+        ciphertext = data[32:]
+        
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
+        
+        return json.loads(decrypted_data.decode('utf-8'))
+    except Exception as e:
+        raise ValueError(f"Decryption failed: {e}")
+
+
+def get_json_database_files(root_dir="."):
+    """
+    Get all JSON files in the root directory that are databases
+    Excludes files already in backups/ folder
+    
+    Args:
+        root_dir: Root directory to search in (default current directory)
+        
+    Returns:
+        list: List of tuples (filename, filepath) for JSON database files
+    """
+    json_files = []
+    
+    # Look for .json files in root directory
+    for filename in os.listdir(root_dir):
+        if filename.endswith('.json'):
+            filepath = os.path.join(root_dir, filename)
+            # Skip backup files and decrypted exports
+            if os.path.isfile(filepath) and not filename.startswith('decrypted_'):
+                json_files.append((filename, filepath))
+    
+    return sorted(json_files)
+
+
+def export_decrypted_databases(root_dir=".", exports_dir="decrypted_exports"):
+    """
+    Decrypt all JSON database files and save decrypted versions
+    
+    Args:
+        root_dir: Root directory where JSON files are located
+        exports_dir: Directory to save decrypted files (relative to root)
+        
+    Returns:
+        dict: {
+            'success': list of exported files,
+            'errors': list of (filename, error_message) tuples,
+            'export_dir': path to exports directory
+        }
+    """
+    # Create exports directory if it doesn't exist
+    export_path = os.path.join(root_dir, exports_dir)
+    os.makedirs(export_path, exist_ok=True)
+    
+    json_files = get_json_database_files(root_dir)
+    result = {
+        'success': [],
+        'errors': [],
+        'export_dir': export_path
+    }
+    
+    for filename, filepath in json_files:
+        try:
+            # Decrypt the file
+            decrypted_data = decrypt_file(filepath)
+            
+            # Save decrypted version with a prefix
+            export_filename = f"decrypted_{filename}"
+            export_filepath = os.path.join(export_path, export_filename)
+            
+            with open(export_filepath, 'w', encoding='utf-8') as f:
+                json.dump(decrypted_data, f, indent=2, ensure_ascii=False)
+            
+            result['success'].append({
+                'filename': export_filename,
+                'original_filename': filename,
+                'size': os.path.getsize(export_filepath)
+            })
+        except Exception as e:
+            result['errors'].append((filename, str(e)))
+    
+    return result

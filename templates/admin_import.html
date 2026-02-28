@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+	<div class="container">
+		<h1 class="title">Database Import</h1>
+
+		<div class="columns">
+			<div class="column is-three-quarters">
+				<div class="box">
+					<h2 class="subtitle">Import Decrypted Database Files</h2>
+
+					<div class="notification is-info">
+						<button class="delete"></button>
+						<h4 class="title is-5">Feature Under Development</h4>
+						<p>
+							The import functionality for decrypted database files is currently being developed.
+							This will allow you to:
+						</p>
+						<ul class="mt-3">
+							<li>Upload decrypted JSON database files</li>
+							<li>Validate the file format and structure</li>
+							<li>Preview data before importing</li>
+							<li>Merge or replace existing database data</li>
+							<li>Restore from backups</li>
+						</ul>
+					</div>
+
+					<div class="content mt-5">
+						<h3>Planned Features</h3>
+						<ol>
+							<li>File Upload Interface
+								<ul>
+									<li>Support for JSON files</li>
+									<li>Drag-and-drop upload</li>
+								</ul>
+							</li>
+							<li>Data Validation
+								<ul>
+									<li>JSON structure validation</li>
+									<li>Required fields checking</li>
+									<li>Data type verification</li>
+								</ul>
+							</li>
+							<li>Preview & Confirmation
+								<ul>
+									<li>Show number of records to be imported</li>
+									<li>Detect conflicts with existing data</li>
+									<li>Preview import summary</li>
+								</ul>
+							</li>
+							<li>Import Options
+								<ul>
+									<li>Merge with existing data</li>
+									<li>Replace all data</li>
+									<li>Update only specific records</li>
+								</ul>
+							</li>
+						</ol>
+					</div>
+
+					<!-- Placeholder Form (Disabled) -->
+					<div class="mt-5">
+						<h3 class="subtitle is-6">Upload Form (Coming Soon)</h3>
+						<form disabled>
+							<div class="field">
+								<label class="label">Select Database File</label>
+								<div class="control">
+									<input class="input" type="file" accept=".json" disabled>
+								</div>
+							</div>
+
+							<div class="field">
+								<label class="label">Import Mode</label>
+								<div class="control">
+									<div class="select is-fullwidth" disabled>
+										<select disabled>
+											<option>Merge with existing data</option>
+											<option>Replace all data</option>
+											<option>Update only</option>
+										</select>
+									</div>
+								</div>
+							</div>
+
+							<div class="field">
+								<div class="control">
+									<label class="checkbox" disabled>
+										<input type="checkbox" disabled>
+										Create backup before import
+									</label>
+								</div>
+							</div>
+
+							<button class="button is-success is-fullwidth" disabled>
+								<span class="icon">
+									<i class="fas fa-upload"></i>
+								</span>
+								<span>Import Database</span>
+							</button>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			<!-- Info Sidebar -->
+			<div class="column">
+				<div class="box">
+					<h3 class="subtitle is-5">About Import</h3>
+					<div class="content is-small">
+						<p>
+							The import feature is a placeholder for future development.
+							It will provide a secure way to:
+						</p>
+						<ul>
+							<li>Upload database backups</li>
+							<li>Restore data from exports</li>
+							<li>Merge multiple databases</li>
+							<li>Maintain data integrity</li>
+						</ul>
+					</div>
+
+					<div class="box is-danger" style="background-color: #fff5f5;">
+						<h4 class="title is-6">Security Note</h4>
+						<p class="is-size-7">
+							When implemented, the import feature will:
+						</p>
+						<ul class="is-size-7">
+							<li>Validate all file uploads</li>
+							<li>Create automatic backups</li>
+							<li>Require admin authentication</li>
+							<li>Log all import operations</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Navigation -->
+		<div class="mt-5">
+			<a href="{{ url_for('admin.decrypt_database_page') }}" class="button is-light">
+				<span class="icon">
+					<i class="fas fa-arrow-left"></i>
+				</span>
+				<span>Back to Decrypt & Export</span>
+			</a>
+			<a href="{{ url_for('admin.index') }}" class="button is-light">
+				<span class="icon">
+					<i class="fas fa-home"></i>
+				</span>
+				<span>Back to Admin Dashboard</span>
+			</a>
+		</div>
+	</div>
+</section>
+
+<script>
+	// Close notification when delete button is clicked
+	document.querySelectorAll('.notification .delete').forEach(button => {
+		button.addEventListener('click', () => {
+			button.parentElement.style.display = 'none';
+		});
+	});
+</script>
+{% endblock %}

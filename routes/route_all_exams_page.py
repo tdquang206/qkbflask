@@ -2,11 +2,12 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from datetime import datetime
 from tinydb import Query
 from collections import defaultdict
+from flask_login import login_required, current_user
 
 #  the database
 
 exams_list_bp = Blueprint('route_all_exams_page', __name__)
-from shared_db import db, patients_table as patients
+from shared_db import db, patients_table as patients, money_log_table
 
 @exams_list_bp.route('/danh_sach_kham_benh', methods = ['GET', 'POST'])
 def get_exam_list():
@@ -14,6 +15,20 @@ def get_exam_list():
         # get patients table
         all_patients = patients.all()
         
+        # load existing money-received records so we can display them in the
+        # list.  We only care about the most recent entry for each exam; if
+        # there are multiple records we'll keep the last one (same logic as a
+        # tinydb search sorted by timestamp would produce).
+        raw_logs = money_log_table.all()
+        money_map = {}
+        for log in raw_logs:
+            exam_id = log.get('exam_id')
+            if not exam_id:
+                continue
+            # keep the latest by timestamp string (ISO format sorts lexicographically)
+            if exam_id not in money_map or log.get('timestamp', '') > money_map[exam_id].get('timestamp', ''):
+                money_map[exam_id] = log
+
         all_exams = []
         for patient in all_patients:
             for exam in patient.get('exams', []):
@@ -94,44 +109,67 @@ def get_exam_list():
         total_pages = (len(older_months) + PAGE_SIZE - 1) // PAGE_SIZE
         has_next = page < total_pages
 
-        return render_template('all_exams_page.html', grouped=grouped, exams = all_exams, current_months = current_months, older_months=older_months_page, page=page, total_pages=total_pages,has_next=has_next)
+        return render_template('all_exams_page.html', grouped=grouped, exams = all_exams,
+                               current_months = current_months, older_months=older_months_page,
+                               page=page, total_pages=total_pages,has_next=has_next,
+                               money_map=money_map)
 
 # mark paid status - toggle button
 @exams_list_bp.route('/api/mark_paid', methods=['POST'])
+@login_required
 def mark_paid():
+    """Toggle the paid status for an exam and optionally log the real amount.
+
+    Request payload may include ``real_amount`` (number).  When the status is
+    flipped to ``True`` we record a ledger entry containing the amount, the
+    user who performed the action and a timestamp.  This lets the accounting
+    team generate in‑out reports without modifying the original patient
+    records.
+    """
     try:
         data = request.get_json()
-        patient_id = data.get('patient_id') # UUID String
-        # print(patient_id)
+        patient_id = data.get('patient_id')  # UUID String
         exam_id = data.get('exam_id')
-        # print(exam_id)
+        real_amount = data.get('real_amount')
         patients = db.table('patients')
-        
-        # Find patient by UUID
-        # results = patients.search(Query().id == patient_id) # Using shared_db instance
-        # Actually in this file we imported 'patients' as 'patients_table' alias 'patients'
-        # But look at line 9: `from shared_db import db, patients_table as patients`
-        
+
         results = patients.search(Query().id == patient_id)
 
         if not results:
-            return jsonify({"success": False, "error": "Patient_id not foud"}), 404
-        
+            return jsonify({"success": False, "error": "Patient_id not found"}), 404
+
         patient = results[0]
 
         updated = False
         new_status = None
         for exam in patient.get('exams', []):
             if exam.get('id') == exam_id:
-
-                curent_status = exam.get('paid_status', False)
-                exam['paid_status'] = not curent_status
+                current_status = exam.get('paid_status', False)
+                exam['paid_status'] = not current_status
                 new_status = exam['paid_status']
                 updated = True
                 break
 
         if updated:
             patients.update({'exams': patient['exams']}, doc_ids=[patient.doc_id])
+
+            # if we just marked it paid and there is a real_amount provided,
+            # append a ledger record
+            if new_status and real_amount is not None:
+                try:
+                    amount_int = int(float(real_amount))
+                except (ValueError, TypeError):
+                    amount_int = 0
+
+                ledger_entry = {
+                    'patient_id': patient_id,
+                    'exam_id': exam_id,
+                    'amount': amount_int,
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'user': current_user.username if hasattr(current_user, 'username') else None
+                }
+                money_log_table.insert(ledger_entry)
+
             return jsonify({
                 "success": True,
                 "message": "Payment updated",

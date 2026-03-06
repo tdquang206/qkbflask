@@ -139,6 +139,7 @@
 
 ## Project Analysis & Summary
 - Overhauled the "/drug_sold" page to provide accurate sales vs. purchase comparisons.
+- Added new money flow report (`/money_flow`) that logs real amounts received along with date and user. This report is printable as PDF via browser.
 - Introduced Safety Stock analysis to help with inventory planning.
 - Fixed file locking issues on Windows by using a shared database instance.
 - Polished visuals with a cleaner, dark-mode friendly table design.

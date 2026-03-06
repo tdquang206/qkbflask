@@ -20,6 +20,7 @@
                             <th>Ngày</th>
                             <th>Tên bé - Ba Mẹ</th>
                             <th>Số tiền</th>
+                            <th>Thực nhận</th>
                             <th style="width: 200px;">Hành động</th>
                         </tr>
                     </thead>
@@ -27,14 +28,11 @@
                         {% for exam in grouped[month].unpaid %}
                         <tr>
                             <td>{{ loop.index }}</td>
-                            <td>
-                                {{ exam.exam_date }}
-                            </td>
+                            <td>{{ exam.exam_date }}</td>
                             <td>
                                 <div>
                                     <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
                                     --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
-
                                 </div>
                                 <div class="mt-1 tags">
                                     {% if exam.department %}
@@ -47,6 +45,11 @@
                             </td>
                             <td class="has-text-weight-semibold has-text-danger">
                                 {{ "{:,}".format(exam.total_money) }}
+                            </td>
+                            <td>
+                                {# input for actual amount, default to logged value or total_money #}
+                                <input type="number" min="0" class="input real_amount_input"
+                                    value="{{ money_map[exam.exam_id].amount if money_map.get(exam.exam_id) else exam.total_money }}">
                             </td>
                             <td>
                                 <div class="buttons">
@@ -78,6 +81,7 @@
                             <th>Ngày</th>
                             <th>Tên bé - Ba Mẹ</th>
                             <th>Số tiền</th>
+                            <th>Thực nhận</th>
                             <th style="width: 200px;">Hành động</th>
                         </tr>
                     </thead>
@@ -100,6 +104,11 @@
                             </td>
                             <td class="has-text-weight-semibold has-text-success">
                                 {{ "{:,}".format(exam.total_money) }}
+                            </td>
+                            <td class="has-text-weight-semibold">
+                                {# display logged amount, fall back to expected #}
+                                {{ "{:,}".format(money_map[exam.exam_id].amount) if money_map.get(exam.exam_id) else "-"
+                                }}
                             </td>
                             <td>
                                 <div class="buttons">
@@ -169,17 +178,39 @@
                 try {
                     const examId = btn.getAttribute("data-exam-id");
                     const patientId = btn.getAttribute("data-patient-id");
+                    // find the adjacent input field for real amount
+                    const row = btn.closest('tr');
+                    let realAmount = null;
+                    if (row) {
+                        const input = row.querySelector('.real_amount_input');
+                        if (input) {
+                            realAmount = input.value;
+                        }
+                    }
+
+                    const payload = { patient_id: patientId, exam_id: examId };
+                    if (realAmount !== null) {
+                        payload.real_amount = realAmount;
+                    }
 
                     const response = await fetch('/api/mark_paid', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ patient_id: patientId, exam_id: examId })
+                        body: JSON.stringify(payload)
                     });
 
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.error || `HTTP error! status: ${response.status}`);
 
                     if (data.success) {
+                        // mark button and input as read-only
+                        const row = btn.closest('tr');
+                        if (row) {
+                            const input = row.querySelector('.real_amount_input');
+                            if (input) {
+                                input.disabled = true;
+                            }
+                        }
                         this.outerHTML = '<span class="tag is-success">Đã nhận tiền</span>';
                         showToast("✅ Đã lưu thành công!", "is-success");
                     } else {

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request
 from datetime import datetime, timedelta
 from collections import defaultdict
 from tinydb import Query, TinyDB
-from shared_db import patients_table as patients, exams_table as exams
+from shared_db import patients_table as patients, exams_table as exams, money_log_table
 from unicodedata import normalize
 
 reports_bp = Blueprint('reports', __name__)
@@ -188,6 +188,62 @@ def drug_sold():
         'drug_sold.html',
         drug_totals=drug_totals,
         unmatched_drugs=unmatched_drugs,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+
+@reports_bp.route('/money_flow')
+def money_flow():
+    """Show a simple ledger of money received entries."""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    # default to current month when not provided
+    if not start_date or not end_date:
+        now = datetime.now()
+        start_date = now.replace(day=1).strftime("%Y-%m-%d")
+        if now.month == 12:
+            next_month = now.replace(year=now.year + 1, month=1, day=1)
+        else:
+            next_month = now.replace(month=now.month + 1, day=1)
+        end_date = (next_month - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+    end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
+
+    # load all logs and filter by date portion
+    entries = []
+    for log in money_log_table.all():
+        ts = log.get('timestamp')
+        if not ts:
+            continue
+        try:
+            log_dt = datetime.fromisoformat(ts)
+        except Exception:
+            continue
+        # compare only date part
+        if start and log_dt.date() < start.date():
+            continue
+        if end and log_dt.date() > end.date():
+            continue
+        entries.append({
+            'timestamp': ts,
+            'amount': log.get('amount', 0),
+            'exam_id': log.get('exam_id'),
+            'patient_id': log.get('patient_id'),
+            'user': log.get('user')
+        })
+
+    # sort newest first
+    entries.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    total = sum([e['amount'] for e in entries])
+
+    return render_template(
+        'money_flow.html',
+        entries=entries,
+        total=total,
         start_date=start_date,
         end_date=end_date
     )

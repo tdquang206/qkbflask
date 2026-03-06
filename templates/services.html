@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+	<div class="container">
+		<div class="level">
+			<div class="level-left">
+				<div class="level-item">
+					<h1 class="title">Quản lý Dịch vụ</h1>
+				</div>
+			</div>
+			<div class="level-right">
+				<div class="level-item">
+					<a href="/settings" class="button is-light">← Quay lại</a>
+				</div>
+			</div>
+		</div>
+
+		<!-- Add New Service Section -->
+		<div class="box">
+			<h2 class="subtitle">Thêm dịch vụ mới</h2>
+			<form id="add-service-form">
+				<div class="columns">
+					<div class="column is-4">
+						<div class="field">
+							<label class="label">Khoa</label>
+							<div class="control">
+								<div class="select is-fullwidth">
+									<select id="new-service-department" required>
+										<option value="">-- Chọn khoa --</option>
+										{% for dept in departments %}
+										<option value="{{ dept }}">{{ dept }}</option>
+										{% endfor %}
+									</select>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="column is-4">
+						<div class="field">
+							<label class="label">Tên dịch vụ</label>
+							<div class="control">
+								<input class="input" type="text" id="new-service-name" placeholder="VD: Khám tổng quát"
+									required>
+							</div>
+						</div>
+					</div>
+					<div class="column is-2">
+						<div class="field">
+							<label class="label">Giá (1 lần)</label>
+							<div class="control">
+								<input class="input" type="number" id="new-service-price" placeholder="0" min="0"
+									required>
+							</div>
+						</div>
+					</div>
+					<div class="column is-2">
+						<div class="field">
+							<label class="label">&nbsp;</label>
+							<div class="control">
+								<button type="submit" class="button is-link is-fullwidth">Thêm</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
+
+		<!-- Services by Department -->
+		{% for dept in departments %}
+		<div class="box">
+			<h2 class="subtitle">{{ dept }}</h2>
+
+			{% if services_by_dept.get(dept) %}
+			<div class="table-container">
+				<table class="table is-fullwidth is-striped is-hoverable">
+					<thead>
+						<tr>
+							<th>Tên dịch vụ</th>
+							<th class="has-text-right">Giá (1 lần)</th>
+							<th class="has-text-centered" style="width: 120px;">Thao tác</th>
+						</tr>
+					</thead>
+					<tbody id="services-{{ dept | replace(' ', '_') }}">
+						{% for service in services_by_dept.get(dept) %}
+						<tr class="service-row" data-service-id="{{ service.id }}">
+							<td>
+								<span class="service-name">{{ service.name }}</span>
+							</td>
+							<td class="has-text-right">
+								<span class="service-price">{{ "{:,.0f}".format(service.price) }}</span>
+								<span class=""> VND</span>
+							</td>
+							<td class="has-text-centered">
+								<button type="button" class="button is-small is-light edit-btn">
+									Sửa
+								</button>
+								<button type="button" class="button is-small is-danger delete-btn">
+									Xóa
+								</button>
+							</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<p class="has-text-grey">Chưa có dịch vụ nào. Thêm dịch vụ ở phần trên.</p>
+			{% endif %}
+		</div>
+		{% endfor %}
+
+		<!-- Edit Modal -->
+		<div class="modal" id="edit-modal">
+			<div class="modal-background"></div>
+			<div class="modal-card">
+				<header class="modal-card-head">
+					<p class="modal-card-title">Sửa dịch vụ</p>
+					<button class="delete" aria-label="close"></button>
+				</header>
+				<section class="modal-card-body">
+					<form id="edit-service-form">
+						<div class="field">
+							<label class="label">Tên dịch vụ</label>
+							<div class="control">
+								<input class="input" type="text" id="edit-service-name" required>
+							</div>
+						</div>
+						<div class="field">
+							<label class="label">Giá (1 lần)</label>
+							<div class="control">
+								<input class="input" type="number" id="edit-service-price" placeholder="0" min="0"
+									required>
+							</div>
+						</div>
+					</form>
+				</section>
+				<footer class="modal-card-foot">
+					<button class="button is-light" id="edit-modal-close">Hủy</button>
+					<button class="button is-link" id="edit-modal-save">Lưu</button>
+				</footer>
+			</div>
+		</div>
+	</div>
+</section>
+
+<script>
+	let currentEditingServiceId = null;
+
+	// Add new service
+	document.getElementById('add-service-form').addEventListener('submit', async (e) => {
+		e.preventDefault();
+
+		const department = document.getElementById('new-service-department').value;
+		const name = document.getElementById('new-service-name').value;
+		const price = document.getElementById('new-service-price').value;
+
+		if (!department) {
+			alert('Vui lòng chọn khoa');
+			return;
+		}
+
+		try {
+			const response = await fetch('/api/services', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ department, name, price })
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				alert(error.error || 'Lỗi khi thêm dịch vụ');
+				return;
+			}
+
+			// Reload page to show updated services
+			location.reload();
+		} catch (error) {
+			console.error('Error:', error);
+			alert('Lỗi khi thêm dịch vụ');
+		}
+	});
+
+	// Edit button click
+	document.addEventListener('click', (e) => {
+		if (e.target.classList.contains('edit-btn')) {
+			const row = e.target.closest('.service-row');
+			const serviceId = row.dataset.serviceId;
+			const serviceName = row.querySelector('.service-name').textContent;
+			const servicePrice = row.querySelector('.service-price').textContent;
+
+			currentEditingServiceId = serviceId;
+			document.getElementById('edit-service-name').value = serviceName;
+			document.getElementById('edit-service-price').value = servicePrice.replace(/[,\s]/g, '');
+
+			document.getElementById('edit-modal').classList.add('is-active');
+		}
+	});
+
+	// Delete button click
+	document.addEventListener('click', async (e) => {
+		if (e.target.classList.contains('delete-btn')) {
+			if (!confirm('Bạn có chắc chắn muốn xóa dịch vụ này?')) return;
+
+			const row = e.target.closest('.service-row');
+			const serviceId = row.dataset.serviceId;
+
+			try {
+				const response = await fetch(`/api/services/${serviceId}`, {
+					method: 'DELETE'
+				});
+
+				if (!response.ok) {
+					alert('Lỗi khi xóa dịch vụ');
+					return;
+				}
+
+				row.remove();
+			} catch (error) {
+				console.error('Error:', error);
+				alert('Lỗi khi xóa dịch vụ');
+			}
+		}
+	});
+
+	// Modal close buttons
+	document.getElementById('edit-modal-close').addEventListener('click', () => {
+		document.getElementById('edit-modal').classList.remove('is-active');
+	});
+
+	document.querySelector('#edit-modal .delete').addEventListener('click', () => {
+		document.getElementById('edit-modal').classList.remove('is-active');
+	});
+
+	// Save edited service
+	document.getElementById('edit-modal-save').addEventListener('click', async () => {
+		const name = document.getElementById('edit-service-name').value;
+		const price = document.getElementById('edit-service-price').value;
+
+		try {
+			const response = await fetch(`/api/services/${currentEditingServiceId}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ name, price })
+			});
+
+			if (!response.ok) {
+				alert('Lỗi khi cập nhật dịch vụ');
+				return;
+			}
+
+			// Reload page to show updated services
+			location.reload();
+		} catch (error) {
+			console.error('Error:', error);
+			alert('Lỗi khi cập nhật dịch vụ');
+		}
+	});
+
+	// Close modal when clicking outside
+	document.getElementById('edit-modal').addEventListener('click', (e) => {
+		if (e.target.classList.contains('modal-background')) {
+			document.getElementById('edit-modal').classList.remove('is-active');
+		}
+	});
+</script>
+{% endblock %}

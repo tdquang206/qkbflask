@@ -1,6 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 import json
 import os
+import uuid
+from tinydb import Query
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -102,3 +104,108 @@ def changelog():
             
     html_content = markdown.markdown(content)
     return render_template('changelog.html', content=html_content)
+
+# ============================================================================
+# Services Management Routes (Khoa / Dịch vụ)
+# ============================================================================
+
+@settings_bp.route('/settings/services', methods=['GET'])
+def services_management():
+    """Display services management page"""
+    settings = load_settings()
+    departments = settings.get('departments', [])
+    
+    from shared_db import services_table
+    all_services = services_table.all()
+    
+    # Group services by department
+    services_by_dept = {}
+    for dept in departments:
+        services_by_dept[dept] = [s for s in all_services if s.get('department') == dept]
+    
+    return render_template('services.html', 
+                         departments=departments,
+                         services_by_dept=services_by_dept)
+
+
+@settings_bp.route('/api/services', methods=['GET', 'POST'])
+def api_services():
+    """API endpoint for managing services"""
+    from shared_db import services_table
+    
+    if request.method == 'GET':
+        # Get all services, optionally filtered by department
+        department = request.args.get('department')
+        
+        if department:
+            ServiceQuery = Query()
+            services = services_table.search(ServiceQuery.department == department)
+        else:
+            services = services_table.all()
+        
+        # Convert to list with id field
+        return jsonify([{**s, 'id': s.doc_id} for s in services])
+    
+    elif request.method == 'POST':
+        # Add new service
+        data = request.get_json()
+        
+        service = {
+            'id': str(uuid.uuid4()),
+            'department': data.get('department'),
+            'name': data.get('name'),
+            'price': float(data.get('price', 0))
+        }
+        
+        if not service['name'] or not service['department']:
+            return jsonify({'error': 'Name and department are required'}), 400
+        
+        services_table.insert(service)
+        service['id'] = service['id']  # Keep uuid id
+        
+        return jsonify(service), 201
+
+
+@settings_bp.route('/api/services/<service_id>', methods=['PUT', 'DELETE'])
+def api_service_detail(service_id):
+    """API endpoint for individual service operations"""
+    from shared_db import services_table
+    
+    ServiceQuery = Query()
+    
+    if request.method == 'PUT':
+        # Update service
+        data = request.get_json()
+        
+        service_doc = None
+        for doc in services_table.all():
+            if doc.get('id') == service_id:
+                service_doc = doc
+                break
+        
+        if not service_doc:
+            return jsonify({'error': 'Service not found'}), 404
+        
+        updated = {
+            'id': service_id,
+            'department': data.get('department', service_doc.get('department')),
+            'name': data.get('name', service_doc.get('name')),
+            'price': float(data.get('price', service_doc.get('price', 0)))
+        }
+        
+        services_table.update(updated, doc_ids=[service_doc.doc_id])
+        return jsonify(updated), 200
+    
+    elif request.method == 'DELETE':
+        # Delete service
+        service_doc = None
+        for doc in services_table.all():
+            if doc.get('id') == service_id:
+                service_doc = doc
+                break
+        
+        if not service_doc:
+            return jsonify({'error': 'Service not found'}), 404
+        
+        services_table.remove(doc_ids=[service_doc.doc_id])
+        return '', 204

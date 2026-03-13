@@ -1,5 +1,4 @@
-import os
-from datetime import datetime
+from template_renderer import render_exam_html
 
 # generate filename for pdf and jpeg on server
 def generate_exam_file_name(phone, exam_date, exam_id):
@@ -10,101 +9,8 @@ def generate_exam_file_name(phone, exam_date, exam_id):
     return f"{phone}_{date_str}_{random_part}"
 
 def build_exam_html(patient, exam_data, doctor_name=None):
-    # reuse pdf template in print
-    # Build drug rows
-    drug_rows = ""
-    for idx, drug in enumerate(exam_data.get('drugs', []), 1):
-        drug_rows += f"""
-        <tr>
-          <td>{idx}</td>
-          <td>{drug['name']}</td>
-          <td>{drug['quantity']}</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td colspan="2" style="font-style:italic;">{drug['note']}</td>
-        </tr>
-        """
-    
-    # Calculate footer data
-    # 1. Total Money Code (e.g., 50000 -> 50)
-    total_money = str(exam_data.get('total_money', '0'))
-    # Clean non-digit characters just in case
-    total_money = ''.join(filter(str.isdigit, total_money))
-    if len(total_money) > 3:
-        total_short = total_money[:-3]
-    else:
-        total_short = "0"
-        
-    # 2. Print Time Code (YYMMDDHHMMSS)
-    # Use submit_time if available, else current time
-    submit_time = exam_data.get('submit_time')
-    if not submit_time:
-        submit_time = datetime.now().strftime('%y%m%d%H%M%S')
-        
-    # Format: YYMMDDHHMMSS + "H" + PriceCode
-    footer_code = f"{submit_time}H{total_short}"
-
-    # Doctor Name Signature
-    signature_text = f"Bác sĩ khám: {doctor_name}" if doctor_name else "Bác sĩ khám: BS. Quang"
-
-    html = f"""
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-        <title>Phiếu Khám</title>
-        <style>
-          @page {{ size: A5 portrait; margin: 1cm; }}
-          * {{ font-family: Arial, Helvetica, sans-serif; }}
-          body {{ font-family: Arial, Helvetica, sans-serif; font-size: 11pt; }}
-          h2 {{ text-align: center; margin: 0.5em 0; font-size: 14pt }}
-          table {{ width: 100%; border-collapse: collapse; margin-top: 1em; }}
-          th, td {{ border: none; padding: 6px 4px; }}
-          th {{ font-weight: bold; text-align: left; }}
-          tbody tr {{ margin-bottom: 5px; display: table-row;}}
-          tbody td {{ padding-top: 5px; padding-bottom: 10px }}
-          @media print {{
-            th, td {{ border: none; }}
-            .footer {{
-              position: fixed;
-              bottom: 1cm;
-              width: 100%;
-              text-align: left;
-              font-size: 12px;
-            }}
-          }}
-        </style>
-      </head>
-      <body>
-        <h2>Phiếu Khám Bệnh - {exam_data.get('exam_date', '')}</h2>
-        <p>{patient.get('kid_name', '')} &nbsp;&nbsp; {patient.get('kid_birthday', '')} &nbsp;&nbsp; {exam_data.get('weight', '')}kg &nbsp;&nbsp; {exam_data.get('height', '')}cm</p>
-        <p>{patient.get('phone', '')} &nbsp;&nbsp; {patient.get('name', '')}</p>
-        <p>{patient.get('address', '')}</p>
-        <p><strong>Ghi chú / Khám bệnh:</strong> {exam_data.get('history', '')}</p>
-        <p>Hẹn tái khám: {exam_data.get('expected_date', '')}</p>
-
-        <h3>💊 Thuốc</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Tên thuốc</th>
-              <th>SL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {drug_rows or '<tr><td colspan="3">Toa không thuốc</td></tr>'}
-          </tbody>
-        </table>
-        <div class="footer">
-          <p>{signature_text}</p>
-          <span style="white-space:nowrap;">{footer_code}</span>
-        </div>
-      </body>
-    </html>
-    """
-    return html
+    # Use template renderer for consistent HTML output
+    return render_exam_html(patient, exam_data, doctor_name)
 
 def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
     """

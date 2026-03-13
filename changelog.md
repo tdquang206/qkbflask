@@ -1,3 +1,59 @@
+# Version 0.9.260307 (2026-03-07)
+==================================================
+
+## Project Analysis & Summary
+- Introduced full **Service List** management and patient **pre‑paid package** support.
+- Services are now selectable during exam creation/edit, multiple per exam, and their cost contributes to the total.
+- Patients may purchase multi‑session packages; the system automatically applies discounts and decrements remaining sessions.
+
+## New Features
+- **Service & Department Database**:
+  - New encrypted database `db_services.json` (TinyDB) holds service records `{id, department, name, price}`.
+  - Added settings submenu to manage departments and services (`Cài đặt → Khoa / Dịch vụ`).
+  - CRUD API endpoints `/api/services` with full create/read/update/delete functionality.
+
+- **Exam Workflow Enhancements**:
+  - `new_exam` and `edit_exam` pages now include a service selector and table identical to the drug interface.
+  - Multiple services may be added/removed; UI updates totals in real‑time.
+  - A manual **override total** field lets doctors adjust final cost independent of line items.
+  - Backwards compatibility: existing exams without services render as "No service" and remain editable.
+
+- **Pre‑paid Packages**:
+  - Patients can have packages stored under their record (`patient.packages`).
+  - When applying a service, the system checks for a matching package with remaining sessions; if found, it uses the package unit price and decrements the count.
+  - Package management (creation/edit) will be exposed on the patient profile page in an upcoming iteration.
+
+- **PDF/Print Updates**:
+  - Generated exam PDFs now include a services section with name and price.
+  - Total calculation respects override and package discounts.
+
+## Data Model & Linkage
+The following diagram illustrates relationships:
+
+```mermaid
+flowchart LR
+    Patient -->|has many| Exam
+    Exam -->|contains| Drug[Drugs]
+    Exam -->|contains| Service[Services]
+    Patient -->|owns optional| Package[Prepaid Package]
+    Service -->|defined in| ServicesDB((db_services.json))
+
+    Package -->|refers to| Service
+    Package -->|decrements on use| Exam
+```
+
+- A **Patient** record stores `exams` and optional `packages`.
+- Each **Exam** may list zero or more services, copied from the services database at the time of entry.
+- **Packages** are tied to a specific service and track `remaining_sessions` and `unit_price`.
+- When an exam uses a service covered by a package, `remaining_sessions` is reduced and the exam cost is adjusted.
+
+## Technical Notes
+- Added service handling logic in `routes/exam.py` (see `service_ids`, `services` arrays, and package decrement).
+- Template updates in `new_exam.html` and `edit_exam.html` include service selector/table and `calculateTotals()` adjustments.
+- `utils/pdf_generator.py` extended to render services section.
+- `shared_db.py` now initializes `services_table`.
+- Changelog and guide updated accordingly.
+
 # Version 0.8.260228 (2026-02-28)
 ==================================================
 

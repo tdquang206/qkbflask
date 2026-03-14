@@ -26,7 +26,11 @@ def load_exam_template(department=None):
         }
     except Exception as e:
         print(f"Error loading template: {e}")
-        return get_default_template()
+        default = get_default_template()
+        return {
+            'template': default.get('default', {}),
+            'placeholders': default.get('placeholders', {})
+        }
 
 def save_exam_template(template_data, department=None):
     """Save the exam template to file, optionally for a specific department"""
@@ -64,7 +68,9 @@ def get_default_template():
         "default": {
             "header": "# Phiếu Khám Bệnh - {exam_date}\n\n**Bé:** {kid_name} ({kid_birthday}) - {weight}kg {height}cm\n**Phụ huynh:** {parent_name}\n**SĐT:** {phone}\n**Địa chỉ:** {address}\n\n**Ghi chú / Khám bệnh:** {history}\n**Hẹn tái khám:** {expected_date}\n\n",
             "drugs_section": "## 💊 Thuốc\n\n| # | Tên thuốc | SL | Ghi chú |\n|---|----------|----|---------|\n{drug_rows}\n\n",
+            "drug_row_template": "| {index} | {name} | {quantity} | {note} |",
             "services_section": "## 🛎️ Dịch vụ\n\n| # | Tên dịch vụ | Giá |\n|---|-------------|-----|\n{service_rows}\n\n",
+            "service_row_template": "| {index} | {name} | {quantity} | {price} | {prepaid_status} |",
             "footer": "**Tổng tiền:** {total_money} VND\n\n*Bác sĩ khám: {doctor_name}*\n\n`{footer_code}`"
         },
         "departments": {},
@@ -87,47 +93,51 @@ def get_default_template():
         }
     }
 
-def build_drug_rows_markdown(drugs):
+def build_drug_rows_markdown(drugs, row_template=None):
     """Build drug rows for markdown table"""
     if not drugs:
         return "| - | Không có thuốc | - | - |"
 
+    if not row_template:
+        # Default fallback (classic behavior)
+        row_template = "| {index} | {name} | {quantity} | {note} |"
+
     rows = []
     for idx, drug in enumerate(drugs, 1):
-        name = drug.get('name', '')
-        qty = str(drug.get('quantity', ''))
-        note = drug.get('note', '')
-        rows.append(f"| {idx} | {name} | {qty} | {note} |")
+        try:
+            rows.append(row_template.format(
+                index=idx,
+                name=drug.get('name', ''),
+                quantity=drug.get('quantity', ''),
+                note=drug.get('note', ''),
+            ))
+        except Exception:
+            # If formatting fails, fall back to simple row
+            rows.append(f"| {idx} | {drug.get('name', '')} | {drug.get('quantity', '')} | {drug.get('note', '')} |")
     return "\n".join(rows)
 
-def build_service_rows_markdown(services, show_quantities=False, show_prepaid=False):
-    """Build service rows for markdown table with optional quantities and prepaid status"""
+def build_service_rows_markdown(services, row_template=None):
+    """Build service rows for markdown table using a template"""
     if not services:
-        headers = ["#", "Tên dịch vụ", "Giá"]
-        if show_quantities:
-            headers.insert(2, "SL")
-        if show_prepaid:
-            headers.append("Trạng thái")
-        header_row = " | ".join(headers)
-        sep_row = "|".join(["-" * len(h) for h in headers])
-        return f"| {header_row} |\n| {sep_row} |\n| {' | '.join(['-'] * len(headers))} |"
+        return "| - | Không có dịch vụ | - |"
+
+    if not row_template:
+        # Default fallback (classic behavior)
+        row_template = "| {index} | {name} | {quantity} | {price} | {prepaid_status} |"
 
     rows = []
     for idx, service in enumerate(services, 1):
-        name = service.get('name', '')
-        price = f"{service.get('price', 0):,.0f} VND"
-        quantity = service.get('quantity', 1)
-        prepaid_status = service.get('prepaid_status', '')
-        
-        row_data = [str(idx), name]
-        if show_quantities:
-            row_data.insert(2, str(quantity))
-        row_data.append(price)
-        if show_prepaid and prepaid_status:
-            row_data.append(prepaid_status)
-        
-        rows.append(" | ".join(row_data))
-    
+        try:
+            rows.append(row_template.format(
+                index=idx,
+                name=service.get('name', ''),
+                quantity=service.get('quantity', ''),
+                price=f"{service.get('price', 0):,.0f} VND",
+                prepaid_status=service.get('prepaid_status', ''),
+            ))
+        except Exception:
+            # If formatting fails, fall back to simple row
+            rows.append(f"| {idx} | {service.get('name', '')} | {service.get('quantity', '')} | {service.get('price', 0):,.0f} VND | {service.get('prepaid_status', '')} |")
     return "\n".join(rows)
 
 def build_drug_rows_html(drugs):
@@ -201,8 +211,11 @@ def render_exam_markdown(patient, exam_data, doctor_name=None, custom_template=N
     template = template_data['template']
 
     # Prepare data
-    drug_rows = build_drug_rows_markdown(exam_data.get('drugs', []))
-    service_rows = build_service_rows_markdown(exam_data.get('services', []), show_quantities=True, show_prepaid=True)
+    drug_row_template = template.get('drug_row_template')
+    service_row_template = template.get('service_row_template')
+
+    drug_rows = build_drug_rows_markdown(exam_data.get('drugs', []), row_template=drug_row_template)
+    service_rows = build_service_rows_markdown(exam_data.get('services', []), row_template=service_row_template)
     footer_code = calculate_footer_code(exam_data)
 
     doctor_name = doctor_name or "BS. Quang"
@@ -239,14 +252,113 @@ def render_exam_markdown(patient, exam_data, doctor_name=None, custom_template=N
 
     return content
 
+
+def markdown_to_html(markdown_text: str) -> str:
+    """Convert a small subset of Markdown into HTML."""
+    import re
+
+    def escape_html(text: str) -> str:
+        return (text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+
+    lines = markdown_text.splitlines()
+    html_parts = []
+    in_table = False
+    table_lines = []
+
+    def flush_table():
+        nonlocal table_lines
+        if not table_lines:
+            return ''
+
+        header = [cell.strip() for cell in table_lines[0].strip().strip('|').split('|')]
+        rows = [
+            [cell.strip() for cell in line.strip().strip('|').split('|')]
+            for line in table_lines[2:]
+        ]
+
+        thead = '<thead><tr>' + ''.join(f'<th>{escape_html(c)}</th>' for c in header) + '</tr></thead>'
+        tbody = '<tbody>' + ''.join(
+            '<tr>' + ''.join(f'<td>{escape_html(c)}</td>' for c in row) + '</tr>' for row in rows
+        ) + '</tbody>'
+
+        table_lines = []
+        return f'<table>{thead}{tbody}</table>'
+
+    for line in lines:
+        if line.strip().startswith('|') and line.strip().endswith('|'):
+            in_table = True
+            table_lines.append(line)
+            continue
+
+        if in_table:
+            html_parts.append(flush_table())
+            in_table = False
+
+        if line.startswith('### '):
+            html_parts.append(f'<h3>{escape_html(line[4:])}</h3>')
+            continue
+        if line.startswith('## '):
+            html_parts.append(f'<h2>{escape_html(line[3:])}</h2>')
+            continue
+        if line.startswith('# '):
+            html_parts.append(f'<h1>{escape_html(line[2:])}</h1>')
+            continue
+
+        escaped = escape_html(line)
+        escaped = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"`([^`]*)`", r"<code>\1</code>", escaped)
+
+        if escaped.strip() == '':
+            html_parts.append('<p></p>')
+        else:
+            html_parts.append(f'<p>{escaped}</p>')
+
+    if in_table:
+        html_parts.append(flush_table())
+
+    return ''.join(html_parts)
+
+
 def render_exam_html(patient, exam_data, doctor_name=None, custom_template=None, department=None):
     """Render exam data as HTML for PDF"""
-    if custom_template:
-        template_data = {'template': custom_template, 'placeholders': get_default_template()['placeholders']}
-    else:
-        template_data = load_exam_template(department)
-    
-    template = template_data['template']
+    markdown = render_exam_markdown(patient, exam_data, doctor_name, custom_template, department)
+    html_body = markdown_to_html(markdown)
+
+    return f"""
+    <html>
+      <head>
+        <meta charset=\"utf-8\" />
+        <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
+        <title>Phiếu Khám</title>
+        <style>
+          @page {{ size: A5 portrait; margin: 1cm; }}
+          * {{ font-family: Arial, Helvetica, sans-serif; }}
+          body {{ font-family: Arial, Helvetica, sans-serif; font-size: 11pt; }}
+          h2 {{ text-align: center; margin: 0.5em 0; font-size: 14pt }}
+          h3 {{ margin-top: 1em; margin-bottom: 0.5em; font-size: 12pt }}
+          table {{ width: 100%; border-collapse: collapse; margin-top: 1em; }}
+          th, td {{ border: none; padding: 6px 4px; }}
+          th {{ font-weight: bold; text-align: left; }}
+          tbody tr {{ margin-bottom: 5px; display: table-row;}}
+          tbody td {{ padding-top: 5px; padding-bottom: 10px }}
+          .text-right {{ text-align: right; }}
+          @media print {{
+            th, td {{ border: none; }}
+            .footer {{
+              position: fixed;
+              bottom: 1cm;
+              width: 100%;
+              text-align: left;
+              font-size: 12px;
+            }}
+          }}
+        </style>
+      </head>
+      <body>
+        {html_body}
+      </body>
+    </html>
+    """
 
     # Prepare data
     drug_rows = build_drug_rows_html(exam_data.get('drugs', []))

@@ -31,6 +31,7 @@
                                 <div class="select is-fullwidth">
                                     <select name="role">
                                         <option value="user">User</option>
+                                        <option value="doctor">Doctor</option>
                                         <option value="admin">Admin</option>
                                     </select>
                                 </div>
@@ -129,6 +130,22 @@
                 </div>
             </div>
         </div>
+
+        <!-- Exam Management Section -->
+        <div class="columns mt-5">
+            <div class="column">
+                <div class="box">
+                    <h2 class="subtitle">Quản lý thông tin toa thuốc</h2>
+                    <p class="mb-4">Tìm kiếm và chỉnh sửa thông tin bác sĩ và khoa cho toa thuốc.</p>
+                    <a href="{{ url_for('admin.edit_exam_info') }}" class="button is-primary is-fullwidth">
+                        <span class="icon">
+                            <i class="fas fa-edit"></i>
+                        </span>
+                        <span>Đổi thông tin toa thuốc</span>
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -160,6 +177,7 @@
                         <div class="select is-fullwidth">
                             <select name="role" id="edit_role">
                                 <option value="user">User</option>
+                                <option value="doctor">Doctor</option>
                                 <option value="admin">Admin</option>
                             </select>
                         </div>

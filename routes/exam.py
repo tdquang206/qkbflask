@@ -154,15 +154,6 @@ def edit_exam(exam_id):
         # total override (manual edit by doctor)
         total_override = request.form.get('total_override')
 
-        # compute new department or keep existing
-        if request.form.get('department'):
-            new_department = request.form.get('department')
-        else:
-            new_department = exam_editting.get('department', 'Nhi khoa')
-
-        # get doctor name (admin can change it)
-        doctor_name = request.form.get('doctor_name', exam_editting.get('created_by_name', 'Admin'))
-
         # calculate total_money if override not provided
         computed_total = 0
         try:
@@ -191,10 +182,10 @@ def edit_exam(exam_id):
             # get submit time # YYMMDDHHMMSS
             'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
             'id': exam_id,
-            # Preserve existing creator info
-            'department': new_department,
+            # Preserve existing creator info (use admin tool to change doctor/department)
+            'department': exam_editting.get('department', 'Nhi khoa'),
             'created_by_id': exam_editting.get('created_by_id'),
-            'created_by_name': doctor_name
+            'created_by_name': exam_editting.get('created_by_name', 'Admin')
         }
 
         # if we modified packages, save back to patient record

@@ -226,7 +226,9 @@ def manage_template():
                 'template': {
                     'header': request.form.get('header_template', ''),
                     'drugs_section': request.form.get('drugs_template', ''),
+                    'drug_row_template': request.form.get('drug_row_template', ''),
                     'services_section': request.form.get('services_template', ''),
+                    'service_row_template': request.form.get('service_row_template', ''),
                     'footer': request.form.get('footer_template', '')
                 },
                 'placeholders': get_default_template()['placeholders']

@@ -179,3 +179,117 @@ def import_database():
     """Placeholder for importing database functionality"""
     flash('Import functionality is coming soon!', 'info')
     return redirect(url_for('admin.import_database_page'))
+
+
+@admin_bp.route('/admin/edit-exam-info', methods=['GET', 'POST'])
+def edit_exam_info():
+    """Admin tool to search and edit exam info (doctor, department)"""
+    from shared_db import patients_table as Patients_db
+    from tinydb import Query
+    exam_found = None
+    patient_found = None
+    all_doctors = set()
+    settings = load_settings()
+    departments = settings.get('departments', [])
+    
+    # Collect all doctors from exams to display as dropdown options
+    for patient in Patients_db.all():
+        for exam in patient.get('exams', []):
+            doctor = exam.get('created_by_name', '')
+            if doctor:
+                all_doctors.add(doctor)
+    all_doctors = sorted(list(all_doctors))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        print(f"[DEBUG] Action: {action}")
+        
+        if action == 'search':
+            search_exam_id = request.form.get('exam_id', '').strip()
+            print(f"[DEBUG] Searching for exam_id: {search_exam_id}")
+            
+            # Search for exam in all patients
+            for patient in Patients_db.all():
+                for exam in patient.get('exams', []):
+                    if exam.get('id') == search_exam_id:
+                        exam_found = exam
+                        patient_found = patient
+                        print(f"[DEBUG] Found exam: {exam_found}")
+                        break
+                if exam_found:
+                    break
+            
+            if not exam_found:
+                flash(f'Exam ID "{search_exam_id}" not found', 'error')
+                print(f"[DEBUG] Exam not found for ID: {search_exam_id}")
+        
+        elif action == 'save':
+            # Get the exam_id from the form
+            exam_id = request.form.get('edit_exam_id', '').strip()
+            new_doctor = request.form.get('doctor_name', '').strip()
+            new_department = request.form.get('department', '').strip()
+            
+            print(f"[DEBUG] Save action: exam_id={exam_id}, doctor={new_doctor}, dept={new_department}")
+            
+            # Validate inputs
+            if not new_doctor:
+                flash('Doctor name cannot be empty', 'error')
+                return redirect(url_for('admin.edit_exam_info'))
+            
+            if not new_department:
+                flash('Department cannot be empty', 'error')
+                return redirect(url_for('admin.edit_exam_info'))
+            
+            # Re-search for the exam using exam_id from form
+            for patient in Patients_db.all():
+                for exam in patient.get('exams', []):
+                    if exam.get('id') == exam_id:
+                        patient_found = patient
+                        exam_found = exam
+                        break
+                if exam_found:
+                    break
+            
+            if not exam_found or not patient_found:
+                flash(f'Exam ID "{exam_id}" not found in database', 'error')
+                print(f"[DEBUG] Could not re-find exam for save: {exam_id}")
+                return redirect(url_for('admin.edit_exam_info'))
+            
+            # Update the exam in the patient record
+            exams = patient_found.get('exams', [])
+            updated = False
+            for i, exam in enumerate(exams):
+                if exam.get('id') == exam_id:
+                    print(f"[DEBUG] Found exam at index {i}, updating...")
+                    # Update only doctor and department
+                    exams[i]['created_by_name'] = new_doctor
+                    exams[i]['department'] = new_department
+                    updated = True
+                    print(f"[DEBUG] Updated exam data: {exams[i]}")
+                    break
+            
+            if updated:
+                # Save back to database
+                try:
+                    print(f"[DEBUG] Saving to database with doc_id: {patient_found.doc_id}")
+                    Patients_db.update({'exams': exams}, doc_ids=[patient_found.doc_id])
+                    print(f"[DEBUG] Successfully saved!")
+                    flash(f'✅ Toa thuốc {exam_id} đã cập nhật thành công!', 'success')
+                    # Redirect to clear the form and show success message
+                    return redirect(url_for('admin.edit_exam_info'))
+                except Exception as e:
+                    print(f"[DEBUG] Error saving: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    flash(f'❌ Lỗi khi lưu: {str(e)}', 'error')
+                    return redirect(url_for('admin.edit_exam_info'))
+            else:
+                flash('❌ Không tìm thấy toa thuốc để cập nhật', 'error')
+                print(f"[DEBUG] Exam ID mismatch")
+                return redirect(url_for('admin.edit_exam_info'))
+    
+    return render_template('edit_exam_info.html', 
+                         exam=exam_found, 
+                         patient=patient_found,
+                         doctors=all_doctors, 
+                         departments=departments)

@@ -59,6 +59,18 @@
 					</div>
 
 					<div class="box">
+						<h2 class="subtitle">Mẫu dòng thuốc</h2>
+						<div class="field">
+							<label class="label">Dòng cho mỗi thuốc</label>
+							<div class="control">
+								<textarea class="textarea" name="drug_row_template" rows="3"
+									placeholder="Nhập mẫu dòng thuốc...">{{ template.drug_row_template or "| {index} | {name} | {quantity} | {note} |" }}</textarea>
+							</div>
+							<p class="help">Sử dụng các placeholder: {index}, {name}, {quantity}, {note}</p>
+						</div>
+					</div>
+
+					<div class="box">
 						<h2 class="subtitle">Template Dịch vụ</h2>
 						<div class="field">
 							<label class="label">Phần danh sách dịch vụ</label>
@@ -71,6 +83,19 @@
 					</div>
 
 					<div class="box">
+						<h2 class="subtitle">Mẫu dòng dịch vụ</h2>
+						<div class="field">
+							<label class="label">Dòng cho mỗi dịch vụ</label>
+							<div class="control">
+								<textarea class="textarea" name="service_row_template" rows="3"
+									placeholder="Nhập mẫu dòng dịch vụ...">{{ template.service_row_template or "| {index} | {name} | {quantity} | {price} | {prepaid_status} |" }}</textarea>
+							</div>
+							<p class="help">Sử dụng các placeholder: {index}, {name}, {quantity}, {price},
+								{prepaid_status}</p>
+						</div>
+					</div>
+
+					<div class="box">
 						<h2 class="subtitle">Template Footer</h2>
 						<div class="field">
 							<label class="label">Phần cuối phiếu khám</label>
@@ -78,7 +103,7 @@
 								<textarea class="textarea" name="footer_template" rows="6"
 									placeholder="Nhập template footer...">{{ template.footer }}</textarea>
 							</div>
-							<p class="help">Sử dụng {total_money}, {doctor_name}, {footer_code}</p>
+							<p class="help">Sử dụng placeholders như {total_money}, {doctor_name}, etc.</p>
 						</div>
 					</div>
 
@@ -132,7 +157,8 @@
 							{% endfor %}
 						</ul>
 						<hr>
-						<p><strong>Mẹo:</strong> Sử dụng <code>{drug_rows}</code> và <code>{service_rows}</code> để chèn bảng thuốc/dịch vụ</p>
+						<p><strong>Mẹo:</strong> Sử dụng <code>{drug_rows}</code> và <code>{service_rows}</code> để chèn
+							bảng thuốc/dịch vụ</p>
 					</div>
 				</div>
 			</div>
@@ -162,7 +188,7 @@
 <script>
 	function changeDepartment() {
 		const department = document.getElementById('departmentSelect').value;
-		const url = department ? `/settings/template?department=${encodeURIComponent(department)}` : '/settings/template';
+		const url = department ? `/template?department=${encodeURIComponent(department)}` : '/template';
 		window.location.href = url;
 	}
 
@@ -173,8 +199,10 @@
 		// Get current template values
 		const header = document.querySelector('[name="header_template"]').value;
 		const drugs = document.querySelector('[name="drugs_template"]').value;
-		const services = document.querySelector('[name="services_template"]').value;
+		const serviceSection = document.querySelector('[name="services_template"]').value;
 		const footer = document.querySelector('[name="footer_template"]').value;
+		const drugRowTemplate = document.querySelector('[name="drug_row_template"]').value;
+		const serviceRowTemplate = document.querySelector('[name="service_row_template"]').value;
 
 		// Show loading
 		modalContent.innerHTML = '<p class="has-text-info">Đang tải preview...</p>';
@@ -191,38 +219,40 @@
 				template: {
 					header: header,
 					drugs_section: drugs,
-					services_section: services,
-					footer: footer
+					services_section: serviceSection,
+					footer: footer,
+					drug_row_template: drugRowTemplate,
+					service_row_template: serviceRowTemplate
 				},
 				department: document.getElementById('departmentSelect').value || null
 			})
 		})
-		.then(response => response.json())
-		.then(data => {
-			if (format === 'html') {
-				modalContent.innerHTML = data.content;
-			} else {
-				// Convert markdown to HTML for preview
-				modalContent.innerHTML = data.content
-					.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-					.replace(/`(.*?)`/g, '<code>$1</code>')
-					.replace(/\n/g, '<br>');
-			}
-		})
-		.catch(error => {
-			modalContent.innerHTML = '<p class="has-text-danger">Lỗi khi tải preview</p>';
-			console.error('Preview error:', error);
-		});
+			.then(response => response.json())
+			.then(data => {
+				if (format === 'html') {
+					modalContent.innerHTML = data.content;
+				} else {
+					// Convert markdown to HTML for preview
+					modalContent.innerHTML = data.content
+						.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+						.replace(/`(.*?)`/g, '<code>$1</code>')
+						.replace(/\n/g, '<br>');
+				}
+			})
+			.catch(error => {
+				modalContent.innerHTML = '<p class="has-text-danger">Lỗi khi tải preview</p>';
+				console.error('Preview error:', error);
+			});
 	});
 
 	// Modal close handlers
-	document.getElementById('modalClose').addEventListener('click', function() {
+	document.getElementById('modalClose').addEventListener('click', function () {
 		document.getElementById('previewModal').classList.remove('is-active');
 	});
-	document.getElementById('modalCloseBtn').addEventListener('click', function() {
+	document.getElementById('modalCloseBtn').addEventListener('click', function () {
 		document.getElementById('previewModal').classList.remove('is-active');
 	});
-	document.getElementById('modalBackground').addEventListener('click', function() {
+	document.getElementById('modalBackground').addEventListener('click', function () {
 		document.getElementById('previewModal').classList.remove('is-active');
 	});
 </script>

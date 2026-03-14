@@ -3,6 +3,7 @@ import json
 import os
 import uuid
 from tinydb import Query
+from utils.template_renderer import load_exam_template, save_exam_template, get_default_template
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -209,3 +210,114 @@ def api_service_detail(service_id):
         
         services_table.remove(doc_ids=[service_doc.doc_id])
         return '', 204
+
+
+# Template Management Routes
+@settings_bp.route('/template', methods=['GET', 'POST'])
+def manage_template():
+    """Manage exam template"""
+    department = request.args.get('department', None)
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'save':
+            template_data = {
+                'template': {
+                    'header': request.form.get('header_template', ''),
+                    'drugs_section': request.form.get('drugs_template', ''),
+                    'drug_row_template': request.form.get('drug_row_template', ''),
+                    'services_section': request.form.get('services_template', ''),
+                    'service_row_template': request.form.get('service_row_template', ''),
+                    'footer': request.form.get('footer_template', '')
+                },
+                'placeholders': get_default_template()['placeholders']
+            }
+            
+            if save_exam_template(template_data, department):
+                flash(f'Template saved successfully for {"department: " + department if department else "default"}!', 'success')
+            else:
+                flash('Error saving template', 'error')
+                
+        elif action == 'reset':
+            default_template = get_default_template()
+            if save_exam_template(default_template, department):
+                flash(f'Template reset to default for {"department: " + department if department else "default"}!', 'success')
+            else:
+                flash('Error resetting template', 'error')
+        
+        return redirect(url_for('settings.manage_template', department=department))
+    
+    # GET request - show template editor
+    template_data = load_exam_template(department)
+    
+    # Get list of departments for the dropdown
+    settings = load_settings()
+    departments = settings.get('departments', [])
+    
+    return render_template('template_editor.html', 
+                         template=template_data['template'],
+                         placeholders=template_data['placeholders'],
+                         current_department=department,
+                         departments=departments)
+
+
+@settings_bp.route('/api/template/preview', methods=['POST'])
+def preview_template():
+    """API endpoint to preview template with sample data"""
+    from utils.template_renderer import render_exam_markdown, render_exam_html
+    
+    data = request.get_json()
+    custom_template = data.get('template')
+    department = data.get('department')
+    
+    # Sample data for preview
+    sample_patient = {
+        'kid_name': 'Bé A',
+        'kid_birthday': '2020-01-01',
+        'name': 'Nguyễn Văn A',
+        'phone': '0987654321',
+        'address': '123 Đường ABC, Quận XYZ'
+    }
+    
+    sample_exam = {
+        'exam_date': '2025-01-15',
+        'weight': '15',
+        'height': '100',
+        'history': 'Sốt nhẹ, ho',
+        'expected_date': '2025-01-22',
+        'total_money': 150000,
+        'drugs': [
+            {'name': 'Paracetamol', 'quantity': '10 viên', 'note': 'Uống 1 viên/lần, 3 lần/ngày'},
+            {'name': 'Amoxicillin', 'quantity': '20 viên', 'note': 'Uống 1 viên/lần, 2 lần/ngày'}
+        ],
+        'services': [
+            {'name': 'Khám tổng quát', 'price': 100000},
+            {'name': 'Xét nghiệm máu', 'price': 50000}
+        ]
+    }
+    
+    format_type = data.get('format', 'markdown')
+    
+    if format_type == 'html':
+        content = render_exam_html(sample_patient, sample_exam, 'BS. Quang', custom_template, department)
+    else:
+        content = render_exam_markdown(sample_patient, sample_exam, 'BS. Quang', custom_template, department)
+    
+    return jsonify({'content': content})
+
+
+@settings_bp.route('/api/template/departments', methods=['GET'])
+def get_department_templates():
+    """Get list of departments that have custom templates"""
+    try:
+        if os.path.exists('exam_template.json'):
+            with open('exam_template.json', 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            departments_with_templates = list(data.get('departments', {}).keys())
+        else:
+            departments_with_templates = []
+        
+        return jsonify({'departments': departments_with_templates})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

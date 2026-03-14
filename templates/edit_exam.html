@@ -23,8 +23,14 @@
         <p id="kid_name"><strong>👶 Bé:</strong> {{ patient.kid_name }} - SN {{ patient.kid_birthday }}</p>
         <p id="phone"><strong>📞 Số điện thoại:</strong> {{ patient.phone }} - {{ patient.name }}</p>
         <p id="address"><strong>🏠 Địa chỉ:</strong> {{ patient.address }}</p>
+
+        <!-- Display doctor and department info (read-only) -->
+        <!-- To edit doctor/department, use Admin > Đổi thông tin toa thuốc -->
         {% if exam.created_by_name %}
         <p><strong>🩺 Bác sĩ khám:</strong> <span class="tag is-success is-light">{{ exam.created_by_name }}</span></p>
+        {% endif %}
+        {% if exam.department %}
+        <p><strong>🏥 Khoa:</strong> <span class="tag is-info is-light">{{ exam.department }}</span></p>
         {% endif %}
       </div>
       <!-- Exam Info -->
@@ -107,62 +113,81 @@
         </div>
       </div>
 
-      <!-- Service Options -->
-      <!-- Service Options -->
+      <!-- Service Selector -->
       <div class="box">
-        <div class="field">
-          <div class="columns is-vcentered is-multiline">
-            <!-- Column 1: Label -->
-            <div class="column is-3">
-              <label class="label">💵 Loại khám</label>
-            </div>
-
-            <!-- Column 1.5: Department Selection (New) -->
-            <div class="column is-3">
-              <div class="field">
-                <div class="control">
-                  <div class="select is-fullwidth">
-                    <select name="department">
-                      {% for dept in departments %}
-                      <option value="{{ dept }}" {% if exam.department==dept %}selected{% endif %}>{{ dept }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
+        <label class="label">🛎️ Dịch vụ</label>
+        <div class="columns is-variable is-2">
+          <div class="column is-4">
+            <div class="field">
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="serviceSelect">
+                    <option value="">-- Chọn dịch vụ --</option>
+                    {% for s in services %}
+                    <option data-price="{{ s.price }}" value="{{ s.id }}">{{ s.name }}{% if s.department %} ({{
+                      s.department }}){% endif %}</option>
+                    {% endfor %}
+                  </select>
                 </div>
               </div>
             </div>
           </div>
-
-          <div class="columns is-vcentered">
-
-            <!-- Column 2: Free -->
-            <div class="column is-3">
-              <label class="radio is-large">
-                <input type="radio" name="service_fee" value="0" {% if exam and exam.service_fee|string=="0" %}checked{%
-                  endif %}>
-                <span class="option-text">Free</span>
-              </label>
-            </div>
-
-            <!-- Column 3: Khám bệnh -->
-            <div class="column is-3">
-              <label class="radio is-large">
-                <input type="radio" name="service_fee" value="150000" {% if exam and exam.service_fee|string=="150000"
-                  %}checked{% endif %}>
-                <span class="option-text">Khám bệnh</span>
-              </label>
-            </div>
-
-            <!-- Column 4: Khám chuyên sâu -->
-            <div class="column is-3">
-              <label class="radio is-large">
-                <input type="radio" name="service_fee" value="200000" {% if exam and exam.service_fee|string=="200000"
-                  %}checked{% endif %}>
-                <span class="option-text">Khám chuyên sâu</span>
-              </label>
-            </div>
+          <div class="column is-1">
+            <!-- kept for alignment -->
+          </div>
+          <div class="column is-1">
+            <button type="button" class="button is-link is-fullwidth" id="addServiceBtn">Thêm</button>
           </div>
         </div>
+        {% if packages %}
+        <div class="content">
+          <p><strong>Gói trả trước:</strong></p>
+          <ul>
+            {% for pkg in packages %}
+            <li>{{ pkg.remaining_sessions }}x {{ pkg.service_name }} ({{ pkg.unit_price }})</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- services table -->
+      <div class="table-container">
+        <table class="table is-striped is-hoverable is-fullwidth" id="serviceTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên dịch vụ</th>
+              <th class="has-text-right">Giá</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="serviceTableBody">
+            {% if exam and exam.services %}
+            {% for s in exam.services %}
+            <tr data-price="{{ s.price }}" data-service-id="{{ s.id }}">
+              <td>{{ loop.index }}</td>
+              <td>
+                {{ s.name }}
+                <input type="hidden" name="service_name" value="{{ s.name }}">
+                <input type="hidden" name="service_id" value="{{ s.id }}">
+              </td>
+              <td class="has-text-right">
+                {{ s.price }}
+                <input type="hidden" name="service_price" value="{{ s.price }}">
+              </td>
+              <td>
+                <button type="button" class="button is-small is-danger removeServiceRow">X</button>
+              </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="4" class="has-text-grey">Không có dịch vụ</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
       </div>
 
       <!-- Thêm thuốc row, bulma grid 4 1 6 1 tổng 12-->
@@ -308,6 +333,15 @@
         </div>
       </div>
     </div>
+    <!-- override total input -->
+    <div class="box">
+      <div class="field">
+        <label class="label">🔧 Ghi đè tổng tiền (nếu cần)</label>
+        <div class="control">
+          <input class="input" type="number" name="total_override" id="total_override" placeholder="Số tiền" step="1">
+        </div>
+      </div>
+    </div>
     <!-- paid status and button -->
     <div class="is-flex is-align-content-from-start is-flex-wrap-wrap"
       style="justify-content: space-between; align-items: center;">
@@ -366,6 +400,7 @@
 
 <script>
   function calculateTotals() {
+    // drugs
     const tableBody = document.getElementById("drugTableBody");
     const rows = tableBody.querySelectorAll("tr");
     let qtySum = 0, priceSum = 0;
@@ -376,13 +411,27 @@
       priceSum += qty * price;
     });
 
-    // Get selected service_fee value and add to total price
-    const serviceFee = parseFloat(document.querySelector("input[name='service_fee']:checked")?.value || 0);
-    const totalWithService = priceSum + serviceFee;
+    // services
+    let serviceSum = 0;
+    const serviceRows = document.querySelectorAll("#serviceTableBody tr");
+    serviceRows.forEach(row => {
+      // skip "no service" row
+      if (row.querySelector("td[colspan]")) return;
+      const price = parseFloat(row.dataset.price) || 0;
+      serviceSum += price;
+    });
+
+    let total = priceSum + serviceSum;
+
+    // override
+    const overrideVal = parseFloat(document.getElementById('total_override')?.value || 0);
+    if (!isNaN(overrideVal) && overrideVal > 0) {
+      total = overrideVal;
+    }
 
     document.getElementById("totalQuantity").textContent = qtySum;
-    document.getElementById("totalPrice").textContent = totalWithService.toLocaleString();
-    document.querySelector("input[name='total_money']").value = totalWithService;
+    document.getElementById("totalPrice").textContent = total.toLocaleString();
+    document.querySelector("input[name='total_money']").value = total;
   }
 </script>
 
@@ -892,6 +941,78 @@
     });
   });
 
+</script>
+
+<!-- Services management script -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const serviceSelect = document.getElementById("serviceSelect");
+    const addServiceBtn = document.getElementById("addServiceBtn");
+    const serviceTableBody = document.getElementById("serviceTableBody");
+
+    addServiceBtn.addEventListener("click", () => {
+      const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+      if (!selectedOption.value) {
+        alert("Vui lòng chọn dịch vụ");
+        return;
+      }
+
+      const serviceId = selectedOption.value;
+      const serviceName = selectedOption.textContent;
+      const servicePrice = parseFloat(selectedOption.getAttribute("data-price")) || 0;
+
+      // remove "no service" placeholder if exists
+      const placeholder = serviceTableBody.querySelector("tr[colspan]");
+      if (placeholder) {
+        placeholder.remove();
+      }
+
+      // Create row
+      const row = document.createElement("tr");
+      row.dataset.price = servicePrice;
+      row.dataset.serviceId = serviceId;
+      row.innerHTML = `
+        <td>${serviceTableBody.querySelectorAll("tr").length + 1}</td>
+        <td>
+          ${serviceName}
+          <input type="hidden" name="service_name" value="${serviceName}">
+          <input type="hidden" name="service_id" value="${serviceId}">
+        </td>
+        <td class="has-text-right">
+          ${servicePrice.toLocaleString()}
+          <input type="hidden" name="service_price" value="${servicePrice}">
+        </td>
+        <td>
+          <button type="button" class="button is-small is-danger removeServiceRow">X</button>
+        </td>
+      `;
+
+      serviceTableBody.appendChild(row);
+      serviceSelect.value = "";
+      calculateTotals();
+    });
+
+    // Remove service row
+    document.addEventListener("click", (e) => {
+      if (e.target.classList.contains("removeServiceRow")) {
+        const row = e.target.closest("tr");
+        row.remove();
+        // if no services left, show placeholder
+        if (serviceTableBody.querySelectorAll("tr").length === 0) {
+          const placeholder = document.createElement("tr");
+          placeholder.innerHTML = '<td colspan="4" class="has-text-grey">Không có dịch vụ</td>';
+          serviceTableBody.appendChild(placeholder);
+        }
+        calculateTotals();
+      }
+    });
+
+    // On override change
+    const overrideInput = document.getElementById("total_override");
+    if (overrideInput) {
+      overrideInput.addEventListener("input", calculateTotals);
+    }
+  });
 </script>
 
 <!-- Print script -->

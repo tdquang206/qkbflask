@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+	<div class="container">
+		<h1 class="title">Chỉnh sửa Template Phiếu Khám</h1>
+
+		<!-- Department Selector -->
+		<div class="box">
+			<div class="field">
+				<label class="label">Chọn Khoa / Phòng khám</label>
+				<div class="control">
+					<div class="select">
+						<select id="departmentSelect" onchange="changeDepartment()">
+							<option value="">Mặc định (tất cả khoa)</option>
+							{% for dept in departments %}
+							<option value="{{ dept }}" {% if current_department==dept %}selected{% endif %}>{{ dept }}
+							</option>
+							{% endfor %}
+						</select>
+					</div>
+				</div>
+				<p class="help">
+					Template mặc định sẽ được sử dụng khi không có template riêng cho khoa.
+					{% if current_department %}
+					Đang chỉnh sửa template cho: <strong>{{ current_department }}</strong>
+					{% else %}
+					Đang chỉnh sửa template mặc định
+					{% endif %}
+				</p>
+			</div>
+		</div>
+
+		<div class="columns">
+			<!-- Template Editor -->
+			<div class="column is-half">
+				<form method="POST" id="templateForm">
+					<div class="box">
+						<h2 class="subtitle">Template Header</h2>
+						<div class="field">
+							<label class="label">Phần đầu phiếu khám</label>
+							<div class="control">
+								<textarea class="textarea" name="header_template" rows="8"
+									placeholder="Nhập template header...">{{ template.header }}</textarea>
+							</div>
+							<p class="help">Sử dụng placeholders như {exam_date}, {kid_name}, etc.</p>
+						</div>
+					</div>
+
+					<div class="box">
+						<h2 class="subtitle">Template Thuốc</h2>
+						<div class="field">
+							<label class="label">Phần danh sách thuốc</label>
+							<div class="control">
+								<textarea class="textarea" name="drugs_template" rows="6"
+									placeholder="Nhập template thuốc...">{{ template.drugs_section }}</textarea>
+							</div>
+							<p class="help">Sử dụng {drug_rows} để chèn bảng thuốc</p>
+						</div>
+					</div>
+
+					<div class="box">
+						<h2 class="subtitle">Mẫu dòng thuốc</h2>
+						<div class="field">
+							<label class="label">Dòng cho mỗi thuốc</label>
+							<div class="control">
+								<textarea class="textarea" name="drug_row_template" rows="3"
+									placeholder="Nhập mẫu dòng thuốc...">{{ template.drug_row_template or "| {index} | {name} | {quantity} | {note} |" }}</textarea>
+							</div>
+							<p class="help">Sử dụng các placeholder: {index}, {name}, {quantity}, {note}</p>
+						</div>
+					</div>
+
+					<div class="box">
+						<h2 class="subtitle">Template Dịch vụ</h2>
+						<div class="field">
+							<label class="label">Phần danh sách dịch vụ</label>
+							<div class="control">
+								<textarea class="textarea" name="services_template" rows="6"
+									placeholder="Nhập template dịch vụ...">{{ template.services_section }}</textarea>
+							</div>
+							<p class="help">Sử dụng {service_rows} để chèn bảng dịch vụ</p>
+						</div>
+					</div>
+
+					<div class="box">
+						<h2 class="subtitle">Mẫu dòng dịch vụ</h2>
+						<div class="field">
+							<label class="label">Dòng cho mỗi dịch vụ</label>
+							<div class="control">
+								<textarea class="textarea" name="service_row_template" rows="3"
+									placeholder="Nhập mẫu dòng dịch vụ...">{{ template.service_row_template or "| {index} | {name} | {quantity} | {price} | {prepaid_status} |" }}</textarea>
+							</div>
+							<p class="help">Sử dụng các placeholder: {index}, {name}, {quantity}, {price},
+								{prepaid_status}</p>
+						</div>
+					</div>
+
+					<div class="box">
+						<h2 class="subtitle">Template Footer</h2>
+						<div class="field">
+							<label class="label">Phần cuối phiếu khám</label>
+							<div class="control">
+								<textarea class="textarea" name="footer_template" rows="6"
+									placeholder="Nhập template footer...">{{ template.footer }}</textarea>
+							</div>
+							<p class="help">Sử dụng placeholders như {total_money}, {doctor_name}, etc.</p>
+						</div>
+					</div>
+
+					<div class="field is-grouped">
+						<div class="control">
+							<button type="submit" name="action" value="save" class="button is-primary">
+								💾 Lưu Template
+							</button>
+						</div>
+						<div class="control">
+							<button type="submit" name="action" value="reset" class="button is-warning"
+								onclick="return confirm('Bạn có chắc muốn reset về template mặc định?')">
+								🔄 Reset về mặc định
+							</button>
+						</div>
+					</div>
+				</form>
+			</div>
+
+			<!-- Preview Panel -->
+			<div class="column">
+				<div class="box">
+					<h2 class="subtitle">Xem trước</h2>
+					<div class="field">
+						<label class="label">Định dạng xem trước</label>
+						<div class="control">
+							<div class="select">
+								<select id="previewFormat">
+									<option value="markdown">Discord (Markdown)</option>
+									<option value="html">PDF (HTML)</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					<div class="field">
+						<div class="control">
+							<button type="button" id="previewBtn" class="button is-info">
+								🔍 Xem trước (Popup)
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Placeholders Reference -->
+				<div class="box">
+					<h2 class="subtitle">Placeholders có sẵn</h2>
+					<div class="content">
+						<ul>
+							{% for key, desc in placeholders.items() %}
+							<li><code>{{ "{" + key + "}" }}</code> - {{ desc }}</li>
+							{% endfor %}
+						</ul>
+						<hr>
+						<p><strong>Mẹo:</strong> Sử dụng <code>{drug_rows}</code> và <code>{service_rows}</code> để chèn
+							bảng thuốc/dịch vụ</p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Preview Modal -->
+		<div class="modal" id="previewModal">
+			<div class="modal-background" id="modalBackground"></div>
+			<div class="modal-card" style="width: 90%; max-width: 1200px;">
+				<header class="modal-card-head">
+					<p class="modal-card-title">Xem trước Template</p>
+					<button class="delete" aria-label="close" id="modalClose"></button>
+				</header>
+				<section class="modal-card-body" style="max-height: 80vh; overflow-y: auto;">
+					<div id="modalPreviewContent">
+						<p class="has-text-grey">Nhấn "Xem trước" để xem kết quả</p>
+					</div>
+				</section>
+				<footer class="modal-card-foot">
+					<button class="button is-success" id="modalCloseBtn">Đóng</button>
+				</footer>
+			</div>
+		</div>
+	</div>
+</section>
+
+<script>
+	function changeDepartment() {
+		const department = document.getElementById('departmentSelect').value;
+		const url = department ? `/template?department=${encodeURIComponent(department)}` : '/template';
+		window.location.href = url;
+	}
+
+	document.getElementById('previewBtn').addEventListener('click', function () {
+		const format = document.getElementById('previewFormat').value;
+		const modalContent = document.getElementById('modalPreviewContent');
+
+		// Get current template values
+		const header = document.querySelector('[name="header_template"]').value;
+		const drugs = document.querySelector('[name="drugs_template"]').value;
+		const serviceSection = document.querySelector('[name="services_template"]').value;
+		const footer = document.querySelector('[name="footer_template"]').value;
+		const drugRowTemplate = document.querySelector('[name="drug_row_template"]').value;
+		const serviceRowTemplate = document.querySelector('[name="service_row_template"]').value;
+
+		// Show loading
+		modalContent.innerHTML = '<p class="has-text-info">Đang tải preview...</p>';
+		document.getElementById('previewModal').classList.add('is-active');
+
+		// Temporarily update template for preview
+		fetch('/api/template/preview', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				format: format,
+				template: {
+					header: header,
+					drugs_section: drugs,
+					services_section: serviceSection,
+					footer: footer,
+					drug_row_template: drugRowTemplate,
+					service_row_template: serviceRowTemplate
+				},
+				department: document.getElementById('departmentSelect').value || null
+			})
+		})
+			.then(response => response.json())
+			.then(data => {
+				if (format === 'html') {
+					modalContent.innerHTML = data.content;
+				} else {
+					// Convert markdown to HTML for preview
+					modalContent.innerHTML = data.content
+						.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+						.replace(/`(.*?)`/g, '<code>$1</code>')
+						.replace(/\n/g, '<br>');
+				}
+			})
+			.catch(error => {
+				modalContent.innerHTML = '<p class="has-text-danger">Lỗi khi tải preview</p>';
+				console.error('Preview error:', error);
+			});
+	});
+
+	// Modal close handlers
+	document.getElementById('modalClose').addEventListener('click', function () {
+		document.getElementById('previewModal').classList.remove('is-active');
+	});
+	document.getElementById('modalCloseBtn').addEventListener('click', function () {
+		document.getElementById('previewModal').classList.remove('is-active');
+	});
+	document.getElementById('modalBackground').addEventListener('click', function () {
+		document.getElementById('previewModal').classList.remove('is-active');
+	});
+</script>
+{% endblock %}

@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+	<div class="container">
+		<h1 class="title">Đổi thông tin toa thuốc</h1>
+		<p class="subtitle">Tìm kiếm và chỉnh sửa thông tin bác sĩ và khoa cho toa thuốc</p>
+
+		<!-- Search Section -->
+		<div class="box">
+			<h2 class="subtitle">Tìm kiếm toa thuốc</h2>
+			<form method="POST">
+				<input type="hidden" name="action" value="search">
+				<div class="field is-grouped">
+					<div class="control is-expanded">
+						<input class="input" type="text" name="exam_id" placeholder="Nhập Exam ID" required>
+					</div>
+					<div class="control">
+						<button type="submit" class="button is-info">
+							<span class="icon">
+								<i class="fas fa-search"></i>
+							</span>
+							<span>Tìm kiếm</span>
+						</button>
+					</div>
+				</div>
+			</form>
+		</div>
+
+		{% if exam and patient %}
+		<!-- Edit Section -->
+		<div class="box">
+			<h2 class="subtitle">Thông tin toa thuốc</h2>
+
+			<!-- Patient Info (Read-only) -->
+			<div class="columns">
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Tên bé</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ patient.get('kid_name', '') }}" readonly
+								disabled>
+						</div>
+					</div>
+				</div>
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Ngày sinh</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ patient.get('kid_birthday', '') }}" readonly
+								disabled>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="columns">
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Phụ huynh</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ patient.get('name', '') }}" readonly disabled>
+						</div>
+					</div>
+				</div>
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">SĐT</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ patient.get('phone', '') }}" readonly disabled>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Exam Info (Read-only) -->
+			<div class="columns">
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Exam ID</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ exam.get('id', '') }}" readonly disabled>
+						</div>
+					</div>
+				</div>
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Ngày khám</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ exam.get('exam_date', '') }}" readonly disabled>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="columns">
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Cân nặng (kg)</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ exam.get('weight', '') }}" readonly disabled>
+						</div>
+					</div>
+				</div>
+				<div class="column is-half">
+					<div class="field">
+						<label class="label">Chiều cao (cm)</label>
+						<div class="control">
+							<input class="input" type="text" value="{{ exam.get('height', '') }}" readonly disabled>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="field">
+				<label class="label">Ghi chú khám bệnh</label>
+				<div class="control">
+					<textarea class="textarea" readonly disabled>{{ exam.get('history', '') }}</textarea>
+				</div>
+			</div>
+
+			<!-- Editable Fields -->
+			<hr>
+			<h3 class="subtitle">Chỉnh sửa thông tin</h3>
+
+			<form method="POST">
+				<input type="hidden" name="action" value="save">
+				<input type="hidden" name="edit_exam_id" value="{{ exam.get('id', '') }}">
+
+				<div class="columns">
+					<div class="column is-half">
+						<div class="field">
+							<label class="label">Bác sĩ khám *</label>
+							<div class="control">
+								<div class="select is-fullwidth">
+									<select name="doctor_name" required>
+										<option value="">-- Chọn bác sĩ --</option>
+										{% for doctor in doctors %}
+										<option value="{{ doctor }}" {% if doctor==exam.get('created_by_name', '' )
+											%}selected{% endif %}>
+											{{ doctor }}
+										</option>
+										{% endfor %}
+									</select>
+								</div>
+							</div>
+							<p class="help">Hoặc có thể gõ bác sĩ mới</p>
+							<div class="control">
+								<input class="input mt-2" type="text" id="doctor_input"
+									placeholder="Gõ tên bác sĩ nếu không có trong danh sách">
+							</div>
+						</div>
+					</div>
+					<div class="column is-half">
+						<div class="field">
+							<label class="label">Khoa / Phòng khám *</label>
+							<div class="control">
+								<div class="select is-fullwidth">
+									<select name="department" required>
+										<option value="">-- Chọn khoa --</option>
+										{% for dept in departments %}
+										<option value="{{ dept }}" {% if dept==exam.get('department', '' ) %}selected{%
+											endif %}>
+											{{ dept }}
+										</option>
+										{% endfor %}
+									</select>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="field is-grouped">
+					<div class="control">
+						<button type="submit" class="button is-success">
+							<span class="icon">
+								<i class="fas fa-save"></i>
+							</span>
+							<span>Lưu thay đổi</span>
+						</button>
+					</div>
+					<div class="control">
+						<a href="{{ url_for('admin.index') }}" class="button is-light">Hủy</a>
+					</div>
+				</div>
+			</form>
+		</div>
+
+		<!-- Services and Drugs Summary -->
+		{% if exam.get('drugs') or exam.get('services') %}
+		<div class="box">
+			<h2 class="subtitle">Thông tin toa</h2>
+
+			{% if exam.get('drugs') %}
+			<div class="mb-5">
+				<h3 class="subtitle is-6">💊 Thuốc</h3>
+				<table class="table is-striped is-hoverable is-fullwidth">
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Tên thuốc</th>
+							<th>SL</th>
+							<th>Ghi chú</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for drug in exam.get('drugs', []) %}
+						<tr>
+							<td>{{ loop.index }}</td>
+							<td>{{ drug.get('name', '') }}</td>
+							<td>{{ drug.get('quantity', '') }}</td>
+							<td>{{ drug.get('note', '') }}</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% endif %}
+
+			{% if exam.get('services') %}
+			<div>
+				<h3 class="subtitle is-6">🛎️ Dịch vụ</h3>
+				<table class="table is-striped is-hoverable is-fullwidth">
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Tên dịch vụ</th>
+							<th>Giá</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for service in exam.get('services', []) %}
+						<tr>
+							<td>{{ loop.index }}</td>
+							<td>{{ service.get('name', '') }}</td>
+							<td>{{ "{:,.0f}".format(service.get('price', 0)) }} VND</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% endif %}
+
+			<div class="mt-4">
+				<strong>Tổng tiền: </strong>
+				<span class="tag is-large is-warning">{{ "{:,.0f}".format(exam.get('total_money', 0)) }} VND</span>
+			</div>
+		</div>
+		{% endif %}
+		{% endif %}
+
+		<!-- No Results Message -->
+		{% if exam is none and request.method == 'POST' %}
+		<div class="notification is-danger">
+			<button class="delete"></button>
+			<strong>Không tìm thấy toa thuốc!</strong> Vui lòng kiểm tra Exam ID và thử lại.
+		</div>
+		{% endif %}
+	</div>
+</section>
+
+<script>
+	// Auto-close notification after 5 seconds
+	document.addEventListener('DOMContentLoaded', function () {
+		const notifications = document.querySelectorAll('.notification');
+		notifications.forEach(notif => {
+			// Check if it's a success notification
+			if (notif.classList.contains('is-success')) {
+				setTimeout(() => {
+					notif.remove();
+					// Refresh page after 2 seconds to show updated data
+					setTimeout(() => {
+						location.reload();
+					}, 1500);
+				}, 3000);
+			}
+		});
+
+		// Allow closing notifications manually
+		document.querySelectorAll('.notification .delete').forEach(button => {
+			button.addEventListener('click', function () {
+				this.parentElement.remove();
+			});
+		});
+
+		// Allow typing custom doctor name
+		const doctorInput = document.getElementById('doctor_input');
+		const doctorSelect = document.querySelector('select[name="doctor_name"]');
+
+		if (doctorInput && doctorSelect) {
+			doctorInput.addEventListener('input', function () {
+				if (this.value.trim()) {
+					doctorSelect.value = this.value;
+				}
+			});
+
+			// Pre-fill the input if a doctor is selected
+			if (doctorSelect.value) {
+				doctorInput.value = doctorSelect.value;
+			}
+		}
+
+		// Form validation and submission
+		const saveForm = document.querySelector('form[action*="admin/edit-exam-info"]');
+		if (saveForm) {
+			saveForm.addEventListener('submit', function (e) {
+				// Only validate on save action
+				const action = this.querySelector('input[name="action"]');
+				if (action && action.value === 'save') {
+					const doctorName = this.querySelector('select[name="doctor_name"]').value;
+					const department = this.querySelector('select[name="department"]').value;
+
+					if (!doctorName.trim()) {
+						e.preventDefault();
+						alert('❌ Vui lòng chọn hoặc nhập tên bác sĩ');
+						return false;
+					}
+
+					if (!department.trim()) {
+						e.preventDefault();
+						alert('❌ Vui lòng chọn khoa/phòng khám');
+						return false;
+					}
+				}
+			});
+		}
+	});
+</script>
+{% endblock %}

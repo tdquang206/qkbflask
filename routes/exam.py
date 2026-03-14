@@ -9,10 +9,10 @@ from routes.settings import load_settings
 from PIL import Image
 import requests
 
-from utils.pdf_generator import generate_exam_file_name, build_exam_html, generate_pdf_and_jpeg, delete_exam_files
+from utils.template_renderer import render_exam_markdown
 
 exam_bp = Blueprint('exam', __name__)
-from shared_db import db, patients_table as Patients_db
+from shared_db import db, patients_table as Patients_db, services_table
 
 # for image
 MAX_SIZE = (2000, 2000)
@@ -33,41 +33,9 @@ def send_discord_helper(patient, exam_data):
     if not webhook_url:
         return
 
-    # Build Message based on settings
-    fields = []
-    
-    if settings.get('include_date'):
-        fields.append(f"**Ngày khám:** {exam_data.get('exam_date')}")
-    
-    if settings.get('include_kid_name'):
-        fields.append(f"**Bé:** {patient.get('kid_name')} ({patient.get('kid_birthday')})")
-        
-    if settings.get('include_parent_name'):
-        fields.append(f"**Phụ huynh:** {patient.get('name')}")
-        
-    if settings.get('include_phone'):
-        fields.append(f"**SĐT:** {patient.get('phone')}")
-        
-    if settings.get('include_address'):
-        fields.append(f"**Địa chỉ:** {patient.get('address')}")
-        
-    if settings.get('include_total_money'):
-        fields.append(f"**Tổng tiền:** {exam_data.get('total_money')}")
-
-    message_content = "\n".join(fields)
-    
-    if settings.get('include_table'):
-        # Build text table
-        table_str = "```\n"
-        table_str += f"{'Tên thuốc':<20} | {'SL':<5} | {'Ghi chú'}\n"
-        table_str += "-"*40 + "\n"
-        for drug in exam_data.get('drugs', []):
-            name = drug.get('name', '')[:20]
-            qty = str(drug.get('quantity', ''))
-            note = drug.get('note', '')
-            table_str += f"{name:<20} | {qty:<5} | {note}\n"
-        table_str += "```"
-        message_content += "\n\n**Toa thuốc:**\n" + table_str
+    # Use template renderer to build message content
+    department = exam_data.get('department')
+    message_content = render_exam_markdown(patient, exam_data, doctor_name=exam_data.get('created_by_name'), department=department)
 
     payload = {
         "content": message_content
@@ -123,7 +91,15 @@ def edit_exam(exam_id):
     if request.method == 'GET':
         settings = load_settings()
         departments = settings.get('departments', ["Nhi khoa", "Khám Da liễu"])
-        return render_template('edit_exam.html', patient=patient_found, exam=exam_editting, departments=departments)
+        # load available services and patient prepaid packages
+        all_services = services_table.all()
+        patient_packages = patient_found.get('packages', [])
+        return render_template('edit_exam.html', 
+            patient=patient_found, 
+            exam=exam_editting, 
+            departments=departments,
+            services=all_services,
+            packages=patient_packages)
 
     if request.method == 'POST':
         # data
@@ -155,11 +131,40 @@ def edit_exam(exam_id):
                     'price': price
                 })
 
-        # prepair exam data
-        if request.form.get('department'):
-            new_department = request.form.get('department')
+        # --- new: handle selected services and packages ---
+        service_ids = request.form.getlist('service_id')
+        service_names = request.form.getlist('service_name')
+        service_prices = request.form.getlist('service_price')
+        services = []
+        # load patient packages for analysis
+        patient_packages = patient_found.get('packages', [])
+        for sid, nm, pr in zip(service_ids, service_names, service_prices):
+            if not sid:
+                continue
+            price_val = float(pr or 0)
+            # apply package discount if available
+            for pkg in patient_packages:
+                if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
+                    # charge package unit price instead
+                    price_val = pkg.get('unit_price', price_val)
+                    pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
+                    break
+            services.append({'id': sid, 'name': nm, 'price': price_val})
+
+        # total override (manual edit by doctor)
+        total_override = request.form.get('total_override')
+
+        # calculate total_money if override not provided
+        computed_total = 0
+        try:
+            computed_total += sum(float(d.get('price',0)) * int(d.get('quantity',1)) for d in drugs)
+        except Exception:
+            pass
+        computed_total += sum(s.get('price',0) for s in services)
+        if total_override and total_override.strip():
+            final_total = total_override
         else:
-            new_department = exam_editting.get('department', 'Nhi khoa')
+            final_total = computed_total
 
         exam_data = {
             'patient_id': patient_found.get('id'), # Use UUID
@@ -170,16 +175,23 @@ def edit_exam(exam_id):
             'service_fee': service_fee,
             'expected_date': expected_date,
             'drugs': drugs,
+            'services': services,
             'paid_status' : False,
-            'total_money': total_money,
+            'total_money': final_total,
+            'total_override': total_override,
             # get submit time # YYMMDDHHMMSS
             'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
             'id': exam_id,
-            # Preserve existing creator info
-            'department': new_department,
+            # Preserve existing creator info (use admin tool to change doctor/department)
+            'department': exam_editting.get('department', 'Nhi khoa'),
             'created_by_id': exam_editting.get('created_by_id'),
             'created_by_name': exam_editting.get('created_by_name', 'Admin')
         }
+
+        # if we modified packages, save back to patient record
+        if patient_packages != patient_found.get('packages', []):
+            patient_found['packages'] = patient_packages
+
         # print(exam_data)
         
         
@@ -213,7 +225,11 @@ def edit_exam(exam_id):
 
         # Update the patient document in TinyDB
         # We must use doc_ids to update specific record found by earlier iteration
-        Patients_db.update({"exams": exams, "last_visit": exam_date}, doc_ids=[patient_found.doc_id])
+        update_fields = {"exams": exams, "last_visit": exam_date}
+        # if packages changed, persist them too
+        if patient_packages is not None:
+            update_fields["packages"] = patient_packages
+        Patients_db.update(update_fields, doc_ids=[patient_found.doc_id])
         # NOTE: PDF and JPEG files, overwrite old files
         short_exam_id = str(exam_id)[:8].replace('-','')
         # html_content = build_exam_html(patient_found, exam_data)
@@ -249,7 +265,13 @@ def new_exam(patient_id):
     if request.method == 'GET':
         settings = load_settings()
         departments = settings.get('departments', ["Nhi khoa", "Khám Da liễu"])
-        return render_template('new_exam.html', patient=patient, departments=departments)
+        all_services = services_table.all()
+        patient_packages = patient.get('packages', [])
+        return render_template('new_exam.html', 
+                               patient=patient, 
+                               departments=departments,
+                               services=all_services,
+                               packages=patient_packages)
     
     if request.method == 'POST':
         # data
@@ -280,11 +302,43 @@ def new_exam(patient_id):
                     'note': note,
                     'price': price
                 })
+
+        # handle services & packages
+        service_ids = request.form.getlist('service_id')
+        service_names = request.form.getlist('service_name')
+        service_prices = request.form.getlist('service_price')
+        services = []
+        patient_packages = patient.get('packages', [])
+        for sid, nm, pr in zip(service_ids, service_names, service_prices):
+            if not sid:
+                continue
+            price_val = float(pr or 0)
+            for pkg in patient_packages:
+                if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
+                    price_val = pkg.get('unit_price', price_val)
+                    pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
+                    break
+            services.append({'id': sid, 'name': nm, 'price': price_val})
+
+        total_override = request.form.get('total_override')
+
         # prepair exam data
         if request.form.get('department'):
             selected_department = request.form.get('department')
         else:
             selected_department = current_user.department if current_user.is_authenticated else 'Nhi khoa'
+
+        # compute totals
+        computed_total = 0
+        try:
+            computed_total += sum(float(d.get('price',0)) * int(d.get('quantity',1)) for d in drugs)
+        except Exception:
+            pass
+        computed_total += sum(s.get('price',0) for s in services)
+        if total_override and total_override.strip():
+            final_total = total_override
+        else:
+            final_total = computed_total
 
         exam_data = {
             'patient_id': patient_id, # UUID
@@ -295,8 +349,10 @@ def new_exam(patient_id):
             'service_fee': service_fee,
             'expected_date': expected_date,
             'drugs': drugs,
+            'services': services,
             'paid_status' : False,
-            'total_money': total_money,
+            'total_money': final_total,
+            'total_override': total_override,
             # get submit time # YYMMDDHHMMSS
             'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
             'id': str(uuid.uuid4()),
@@ -354,11 +410,14 @@ def new_exam(patient_id):
 
         # Update the patient document in TinyDB
         # Use doc_ids here because we already found the patient object and its doc_id
-        Patients_db.update({
+        update_fields = {
             "exams": exams,
             "last_visit": exam_date
-            }, 
-            doc_ids=[patient.doc_id])
+        }
+        # persist package changes too
+        if patient_packages is not None:
+            update_fields["packages"] = patient_packages
+        Patients_db.update(update_fields, doc_ids=[patient.doc_id])
 
         # NOTE: create PDF and JPEG files
         
@@ -414,7 +473,8 @@ def api_generate_files():
 
     # Generate
     short_exam_id = str(exam_id)[:8].replace('-','')
-    html_content = build_exam_html(patient, exam_found, doctor_name=exam_found.get('created_by_name'))
+    department = exam_found.get('department')
+    html_content = build_exam_html(patient, exam_found, doctor_name=exam_found.get('created_by_name'), department=department)
     pdf_result = generate_pdf_and_jpeg(
         html_content,
         patient.get('phone'),

@@ -1,4 +1,5 @@
-from template_renderer import render_exam_html
+from utils.template_renderer import render_exam_html
+import os
 
 # generate filename for pdf and jpeg on server
 def generate_exam_file_name(phone, exam_date, exam_id):
@@ -8,9 +9,9 @@ def generate_exam_file_name(phone, exam_date, exam_id):
     
     return f"{phone}_{date_str}_{random_part}"
 
-def build_exam_html(patient, exam_data, doctor_name=None):
+def build_exam_html(patient, exam_data, doctor_name=None, department=None):
     # Use template renderer for consistent HTML output
-    return render_exam_html(patient, exam_data, doctor_name)
+    return render_exam_html(patient, exam_data, doctor_name=doctor_name, department=department)
 
 def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
     """

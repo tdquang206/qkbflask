@@ -515,6 +515,18 @@
     const saveBtn = document.getElementById("saveBtn");
     const modal = document.getElementById("progressModal");
     const errorMsg = document.getElementById("errorMsg");
+    const printBtn = document.getElementById("printBtn");
+    let shouldPrintAfterSave = false;
+    let currentPdfUrl = null;
+
+    if (printBtn) {
+      printBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        shouldPrintAfterSave = true;
+        // Trigger form submit
+        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      });
+    }
 
     // Helper to update status
     function updateStatus(elementId, status) {
@@ -580,6 +592,9 @@
           const res2 = await callStep('/api/exam/generate_files', payload);
           if (res2.status === 'success') {
             updateStatus("stepPdf", "success");
+            if (res2.pdf_url) {
+              currentPdfUrl = res2.pdf_url;
+            }
           } else {
             console.error(res2);
             updateStatus("stepPdf", "error");
@@ -618,6 +633,12 @@
           saveBtn.classList.add("is-outlined");
           saveBtn.textContent = "Đã cập nhật";
           showToast("✅ Đã lưu xong!", "is-success");
+
+          // If printing was requested, redirect to PDF URL
+          if (shouldPrintAfterSave && currentPdfUrl) {
+            window.open(currentPdfUrl, "_blank");
+          }
+          shouldPrintAfterSave = false; // reset
         }, 500);
 
       } catch (err) {
@@ -1015,149 +1036,6 @@
   });
 </script>
 
-<!-- Print script -->
-<script>
-  document.getElementById("printBtn").addEventListener("click", function () {
-    // Collect patient info
-    const kidName = document.getElementById("kid_name")?.textContent || "<Lỗi tên bé>";
-    const birthday = ""; // You may need to get this from patient info
-    const weight = document.querySelector("input[name='weight']").value || "";
-    const height = document.querySelector("input[name='height']").value || "";
-    const phone = document.getElementById("phone")?.textContent || "<Lỗi sđt>";
-    const parentName = ""; // You may need to get this from patient info
-    const address = document.getElementById("address")?.textContent || "<Lỗi địa chỉ>";
-    const history = document.querySelector("textarea[name='history']")?.value || "<Lỗi nội dung khám bệnh>";
-    const ngay_kham = document.querySelector("input[name='exam_date']").value || "<lỗi lấy ngày khám>";
-    const ngay_tai_kham = document.querySelector("input[name='expected_date']").value || "<lỗi lấy ngày tái khám>";
-
-    // Collect drug rows
-    let drugRows = "";
-    let index = 1;
-    document.querySelectorAll("#drugTable tbody tr").forEach(row => {
-      const name = row.children[1]?.textContent || "";
-      const qty = row.children[2]?.textContent || "";
-      const note = row.children[3]?.textContent || "";
-      if (name) {
-        drugRows += `
-        <tr>
-          <td>${index++}</td>
-          <td>${name}</td>
-          <td>${qty}</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td colspan="2" style="font-style:italic;">${note}</td>
-        </tr>
-        <tr class="show-when-print" style="display: none;"></tr>
-    `}
-    });
-
-    // collect total price for footer
-    let totalPrice = document.getElementById("totalPrice")?.textContent || "0";
-    // Remove all non-digit characters
-    let clean = totalPrice.replace(/\D/g, "");
-    // Remove last 3 digits (if length > 3), else set to "0"
-    let totalShort = (clean.length > 3 ? clean.slice(0, -3) : "0") + "";
-
-    console.log('raw totalPrice text:', totalPrice);
-    console.log('clean:', clean);
-    console.log('clean length:', clean.length);
-
-
-    // Get print time as yymmddhhmmss
-    const now = new Date();
-    const pad = n => n.toString().padStart(2, "0");
-    const printTime =
-      pad(now.getFullYear() % 100) +
-      pad(now.getMonth() + 1) +
-      pad(now.getDate()) +
-      pad(now.getHours()) +
-      pad(now.getMinutes()) +
-      pad(now.getSeconds());
-
-    // Build print content
-    const printContent = `
-    <html>
-      <head>
-        <title>Phiếu Khám</title>
-        <style>
-          @page { size: A5 portrait; margin: 1cm; }
-          body { font-family: sans-serif; font-size: 11pt; }
-          h2 { text-align: center; margin-bottom: 1em; }
-          table { width: 100%; border-collapse: collapse; margin-top: 1em; }
-          th, td { border: none; padding: 6px 4px; }
-          th { font-weight: bold; text-align: left; }
-          tbody tr { margin-bottom: 5px; display: table-row;}
-          tbody td { padding-top: 5px; padding-bottom: 10px }
-          @media print {
-            th, td {
-              border: none;
-            }
-            .show-when-print {
-              display: table-row;
-              height: 10px;
-            }
-            /* Tell the browser to use the running footer at the bottom of each page */
-            .footer {
-              position: fixed;
-              bottom: 1cm;
-              width: 100%;
-              text-align: left;
-              font-size: 12px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <h2>Phiếu Khám Bệnh - ${ngay_kham}</h2>
-        <p> ${kidName} &nbsp;&nbsp; ${birthday} &nbsp;&nbsp; ${weight}kg &nbsp;&nbsp; ${height}cm</p>
-        <p> ${phone} &nbsp;&nbsp; ${parentName}</p>
-        <p> ${address}</p>
-        <p><strong>Ghi chú / Khám bệnh:</strong> ${history}</p>
-        <p>Hẹn tái khám: ${ngay_tai_kham}</p>
-
-        <h3>💊 Thuốc</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Tên thuốc</th>
-              <th>SL</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${drugRows || "<tr><td colspan='4'>Toa không thuốc</td></tr>"}
-          </tbody>
-        </table>
-        <div class="footer">
-          <span style="white-space:nowrap;">${printTime}H${totalShort}</span>
-        </div>
-      </body>
-    </html>
-    `;
-
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-
-    printWindow.onload = () => {
-      printWindow.focus();
-
-      // Add afterprint listener
-      printWindow.addEventListener("afterprint", () => {
-        printWindow.close();
-      });
-
-      // Fallback in case afterprint doesn't fire
-      setTimeout(() => {
-        printWindow.close();
-      }, 1000); // Adjust delay as needed
-
-      printWindow.print();
-    };
-
-  });
-</script>
 
 <!-- input hdsd thuốc -->
 <script>
@@ -1296,15 +1174,14 @@
 <script>
   // Load existing images on page load
   document.addEventListener('DOMContentLoaded', async function () {
-    const examImages = {{ exam.images | tojson | safe if exam.images else '[]' | safe
-  }};
-  const imageGallery = document.getElementById('imageGallery');
+    const examImages = JSON.parse('{{ (exam.images or []) | tojson | safe }}');
+    const imageGallery = document.getElementById('imageGallery');
 
-  if (examImages && examImages.length > 0) {
-    examImages.forEach(img => {
-      addThumbnail(img.filename, img.path);
-    });
-  }
+    if (examImages && examImages.length > 0) {
+      examImages.forEach(img => {
+        addThumbnail(img.filename, img.path);
+      });
+    }
   });
 
   // Preview images when selected

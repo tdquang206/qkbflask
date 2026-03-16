@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash
-from flask_login import current_user
+from flask_login import current_user, login_required
 from datetime import datetime
 from tinydb import Query
 import uuid
@@ -10,6 +10,7 @@ from PIL import Image
 import requests
 
 from utils.template_renderer import render_exam_markdown
+from utils.pdf_generator import build_exam_html, generate_pdf_and_jpeg, delete_exam_files, generate_exam_file_name
 
 exam_bp = Blueprint('exam', __name__)
 from shared_db import db, patients_table as Patients_db, services_table
@@ -102,154 +103,145 @@ def edit_exam(exam_id):
             packages=patient_packages)
 
     if request.method == 'POST':
-        # data
-        exam_date = request.form.get('exam_date')
-        weight = request.form.get('weight')
-        height = request.form.get('height')
-        history = request.form.get('history')
-        # string, e.g. "50000"
-        service_fee = request.form.get("service_fee")  
-        
-        expected_date = request.form.get('expected_date')
-
-        # Collect drug rows (they come as lists)
-        drug_names = request.form.getlist('drug_name')
-        drug_quantities = request.form.getlist('drug_quantity')
-        drug_notes = request.form.getlist('drug_note')
-        drug_prices = request.form.getlist('drug_price')
-        total_money = request.form.get('total_money') 
-        send_discord_flag = request.form.get('send_discord')
-
-        # try to discard empty name when receiving data
-        drugs = []
-        for name, qty, note, price in zip(drug_names, drug_quantities, drug_notes, drug_prices):
-            if name.strip():
-                drugs.append({
-                    'name': name,
-                    'quantity': qty,
-                    'note': note,
-                    'price': price
-                })
-
-        # --- new: handle selected services and packages ---
-        service_ids = request.form.getlist('service_id')
-        service_names = request.form.getlist('service_name')
-        service_prices = request.form.getlist('service_price')
-        services = []
-        # load patient packages for analysis
-        patient_packages = patient_found.get('packages', [])
-        for sid, nm, pr in zip(service_ids, service_names, service_prices):
-            if not sid:
-                continue
-            price_val = float(pr or 0)
-            # apply package discount if available
-            for pkg in patient_packages:
-                if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
-                    # charge package unit price instead
-                    price_val = pkg.get('unit_price', price_val)
-                    pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
-                    break
-            services.append({'id': sid, 'name': nm, 'price': price_val})
-
-        # total override (manual edit by doctor)
-        total_override = request.form.get('total_override')
-
-        # calculate total_money if override not provided
-        computed_total = 0
         try:
-            computed_total += sum(float(d.get('price',0)) * int(d.get('quantity',1)) for d in drugs)
-        except Exception:
-            pass
-        computed_total += sum(s.get('price',0) for s in services)
-        if total_override and total_override.strip():
-            final_total = total_override
-        else:
-            final_total = computed_total
-
-        exam_data = {
-            'patient_id': patient_found.get('id'), # Use UUID
-            'exam_date': exam_date,
-            'weight': weight,
-            'height': height,
-            'history': history,
-            'service_fee': service_fee,
-            'expected_date': expected_date,
-            'drugs': drugs,
-            'services': services,
-            'paid_status' : False,
-            'total_money': final_total,
-            'total_override': total_override,
-            # get submit time # YYMMDDHHMMSS
-            'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
-            'id': exam_id,
-            # Preserve existing creator info (use admin tool to change doctor/department)
-            'department': exam_editting.get('department', 'Nhi khoa'),
-            'created_by_id': exam_editting.get('created_by_id'),
-            'created_by_name': exam_editting.get('created_by_name', 'Admin')
-        }
-
-        # if we modified packages, save back to patient record
-        if patient_packages != patient_found.get('packages', []):
-            patient_found['packages'] = patient_packages
-
-        # print(exam_data)
-        
-        
-        # Handle image upload if present
-        image = request.files.get('lab_image')
-        if image and image.filename:
-            filename = secure_filename(image.filename)
-            image_path = os.path.join('uploads', filename)  # Changed to direct path
-            image.save(image_path)
-            exam_data['image_path'] = image_path
+            # data
+            exam_date = request.form.get('exam_date')
+            weight = request.form.get('weight')
+            height = request.form.get('height')
+            history = request.form.get('history')
+            # string, e.g. "50000"
+            service_fee = request.form.get("service_fee")  
             
-        # search the exam id
-        exams = patient_found.get("exams", [])
-        updated = False
-        for i, exam in enumerate(exams):
-            if exam.get('id') == exam_id:
-                # get old exam_id
-                old_date = exam.get('exam_date')
-                short_id = str(exam_id)[:8].replace('-','')
-                # delete old physical pdf and jpeg files
-                if old_date:
-                    delete_exam_files(patient_found.get('phone'), old_date, short_id)
-                # update newdata
-                exams[i].update(exam_data)
-                updated = True
-                break
+            expected_date = request.form.get('expected_date')
 
-        # if exam_id change: create a new one
-        if not updated:
-            exams.append(exam_data)
+            # Collect drug rows (they come as lists)
+            drug_names = request.form.getlist('drug_name')
+            drug_quantities = request.form.getlist('drug_quantity')
+            drug_notes = request.form.getlist('drug_note')
+            drug_prices = request.form.getlist('drug_price')
+            total_money = request.form.get('total_money') 
+            send_discord_flag = request.form.get('send_discord')
 
-        # Update the patient document in TinyDB
-        # We must use doc_ids to update specific record found by earlier iteration
-        update_fields = {"exams": exams, "last_visit": exam_date}
-        # if packages changed, persist them too
-        if patient_packages is not None:
-            update_fields["packages"] = patient_packages
-        Patients_db.update(update_fields, doc_ids=[patient_found.doc_id])
-        # NOTE: PDF and JPEG files, overwrite old files
-        short_exam_id = str(exam_id)[:8].replace('-','')
-        # html_content = build_exam_html(patient_found, exam_data)
-        # pdf_result = generate_pdf_and_jpeg(
-        #     html_content,
-        #     patient_found.get("phone"),
-        #     exam_date,
-        #     short_exam_id
-        # )
+            # try to discard empty name when receiving data
+            drugs = []
+            for name, qty, note, price in zip(drug_names, drug_quantities, drug_notes, drug_prices):
+                if name.strip():
+                    drugs.append({
+                        'name': name,
+                        'quantity': qty,
+                        'note': note,
+                        'price': price
+                    })
 
-        if send_discord_flag:
-            # We will send discord in a separate request
-            pass
+            # --- new: handle selected services and packages ---
+            service_ids = request.form.getlist('service_id')
+            service_names = request.form.getlist('service_name')
+            service_prices = request.form.getlist('service_price')
+            services = []
+            # load patient packages for analysis
+            patient_packages = patient_found.get('packages', [])
+            for sid, nm, pr in zip(service_ids, service_names, service_prices):
+                if not sid:
+                    continue
+                price_val = float(pr or 0)
+                # apply package discount if available
+                for pkg in patient_packages:
+                    if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
+                        # charge package unit price instead
+                        price_val = pkg.get('unit_price', price_val)
+                        pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
+                        break
+                services.append({'id': sid, 'name': nm, 'price': price_val})
 
-        return jsonify({
-          "status": "success",
-          "message": "Exam updated",
-          "exam_id": exam_data['id'],
-          "patient_id": patient_found.get('id') # UUID
-        })
+            # total override (manual edit by doctor)
+            total_override = request.form.get('total_override')
+
+            # calculate total_money if override not provided
+            computed_total = 0
+            try:
+                computed_total += sum(float(d.get('price',0)) * int(d.get('quantity',1)) for d in drugs)
+            except Exception as e:
+                print(f"[DEBUG] Error computing drug total: {e}")
+                
+            computed_total += sum(s.get('price',0) for s in services)
+            if total_override and total_override.strip():
+                final_total = total_override
+            else:
+                final_total = computed_total
+
+            exam_data = {
+                'patient_id': patient_found.get('id'), # Use UUID
+                'exam_date': exam_date,
+                'weight': weight,
+                'height': height,
+                'history': history,
+                'service_fee': service_fee,
+                'expected_date': expected_date,
+                'drugs': drugs,
+                'services': services,
+                'paid_status' : False,
+                'total_money': final_total,
+                'total_override': total_override,
+                # get submit time # YYMMDDHHMMSS
+                'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
+                'id': exam_id,
+                # Preserve existing creator info (use admin tool to change doctor/department)
+                'department': exam_editting.get('department', 'Nhi khoa'),
+                'created_by_id': exam_editting.get('created_by_id'),
+                'created_by_name': exam_editting.get('created_by_name', 'Admin')
+            }
+
+            # if we modified packages, save back to patient record
+            if patient_packages != patient_found.get('packages', []):
+                patient_found['packages'] = patient_packages
+
+            # Handle image upload if present
+            image = request.files.get('lab_image')
+            if image and image.filename:
+                filename = secure_filename(image.filename)
+                image_path = os.path.join('uploads', filename)
+                os.makedirs('uploads', exist_ok=True)
+                image.save(image_path)
+                exam_data['image_path'] = image_path
+                
+            # search the exam id
+            exams = patient_found.get("exams", [])
+            updated = False
+            for i, exam in enumerate(exams):
+                if exam.get('id') == exam_id:
+                    # get old exam_id
+                    old_date = exam.get('exam_date')
+                    short_id = str(exam_id)[:8].replace('-','')
+                    # delete old physical pdf and jpeg files
+                    if old_date:
+                        delete_exam_files(patient_found.get('phone'), old_date, short_id)
+                    # update newdata
+                    exams[i].update(exam_data)
+                    updated = True
+                    break
+
+            # if exam_id change: create a new one
+            if not updated:
+                exams.append(exam_data)
+
+            # Update the patient document in TinyDB
+            update_fields = {"exams": exams, "last_visit": exam_date}
+            if patient_packages is not None:
+                update_fields["packages"] = patient_packages
+            
+            Patients_db.update(update_fields, doc_ids=[patient_found.doc_id])
+
+            return jsonify({
+              "status": "success",
+              "message": "Exam updated",
+              "exam_id": exam_data['id'],
+              "patient_id": patient_found.get('id')
+            })
+        except Exception as e:
+            import traceback
+            print(f"[DEBUG] Error in edit_exam POST: {e}")
+            traceback.print_exc()
+            return jsonify({"status": "error", "message": str(e)}), 500
 
 # NOTE: Create
 # Create new exam
@@ -274,171 +266,161 @@ def new_exam(patient_id):
                                packages=patient_packages)
     
     if request.method == 'POST':
-        # data
-        exam_date = request.form.get('exam_date')
-        weight = request.form.get('weight')
-        height = request.form.get('height')
-        history = request.form.get('history')
-        # string, e.g. "50000"
-        service_fee = request.form.get("service_fee")  
-        
-        expected_date = request.form.get('expected_date')
-
-        # Collect drug rows (they come as lists)
-        drug_names = request.form.getlist('drug_name')
-        drug_quantities = request.form.getlist('drug_quantity')
-        drug_notes = request.form.getlist('drug_note')
-        drug_prices = request.form.getlist('drug_price')
-        total_money = request.form.get('total_money') 
-        send_discord_flag = request.form.get('send_discord')
-
-        # try to discard empty name when receiving data
-        drugs = []
-        for name, qty, note, price in zip(drug_names, drug_quantities, drug_notes, drug_prices):
-            if name.strip():
-                drugs.append({
-                    'name': name,
-                    'quantity': qty,
-                    'note': note,
-                    'price': price
-                })
-
-        # handle services & packages
-        service_ids = request.form.getlist('service_id')
-        service_names = request.form.getlist('service_name')
-        service_prices = request.form.getlist('service_price')
-        services = []
-        patient_packages = patient.get('packages', [])
-        for sid, nm, pr in zip(service_ids, service_names, service_prices):
-            if not sid:
-                continue
-            price_val = float(pr or 0)
-            for pkg in patient_packages:
-                if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
-                    price_val = pkg.get('unit_price', price_val)
-                    pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
-                    break
-            services.append({'id': sid, 'name': nm, 'price': price_val})
-
-        total_override = request.form.get('total_override')
-
-        # prepair exam data
-        if request.form.get('department'):
-            selected_department = request.form.get('department')
-        else:
-            selected_department = current_user.department if current_user.is_authenticated else 'Nhi khoa'
-
-        # compute totals
-        computed_total = 0
         try:
-            computed_total += sum(float(d.get('price',0)) * int(d.get('quantity',1)) for d in drugs)
-        except Exception:
-            pass
-        computed_total += sum(s.get('price',0) for s in services)
-        if total_override and total_override.strip():
-            final_total = total_override
-        else:
-            final_total = computed_total
-
-        exam_data = {
-            'patient_id': patient_id, # UUID
-            'exam_date': exam_date,
-            'weight': weight,
-            'height': height,
-            'history': history,
-            'service_fee': service_fee,
-            'expected_date': expected_date,
-            'drugs': drugs,
-            'services': services,
-            'paid_status' : False,
-            'total_money': final_total,
-            'total_override': total_override,
-            # get submit time # YYMMDDHHMMSS
-            'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
-            'id': str(uuid.uuid4()),
-            'department': selected_department,
-            'created_by_id': current_user.id if current_user.is_authenticated else None,
-            'created_by_name': current_user.display_name if current_user.is_authenticated else 'Admin'
-        }
-        short_exam_id = str(exam_data['id'])[:8].replace('-','')
-        # Handle image upload if present
-        image_list = []
-        images = request.files.getlist('lab_image')
-
-        if images and images[0].filename:
-            folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
-            os.makedirs(folder, exist_ok=True)
-            folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
-            os.makedirs(folder, exist_ok=True)
-
-            for idx, image_file in enumerate(images, start=1):
-                # ✅ Renamed loop variable to 'image_file' to avoid conflict
-                if image_file and image_file.filename:
-                    safe_name = secure_filename(image_file.filename)
-                    ext = os.path.splitext(safe_name)[1].lower()
-                    new_name = f"{patient.get('phone')}_{exam_date}_image_{idx}{ext}"
-                    image_path = os.path.join(folder, new_name)
-
-                    # Resize
-                    img = Image.open(image_file)
-                    img.thumbnail(MAX_SIZE, Image.Resampling.LANCZOS)
-                    
-                    # Save to buffer to check size
-                    buffer = io.BytesIO()
-                    img.save(buffer, format=img.format or "JPEG", optimize=True, quality=85)
-                    
-                    # If too large, reduce quality
-                    if buffer.tell() > MAX_FILE_SIZE:
-                        buffer = io.BytesIO()
-                        img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
-                    
-                    # Write to disk
-                    with open(image_path, "wb") as f:
-                        f.write(buffer.getvalue())
-                    
-                    image_list.append({
-                        "filename": new_name,
-                        "path": image_path
-                    })
-        
-        if image_list:    
-            exam_data['images'] = image_list
+            # data
+            exam_date = request.form.get('exam_date')
+            weight = request.form.get('weight')
+            height = request.form.get('height')
+            history = request.form.get('history')
+            # string, e.g. "50000"
+            service_fee = request.form.get("service_fee")  
             
-        # Append to patient's exams list
-        exams = patient.get("exams", [])
-        exams.append(exam_data)
+            expected_date = request.form.get('expected_date')
 
-        # Update the patient document in TinyDB
-        # Use doc_ids here because we already found the patient object and its doc_id
-        update_fields = {
-            "exams": exams,
-            "last_visit": exam_date
-        }
-        # persist package changes too
-        if patient_packages is not None:
-            update_fields["packages"] = patient_packages
-        Patients_db.update(update_fields, doc_ids=[patient.doc_id])
+            # Collect drug rows (they come as lists)
+            drug_names = request.form.getlist('drug_name')
+            drug_quantities = request.form.getlist('drug_quantity')
+            drug_notes = request.form.getlist('drug_note')
+            drug_prices = request.form.getlist('drug_price')
+            total_money = request.form.get('total_money') 
+            send_discord_flag = request.form.get('send_discord')
 
-        # NOTE: create PDF and JPEG files
-        
-        # html_content = build_exam_html(patient, exam_data)
-        # pdf_result = generate_pdf_and_jpeg(
-        #     html_content,
-        #     patient.get('phone'),
-        #     exam_date,
-        #     short_exam_id
-        # )
+            # try to discard empty name when receiving data
+            drugs = []
+            for name, qty, note, price in zip(drug_names, drug_quantities, drug_notes, drug_prices):
+                if name.strip():
+                    drugs.append({
+                        'name': name,
+                        'quantity': qty,
+                        'note': note,
+                        'price': price
+                    })
 
-        # if send_discord_flag:
-        #     send_discord_helper(patient, exam_data)
+            # handle services & packages
+            service_ids = request.form.getlist('service_id')
+            service_names = request.form.getlist('service_name')
+            service_prices = request.form.getlist('service_price')
+            services = []
+            patient_packages = patient.get('packages', [])
+            for sid, nm, pr in zip(service_ids, service_names, service_prices):
+                if not sid:
+                    continue
+                price_val = float(pr or 0)
+                for pkg in patient_packages:
+                    if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
+                        price_val = pkg.get('unit_price', price_val)
+                        pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
+                        break
+                services.append({'id': sid, 'name': nm, 'price': price_val})
 
-        return jsonify({
-            "status": "success",
-            "message": "Dữ liệu được lưu thành công",
-            "redirect_url": url_for('exam.edit_exam', exam_id=exam_data['id']),
-            "exam_id": exam_data['id'],
-            "patient_id": patient_id
-        })
+            total_override = request.form.get('total_override')
+
+            # prepair exam data
+            if request.form.get('department'):
+                selected_department = request.form.get('department')
+            else:
+                selected_department = current_user.department if current_user.is_authenticated else 'Nhi khoa'
+
+            # compute totals
+            computed_total = 0
+            try:
+                computed_total += sum(float(d.get('price',0)) * int(d.get('quantity',1)) for d in drugs)
+            except Exception as e:
+                print(f"[DEBUG] Error computing drug total: {e}")
+                
+            computed_total += sum(s.get('price',0) for s in services)
+            if total_override and total_override.strip():
+                final_total = total_override
+            else:
+                final_total = computed_total
+
+            exam_data = {
+                'patient_id': patient_id, # UUID
+                'exam_date': exam_date,
+                'weight': weight,
+                'height': height,
+                'history': history,
+                'service_fee': service_fee,
+                'expected_date': expected_date,
+                'drugs': drugs,
+                'services': services,
+                'paid_status' : False,
+                'total_money': final_total,
+                'total_override': total_override,
+                # get submit time # YYMMDDHHMMSS
+                'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
+                'id': str(uuid.uuid4()),
+                'department': selected_department,
+                'created_by_id': current_user.id if current_user.is_authenticated else None,
+                'created_by_name': current_user.display_name if current_user.is_authenticated else 'Admin'
+            }
+            short_exam_id = str(exam_data['id'])[:8].replace('-','')
+            # Handle image upload if present
+            image_list = []
+            images = request.files.getlist('lab_image')
+
+            if images and images[0].filename:
+                folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
+                os.makedirs(folder, exist_ok=True)
+
+                for idx, image_file in enumerate(images, start=1):
+                    if image_file and image_file.filename:
+                        safe_name = secure_filename(image_file.filename)
+                        ext = os.path.splitext(safe_name)[1].lower()
+                        new_name = f"{patient.get('phone')}_{exam_date}_image_{idx}{ext}"
+                        image_path = os.path.join(folder, new_name)
+
+                        # Resize
+                        img = Image.open(image_file)
+                        img.thumbnail(MAX_SIZE, Image.Resampling.LANCZOS)
+                        
+                        # Save to buffer to check size
+                        buffer = io.BytesIO()
+                        img.save(buffer, format=img.format or "JPEG", optimize=True, quality=85)
+                        
+                        # If too large, reduce quality
+                        if buffer.tell() > MAX_FILE_SIZE:
+                            buffer = io.BytesIO()
+                            img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
+                        
+                        # Write to disk
+                        with open(image_path, "wb") as f:
+                            f.write(buffer.getvalue())
+                        
+                        image_list.append({
+                            "filename": new_name,
+                            "path": image_path
+                        })
+            
+            if image_list:    
+                exam_data['images'] = image_list
+                
+            # Append to patient's exams list
+            exams = patient.get("exams", [])
+            exams.append(exam_data)
+
+            # Update the patient document in TinyDB
+            update_fields = {
+                "exams": exams,
+                "last_visit": exam_date
+            }
+            # persist package changes too
+            if patient_packages is not None:
+                update_fields["packages"] = patient_packages
+            Patients_db.update(update_fields, doc_ids=[patient.doc_id])
+
+            return jsonify({
+                "status": "success",
+                "message": "Dữ liệu được lưu thành công",
+                "redirect_url": url_for('exam.edit_exam', exam_id=exam_data['id']),
+                "exam_id": exam_data['id'],
+                "patient_id": patient_id
+            })
+        except Exception as e:
+            import traceback
+            print(f"[DEBUG] Error in new_exam POST: {e}")
+            traceback.print_exc()
+            return jsonify({"status": "error", "message": str(e)}), 500
 
 
     return render_template(
@@ -483,7 +465,13 @@ def api_generate_files():
     )
     
     if pdf_result.get('success'):
-         return jsonify({"status": "success"})
+         filename = pdf_result.get('filename')
+         pdf_url = url_for('serve_pdf', filename=f"{filename}.pdf")
+         return jsonify({
+             "status": "success", 
+             "pdf_url": pdf_url,
+             "filename": filename
+         })
     else:
          return jsonify({"status": "error", "message": pdf_result.get('error')}), 500
 
@@ -518,6 +506,58 @@ def api_send_discord():
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@exam_bp.route('/preview_print', methods=['POST'])
+@login_required
+def preview_print():
+    """
+    Generate an HTML preview of the exam for printing.
+    Expects JSON data: {
+        'patient_id': ...,
+        'exam_date': ...,
+        'weight': ...,
+        'height': ...,
+        'history': ...,
+        'expected_date': ...,
+        'drugs': [...],
+        'services': [...],
+        'total_money': ...,
+        'department': ...,
+        'created_by_name': ...
+    }
+    """
+    data = request.json
+    if not data:
+        return "No data provided", 400
+    
+    patient_id = data.get('patient_id')
+    results = Patients_db.search(Query().id == patient_id)
+    if not results:
+         return "Patient not found", 404
+    patient = results[0]
+    
+    # Construct a temporary exam object for rendering
+    exam_data = {
+        'exam_date': data.get('exam_date'),
+        'weight': data.get('weight'),
+        'height': data.get('height'),
+        'history': data.get('history'),
+        'expected_date': data.get('expected_date'),
+        'drugs': data.get('drugs', []),
+        'services': data.get('services', []),
+        'total_money': data.get('total_money', 0),
+        'submit_time': datetime.now().strftime('%y%m%d%H%M%S'),
+    }
+    
+    # Get doctor name and department from payload or current user
+    doctor_name = data.get('created_by_name') or (current_user.display_name if current_user.is_authenticated else 'Admin')
+    department = data.get('department') or (current_user.department if current_user.is_authenticated else 'Nhi khoa')
+
+    # Reuse build_exam_html from pdf_generator for identical layout
+    from utils.pdf_generator import build_exam_html
+    html_content = build_exam_html(patient, exam_data, doctor_name=doctor_name, department=department)
+    
+    return html_content
 
 # NOTE: Delete
 @exam_bp.route("/exam/delete_exam/<exam_id>", methods=["POST"])

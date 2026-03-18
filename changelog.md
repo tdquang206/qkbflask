@@ -1,3 +1,39 @@
+# Version 0.11.260318 (2026-03-18)
+==================================================
+
+## Project Analysis & Summary
+- Revamped homepage into a **mobile-first omni-search** dashboard.
+- Refactored `app.py` to remove inline route handlers — all logic now lives in blueprints/utilities.
+- v0.10 skipped (unreleased iteration).
+
+## New Features
+- **Omni-search (`/api/omni-search`)**:
+  - Single search bar on the homepage queries patients, exams, drugs, and purchase orders simultaneously.
+  - Live search: triggers after 3 characters with a 500 ms debounce; Enter bypasses the debounce.
+  - Fuzzy matching via `rapidfuzz` (`partial_ratio` + `token_set_ratio`) with Vietnamese diacritic normalisation.
+  - Results are grouped by record type, each card showing a compact preview with relevant fields.
+  - Patient cards include: name, child name, phone, address, last visit, and most-recent exam snippet.
+  - Drug cards include: sell price, cost price, inventory, and 3 latest purchase records.
+  - Exam cards include: date, patient identifiers, history snippet, and prescribed drug names.
+  - Purchase cards include: date, paid status, total cost, item count, and drug list snippet.
+  - Each card has a direct action button; a soft note reminds users that full editing is easier on PC.
+- **Homepage redesign**:
+  - Removed old two-column menu layout.
+  - New single-column hero section with search panel, scope tags, and live status indicator.
+
+## Refactoring
+- **`routes/core.py`** (new Blueprint):
+  - Moved global `before_app_request` login guard and `after_app_request` backup/audit hook out of `app.py`.
+  - Moved `GET /`, `GET /exams`, `GET /uploads/<filename>`, `GET /files/pdf/<filename>` routes here.
+  - Added `GET /api/omni-search` endpoint (thin wrapper around `utils/omni_search.py`).
+- **`utils/omni_search.py`** (new utility module):
+  - All search logic: text normalisation, digit-only comparison, tiered scoring, per-table searchers, purchase-history pre-computation.
+  - Keeps the route handler to a one-liner; can be unit-tested independently.
+- **`static/omni_search.js`** (new, offline):
+  - Debounced live search, AbortController to cancel stale requests, HTML escaping for XSS safety, grouped result rendering.
+- **`static/style.css`**:
+  - Appended homepage/search CSS (hero section, search bar, result cards, chips, loading dots, mobile overrides).
+
 # Version 0.9.260307 (2026-03-07)
 ==================================================
 

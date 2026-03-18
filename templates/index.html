@@ -1,29 +1,54 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="section">
-        <div class="container">
-            <div class="columns">
-                <!-- Left Column: Menu -->
-                <div class="column is-one-quarter">
-                    <aside class="menu">
-                        <p class="menu-label">Menu</p>
-                        <ul class="menu-list">
-                            <li><a href="#">Dashboard</a></li>
-                            <li><a href="/patients">Danh sách BN</a></li>
-                            <li><a href="#">Lịch hẹn</a></li>
-                            <li><a href="/drugs">Thuốc</a></li>
-                        </ul>
-                    </aside>
-                </div>
 
-                <!-- Right Column: Content -->
-                <div class="column">
-                    <div class="box">
-                        <h1 class="title">Welcome to Clinic EMR</h1>
-                        <p>This area is blank for now. You can add forms, charts, or patient data here later.</p>
-                    </div>
-                </div>
+<script src="{{ url_for('static', filename='omni_search.js') }}" defer></script>
+
+<div class="search-hero">
+    <span class="hero-kicker">Omni Search — tra cứu nhanh</span>
+    <h1 class="title hero-title">Tìm bệnh nhân, toa khám, thuốc và phiếu mua.</h1>
+    <p class="hero-copy">
+        Gõ từ 3 ký tự để tìm đồng thời trong bệnh nhân, toa khám, thuốc và mua thuốc.
+        Trang này ưu tiên xem nhanh trên điện thoại, thao tác chi tiết thuận tiện hơn trên PC.
+    </p>
+
+    <div class="search-panel">
+        <label class="search-input-wrap" for="omniSearchInput">
+            <input
+                id="omniSearchInput"
+                class="input"
+                type="search"
+                autocomplete="off"
+                placeholder="Tên phụ huynh, số điện thoại, địa chỉ, tên thuốc, mã toa..."
+            >
+        </label>
+
+        <div class="search-bar-footer">
+            <div class="search-scope-tags">
+                <span class="search-scope-tag">Bệnh nhân</span>
+                <span class="search-scope-tag">Toa khám</span>
+                <span class="search-scope-tag">Thuốc</span>
+                <span class="search-scope-tag">Mua thuốc</span>
             </div>
+            <div id="searchStatus">Live search sau 3 ký tự, delay 500ms.</div>
         </div>
-</section>
+    </div>
+</div>
+
+<div class="search-results" style="margin-top:1.25rem;">
+    <div id="resultsSummary" class="search-summary" hidden>
+        <div id="resultsHeadline"></div>
+    </div>
+
+    <div id="loadingState" class="search-loading" hidden>
+        Đang tra cứu toàn bộ dữ liệu
+        <span class="loading-pulse"><span></span><span></span><span></span></span>
+    </div>
+
+    <div id="emptyState" class="search-empty">
+        Nhập ít nhất 3 ký tự để bắt đầu tra cứu nhanh.
+    </div>
+
+    <div id="resultsGrid"></div>
+</div>
+
 {% endblock %}

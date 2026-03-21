@@ -2,6 +2,29 @@
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
+<style>
+  .drug-price-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 72px;
+    z-index: 30;
+    border-radius: 999px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  @media (max-width: 768px) {
+    .drug-price-toggle {
+      right: 12px;
+      bottom: 64px;
+      width: 44px;
+      height: 44px;
+    }
+  }
+</style>
+
 <section class="section">
   <form id="examForm" action="{{ url_for('exam.edit_exam', exam_id=exam.id) }}" method="POST"
     onsubmit="calculateTotals()">
@@ -241,7 +264,7 @@
               <th>Tên thuốc</th>
               <th>Số lượng</th>
               <th>Ghi chú</th>
-              <th hidden>Giá phụ</th>
+              <th class="drug-price-col" hidden>Giá</th>
               <th>Hành động</th>
             </tr>
           </thead>
@@ -262,7 +285,7 @@
                 {{ d.note }}
                 <input type="hidden" name="drug_note" value="{{ d.note }}">
               </td>
-              <td hidden>
+              <td class="drug-price-col" hidden>
                 {{ d.price }}
                 <input type="hidden" name="drug_price" value="{{ d.price }}">
               </td>
@@ -397,6 +420,41 @@
   </form>
 </section>
 
+<button type="button" class="button is-warning drug-price-toggle" id="drugPriceToggleBtn" title="Hiện giá thuốc">
+  <span class="icon"><i class="fas fa-eye"></i></span>
+</button>
+
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const toggleBtn = document.getElementById("drugPriceToggleBtn");
+    if (!toggleBtn) return;
+
+    const icon = toggleBtn.querySelector("i");
+    let isVisible = false;
+
+    window.applyDrugPriceVisibility = function (visible) {
+      document.querySelectorAll(".drug-price-col").forEach((cell) => {
+        cell.hidden = !visible;
+      });
+      if (icon) {
+        icon.classList.toggle("fa-eye", !visible);
+        icon.classList.toggle("fa-eye-slash", visible);
+      }
+      toggleBtn.classList.toggle("is-warning", !visible);
+      toggleBtn.classList.toggle("is-dark", visible);
+      toggleBtn.title = visible ? "Ẩn giá thuốc" : "Hiện giá thuốc";
+      document.body.dataset.drugPricesVisible = visible ? "1" : "0";
+    };
+
+    toggleBtn.addEventListener("click", () => {
+      isVisible = !isVisible;
+      window.applyDrugPriceVisibility(isVisible);
+    });
+
+    window.applyDrugPriceVisibility(false);
+  });
+</script>
 
 <script>
   function calculateTotals() {
@@ -934,13 +992,16 @@
       ${note}
       <input type="hidden" name="drug_note" value="${note}">
     </td>
-    <td hidden>
+    <td class="drug-price-col" hidden>
       ${price}
       <input type="hidden" name="drug_price" value="${price}">
     </td>
     <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
   `;
       tableBody.appendChild(row);
+      if (window.applyDrugPriceVisibility) {
+        window.applyDrugPriceVisibility(document.body.dataset.drugPricesVisible === "1");
+      }
       updateRowNumbers();
       calculateTotals();
 

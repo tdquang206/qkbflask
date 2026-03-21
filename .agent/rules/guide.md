@@ -12,5 +12,6 @@ trigger: always_on
 - do not add long <script> or <style> to html file
 - add encoding='utf-8' or similar param when possible
 - make sure to comment on non-trivial code
+- make sure to not break existing api
 - add function to new files, do not add directly to app.py
 - for debug files, put them inside debug folder, and use load_dotenv()

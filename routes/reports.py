@@ -195,7 +195,7 @@ def drug_sold():
 
 @reports_bp.route('/money_flow')
 def money_flow():
-    """Show a simple ledger of money received entries."""
+    """Show combined money in/out ledger entries."""
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
@@ -212,7 +212,26 @@ def money_flow():
     start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
     end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
 
-    # load all logs and filter by date portion
+    # Build patient lookup once for friendly display text.
+    patient_map = {}
+    for p in patients.all():
+        p_id = p.get('id')
+        if p_id:
+            patient_map[p_id] = p
+
+    def patient_display(patient_id):
+        if not patient_id:
+            return '-'
+        p = patient_map.get(patient_id)
+        if not p:
+            return patient_id
+        kid_name = p.get('kid_name') or 'Chưa có tên'
+        parent_name = p.get('name') or '-'
+        phone = p.get('phone') or '-'
+        address = p.get('address') or '-'
+        return f"Bé {kid_name} --- {parent_name} --- {phone} --- {address}"
+
+    # Money in entries from payment logs.
     entries = []
     for log in money_log_table.all():
         ts = log.get('timestamp')
@@ -227,23 +246,85 @@ def money_flow():
             continue
         if end and log_dt.date() > end.date():
             continue
+        amount = log.get('amount', 0)
+        try:
+            amount = int(float(amount or 0))
+        except Exception:
+            amount = 0
         entries.append({
-            'timestamp': ts,
-            'amount': log.get('amount', 0),
+            'timestamp_raw': log_dt,
+            'timestamp': log_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            'money_in': amount,
+            'money_out': 0,
             'exam_id': log.get('exam_id'),
-            'patient_id': log.get('patient_id'),
-            'user': log.get('user')
+            'patient': patient_display(log.get('patient_id')),
+            'user': log.get('user'),
+            'note': log.get('note') or ''
+        })
+
+    # Money out entries from /mua_thuoc purchases.
+    # We only include purchases marked as paid to reflect actual cash outflow.
+    try:
+        from routes.mua_thuoc import purchases_table
+        all_purchases = purchases_table.all()
+    except Exception:
+        all_purchases = []
+
+    for purchase in all_purchases:
+        if not purchase.get('paid'):
+            continue
+
+        date_buy = purchase.get('date_buy')
+        if not date_buy:
+            continue
+
+        try:
+            buy_dt = datetime.strptime(date_buy, "%Y-%m-%d")
+        except Exception:
+            continue
+
+        if start and buy_dt.date() < start.date():
+            continue
+        if end and buy_dt.date() > end.date():
+            continue
+
+        submit_time = str(purchase.get('submit_time') or '')
+        hh = mm = ss = '00'
+        if len(submit_time) >= 12:
+            hh = submit_time[6:8]
+            mm = submit_time[8:10]
+            ss = submit_time[10:12]
+
+        timestamp_text = f"{date_buy} {hh}:{mm}:{ss}"
+
+        total_cost = purchase.get('total_cost', 0)
+        try:
+            total_cost = int(float(total_cost or 0))
+        except Exception:
+            total_cost = 0
+
+        entries.append({
+            'timestamp_raw': datetime.strptime(timestamp_text, '%Y-%m-%d %H:%M:%S'),
+            'timestamp': timestamp_text,
+            'money_in': 0,
+            'money_out': total_cost,
+            'exam_id': '-',
+            'patient': '-',
+            'user': '-',
+            'note': purchase.get('note') or ''
         })
 
     # sort newest first
-    entries.sort(key=lambda x: x['timestamp'], reverse=True)
+    entries.sort(key=lambda x: x['timestamp_raw'], reverse=True)
 
-    total = sum([e['amount'] for e in entries])
+    total_in = sum(e['money_in'] for e in entries)
+    total_out = sum(e['money_out'] for e in entries)
 
     return render_template(
         'money_flow.html',
         entries=entries,
-        total=total,
+        total_in=total_in,
+        total_out=total_out,
         start_date=start_date,
         end_date=end_date
     )

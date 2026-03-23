@@ -402,11 +402,17 @@
 
   function filterTable() {
     const input = document.getElementById("searchInput").value.toLowerCase();
-    const rows = Array.from(document.querySelectorAll("#drugTable tbody tr"));
+    const tbody = document.querySelector("#drugTable > tbody");
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll(":scope > tr"));
 
     // Collect matches with scores
     const scoredRows = rows.map(row => {
-      const name = row.cells[1].textContent.toLowerCase();
+      const nameCell = row.cells[1];
+      if (!nameCell) {
+        return { row, score: 0, label: "" };
+      }
+      const name = nameCell.textContent.toLowerCase();
 
       let score = 0;
 
@@ -425,13 +431,10 @@
     scoredRows.sort((a, b) => b.score - a.score);
 
     // Re-append rows in sorted order
-    const tbody = document.querySelector("#drugTable tbody");
     scoredRows.forEach(({ row, score }) => {
       row.style.display = score > 0.5 ? "" : "none"; // hide weak matches
       tbody.appendChild(row); // reorder in DOM
     });
-    // debug what happen
-    console.table(scoredRows.map(r => ({ name: r.label, score: r.score })));
   }
 
   // **NEW** - Logic for Modal and Auto SKU Generation

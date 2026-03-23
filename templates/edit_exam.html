@@ -609,7 +609,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      return await res.json();
+      let body = {};
+      try {
+        body = await res.json();
+      } catch (_) {
+        body = {};
+      }
+      return {
+        ok: res.ok,
+        statusCode: res.status,
+        body
+      };
     }
 
     form.addEventListener("submit", async function (e) {
@@ -622,8 +632,8 @@
       modal.classList.add("is-active");
       errorMsg.classList.add("is-hidden");
       updateStatus("stepSave", "working");
-      updateStatus("stepPdf", "⏳");
-      updateStatus("stepDiscord", "⏳");
+      updateStatus("stepPdf", "working");
+      updateStatus("stepDiscord", "working");
 
       try {
         // STEP 1: Save Data
@@ -648,18 +658,25 @@
         updateStatus("stepPdf", "working");
         try {
           const res2 = await callStep('/api/exam/generate_files', payload);
-          if (res2.status === 'success') {
+          const step2Ok = res2.ok && (res2.body.status === 'success' || res2.body.success === true);
+          if (step2Ok) {
             updateStatus("stepPdf", "success");
-            if (res2.pdf_url) {
-              currentPdfUrl = res2.pdf_url;
+            if (res2.body.pdf_url) {
+              currentPdfUrl = res2.body.pdf_url;
             }
           } else {
             console.error(res2);
+            if (res2.body && res2.body.message) {
+              errorMsg.textContent = res2.body.message;
+              errorMsg.classList.remove("is-hidden");
+            }
             updateStatus("stepPdf", "error");
           }
 
         } catch (errPdf) {
           console.error(errPdf);
+          errorMsg.textContent = errPdf.message || 'Lỗi không xác định khi tạo PDF/JPEG';
+          errorMsg.classList.remove("is-hidden");
           updateStatus("stepPdf", "error");
         }
 
@@ -669,7 +686,8 @@
           updateStatus("stepDiscord", "working");
           try {
             const res3 = await callStep('/api/exam/send_discord', payload);
-            if (res3.status === 'success') {
+            const step3Ok = res3.ok && (res3.body.status === 'success' || res3.body.success === true);
+            if (step3Ok) {
               updateStatus("stepDiscord", "success");
             } else {
               console.error(res3);

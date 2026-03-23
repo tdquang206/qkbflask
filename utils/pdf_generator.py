@@ -1,4 +1,5 @@
 from utils.template_renderer import render_exam_html
+from utils.error_logger import append_error_log
 import os
 
 # generate filename for pdf and jpeg on server
@@ -102,6 +103,15 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
     
     except Exception as e:
         print(f"❌ Error generating PDF: {e}")
+        append_error_log(
+            'PDF generation failed',
+            str(e),
+            {
+                'phone': phone,
+                'exam_date': exam_date,
+                'short_exam_id': short_exam_id,
+            }
+        )
         return {
             "success": False,
             "error": str(e)

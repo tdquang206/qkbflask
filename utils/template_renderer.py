@@ -4,6 +4,22 @@ from datetime import datetime
 
 TEMPLATE_FILE = 'exam_template.json'
 
+def _to_number(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip().replace(',', '')
+        if text == '':
+            return default
+        return float(text)
+    except Exception:
+        return default
+
+def _format_currency(value):
+    return f"{_to_number(value):,.0f}"
+
 def load_exam_template(department=None):
     """Load the exam template from file, optionally for a specific department"""
     if not os.path.exists(TEMPLATE_FILE):
@@ -127,17 +143,18 @@ def build_service_rows_markdown(services, row_template=None):
 
     rows = []
     for idx, service in enumerate(services, 1):
+        price_text = f"{_format_currency(service.get('price', 0))} VND"
         try:
             rows.append(row_template.format(
                 index=idx,
                 name=service.get('name', ''),
                 quantity=service.get('quantity', ''),
-                price=f"{service.get('price', 0):,.0f} VND",
+                price=price_text,
                 prepaid_status=service.get('prepaid_status', ''),
             ))
         except Exception:
             # If formatting fails, fall back to simple row
-            rows.append(f"| {idx} | {service.get('name', '')} | {service.get('quantity', '')} | {service.get('price', 0):,.0f} VND | {service.get('prepaid_status', '')} |")
+            rows.append(f"| {idx} | {service.get('name', '')} | {service.get('quantity', '')} | {price_text} | {service.get('prepaid_status', '')} |")
     return "\n".join(rows)
 
 def build_drug_rows_html(drugs):
@@ -174,12 +191,13 @@ def build_service_rows_html(services, show_quantities=False, show_prepaid=False)
     for idx, service in enumerate(services, 1):
         quantity = service.get('quantity', 1)
         prepaid_status = service.get('prepaid_status', '')
+        price_text = f"{_format_currency(service.get('price', 0))} VND"
         
         rows += f"<tr><td>{idx}</td>"
         if show_quantities:
             rows += f"<td>{quantity}</td>"
         rows += f"<td>{service['name']}</td>"
-        rows += f'<td class="text-right">{"{:,.0f}".format(service["price"])} VND</td>'
+        rows += f'<td class="text-right">{price_text}</td>'
         if show_prepaid and prepaid_status:
             rows += f"<td>{prepaid_status}</td>"
         rows += "</tr>"
@@ -234,7 +252,7 @@ def render_exam_markdown(patient, exam_data, doctor_name=None, custom_template=N
         'expected_date': exam_data.get('expected_date', ''),
         'drug_rows': drug_rows,
         'service_rows': service_rows,
-        'total_money': f"{exam_data.get('total_money', 0):,.0f}",
+        'total_money': _format_currency(exam_data.get('total_money', 0)),
         'doctor_name': doctor_name,
         'footer_code': footer_code
     }

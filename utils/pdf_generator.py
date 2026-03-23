@@ -1,14 +1,24 @@
 from utils.template_renderer import render_exam_html
 from utils.error_logger import append_error_log
 import os
+import re
+
+
+def _safe_path_segment(value, fallback="x"):
+    text = str(value or "").strip()
+    text = text.replace("/", "_").replace("\\", "_")
+    text = re.sub(r"[^A-Za-z0-9._-]+", "_", text)
+    text = text.strip("._-")
+    return text or fallback
 
 # generate filename for pdf and jpeg on server
 def generate_exam_file_name(phone, exam_date, exam_id):
     # phone_date_hex[:8]
-    random_part = str(exam_id)[:8].replace('-', '')
-    date_str = str(exam_date).replace('-', '')  # ✅ Renamed for clarity
-    
-    return f"{phone}_{date_str}_{random_part}"
+    random_part = _safe_path_segment(str(exam_id)[:8].replace('-', ''), fallback="id")
+    date_str = re.sub(r"[^0-9]", "", str(exam_date)) or "date"
+    phone_str = _safe_path_segment(phone, fallback="phone")
+
+    return f"{phone_str}_{date_str}_{random_part}"
 
 def build_exam_html(patient, exam_data, doctor_name=None, department=None):
     # Use template renderer for consistent HTML output

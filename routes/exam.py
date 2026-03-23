@@ -20,6 +20,27 @@ from shared_db import db, patients_table as Patients_db, services_table
 MAX_SIZE = (2000, 2000)
 MAX_FILE_SIZE = 1 * 1024 * 1024
 SETTINGS_FILE = 'user_settings.json'
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+
+
+def _json_server_error(message='Đã có lỗi hệ thống, vui lòng thử lại sau.'):
+    return jsonify({"status": "error", "message": message}), 500
+
+
+def _safe_patient_image_folder(phone):
+    safe_phone = secure_filename(str(phone or 'unknown')) or 'unknown'
+    folder = os.path.join('uploads', 'patient_image', safe_phone)
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def _is_allowed_image_ext(ext):
+    return ext in ALLOWED_IMAGE_EXTENSIONS
+
+
+def _safe_filename_token(value, fallback='x'):
+    token = secure_filename(str(value or '')).strip('._')
+    return token or fallback
 
 def _to_float(value, default=0.0):
     try:
@@ -209,9 +230,34 @@ def edit_exam(exam_id):
 
             image = request.files.get('lab_image')
             if image and image.filename:
-                filename = secure_filename(image.filename)
-                image_path = os.path.join('uploads', filename)
-                image.save(image_path)
+                safe_name = secure_filename(image.filename)
+                ext = os.path.splitext(safe_name)[1].lower()
+                if not _is_allowed_image_ext(ext):
+                    return jsonify({"status": "error", "message": "Định dạng ảnh không hợp lệ"}), 400
+
+                try:
+                    # Validate that the uploaded file is a real image
+                    image.stream.seek(0)
+                    pil_image = Image.open(image.stream)
+                    pil_image.verify()
+                    # Re-open after verify() to get a usable image object
+                    image.stream.seek(0)
+                    pil_image = Image.open(image.stream)
+                except Exception:
+                    return jsonify({"status": "error", "message": "File ảnh không hợp lệ"}), 400
+
+                folder = _safe_patient_image_folder(patient_found.get('phone'))
+                patient_token = _safe_filename_token(patient_found.get('phone'), fallback='patient')
+                date_token = _safe_filename_token(exam_date, fallback='date')
+                filename = f"{patient_token}_{date_token}_image_1{ext}"
+                image_path = os.path.join(folder, filename)
+
+                # Save processed/validated image to disk
+                save_format = pil_image.format or None
+                if save_format is not None:
+                    pil_image.save(image_path, format=save_format)
+                else:
+                    pil_image.save(image_path)
                 exam_data['image_path'] = image_path
 
             exams = patient_found.get("exams", [])
@@ -254,7 +300,7 @@ def edit_exam(exam_id):
                     'exam_date': request.form.get('exam_date'),
                 }
             )
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return _json_server_error('Không thể cập nhật toa khám lúc này.')
 
 # NOTE: Create
 # Create new exam
@@ -345,16 +391,18 @@ def new_exam(patient_id):
             image_list = []
             images = request.files.getlist('lab_image')
             if images and images[0].filename:
-                folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
-                os.makedirs(folder, exist_ok=True)
-                folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
-                os.makedirs(folder, exist_ok=True)
+                folder = _safe_patient_image_folder(patient.get('phone'))
+                patient_token = _safe_filename_token(patient.get('phone'), fallback='patient')
+                date_token = _safe_filename_token(exam_date, fallback='date')
 
                 for idx, image_file in enumerate(images, start=1):
                     if image_file and image_file.filename:
                         safe_name = secure_filename(image_file.filename)
                         ext = os.path.splitext(safe_name)[1].lower()
-                        new_name = f"{patient.get('phone')}_{exam_date}_image_{idx}{ext}"
+                        if not _is_allowed_image_ext(ext):
+                            return jsonify({"status": "error", "message": "Định dạng ảnh không hợp lệ"}), 400
+
+                        new_name = f"{patient_token}_{date_token}_image_{idx}{ext}"
                         image_path = os.path.join(folder, new_name)
 
                         img = Image.open(image_file)
@@ -406,7 +454,7 @@ def new_exam(patient_id):
                     'exam_date': request.form.get('exam_date'),
                 }
             )
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return _json_server_error('Không thể tạo toa khám lúc này.')
 
 
     return render_template(
@@ -491,7 +539,7 @@ def api_generate_files():
         return jsonify({
             "status": "error",
             "success": False,
-            "message": str(e)
+            "message": "Không thể tạo file toa khám lúc này."
         }), 500
 
 
@@ -533,7 +581,7 @@ def api_send_discord():
                 'exam_id': exam_id,
             }
         )
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _json_server_error('Không thể gửi Discord lúc này.')
 
 # NOTE: Delete
 @exam_bp.route("/exam/delete_exam/<exam_id>", methods=["POST"])
@@ -583,7 +631,7 @@ def delete_exam(exam_id):
                 'exam_id': exam_id,
             }
         )
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _json_server_error('Không thể xóa toa khám lúc này.')
 
 # NOTE: Upload images to existing exam
 @exam_bp.route('/exam/<patient_id>/<exam_id>/upload_images', methods=['POST'])
@@ -609,8 +657,9 @@ def upload_images(patient_id, exam_id):
         images = request.files.getlist('lab_image')
         image_list = []
 
-        folder = os.path.join('uploads', 'patient_image', patient.get('phone'))
-        os.makedirs(folder, exist_ok=True)
+        folder = _safe_patient_image_folder(patient.get('phone'))
+        patient_token = _safe_filename_token(patient.get('phone'), fallback='patient')
+        date_token = _safe_filename_token(exam_date, fallback='date')
 
         existing_images = exam_found.get('images', [])
         start_idx = len(existing_images) + 1
@@ -619,7 +668,10 @@ def upload_images(patient_id, exam_id):
             if image and image.filename:
                 safe_name = secure_filename(image.filename)
                 ext = os.path.splitext(safe_name)[1].lower()
-                new_name = f"{patient.get('phone')}_{exam_date}_image_{idx}{ext}"
+                if not _is_allowed_image_ext(ext):
+                    return jsonify({"status": "error", "message": "Định dạng ảnh không hợp lệ"}), 400
+
+                new_name = f"{patient_token}_{date_token}_image_{idx}{ext}"
                 image_path = os.path.join(folder, new_name)
 
                 img = Image.open(image)
@@ -656,12 +708,16 @@ def upload_images(patient_id, exam_id):
                 'exam_id': exam_id,
             }
         )
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _json_server_error('Không thể tải ảnh lên lúc này.')
 
 # NOTE: Delete image from exam
 @exam_bp.route('/exam/<patient_id>/<exam_id>/delete_image/<filename>', methods=['DELETE'])
 def delete_exam_image(patient_id, exam_id, filename):
     try:
+        safe_route_filename = secure_filename(filename)
+        if not safe_route_filename or safe_route_filename != filename:
+            return jsonify({"status": "error", "message": "Invalid filename"}), 400
+
         results = Patients_db.search(Query().id == patient_id)
         if not results:
             return jsonify({"status": "error", "message": "Patient not found"}), 404
@@ -680,21 +736,27 @@ def delete_exam_image(patient_id, exam_id, filename):
         current_images = exams[exam_index].get('images', [])
         image_to_remove = None
         for img in current_images:
-            if img.get('filename') == filename:
+            if img.get('filename') == safe_route_filename:
                 image_to_remove = img
                 break
         
         if not image_to_remove:
             return jsonify({"status": "error", "message": "Image not found in exam"}), 404
         
-        new_images = [img for img in current_images if img.get('filename') != filename]
+        new_images = [img for img in current_images if img.get('filename') != safe_route_filename]
         exams[exam_index]['images'] = new_images
         
         try:
-            if os.path.exists(image_to_remove['path']):
-                os.remove(image_to_remove['path'])
+            patient_folder = _safe_patient_image_folder(patient.get('phone'))
+            candidate_path = os.path.abspath(os.path.join(patient_folder, safe_route_filename))
+            patient_folder_abs = os.path.abspath(patient_folder)
+            if not (candidate_path == patient_folder_abs or candidate_path.startswith(patient_folder_abs + os.sep)):
+                return jsonify({"status": "error", "message": "Invalid file path"}), 400
+
+            if os.path.exists(candidate_path):
+                os.remove(candidate_path)
             else:
-                 print(f"File not found on disk: {image_to_remove['path']}")
+                 print(f"File not found on disk: {candidate_path}")
         except Exception as e:
             print(f"Error deleting file: {e}")
         
@@ -709,7 +771,7 @@ def delete_exam_image(patient_id, exam_id, filename):
                 'route': '/exam/<patient_id>/<exam_id>/delete_image/<filename>',
                 'patient_id': patient_id,
                 'exam_id': exam_id,
-                'filename': filename,
+                'filename': safe_route_filename if 'safe_route_filename' in locals() else filename,
             }
         )
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _json_server_error('Không thể xóa ảnh lúc này.')

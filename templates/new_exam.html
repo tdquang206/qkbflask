@@ -794,6 +794,14 @@
       });
     }
 
+    function appendHiddenInput(parent, inputName, inputValue) {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = inputName;
+      hidden.value = String(inputValue ?? "");
+      parent.appendChild(hidden);
+    }
+
     addServiceBtn.addEventListener("click", () => {
       const sid = serviceSelect.value;
       if (!sid) return;
@@ -804,20 +812,30 @@
       const row = document.createElement("tr");
       row.dataset.price = price;
       row.dataset.serviceId = sid;
-      row.innerHTML = `
-    <td></td>
-    <td>
-      ${name}
-      <input type="hidden" name="service_name" value="${name}">
-      <input type="hidden" name="service_id" value="${sid}">
-    </td>
-    <td class="has-text-right">
-      ${price}
-      <input type="hidden" name="service_price" value="${price}">
-    </td>
-    <td>
-      <button type="button" class="button is-small is-danger removeServiceRow">X</button>
-    </td>`;
+
+      const indexCell = document.createElement("td");
+      const nameCell = document.createElement("td");
+      const priceCell = document.createElement("td");
+      const actionCell = document.createElement("td");
+      const removeBtn = document.createElement("button");
+
+      nameCell.textContent = name;
+      appendHiddenInput(nameCell, "service_name", name);
+      appendHiddenInput(nameCell, "service_id", sid);
+
+      priceCell.className = "has-text-right";
+      priceCell.textContent = String(price);
+      appendHiddenInput(priceCell, "service_price", price);
+
+      removeBtn.type = "button";
+      removeBtn.className = "button is-small is-danger removeServiceRow";
+      removeBtn.textContent = "X";
+      actionCell.appendChild(removeBtn);
+
+      row.appendChild(indexCell);
+      row.appendChild(nameCell);
+      row.appendChild(priceCell);
+      row.appendChild(actionCell);
       serviceTableBody.appendChild(row);
       updateServiceRowNumbers();
       calculateTotals();
@@ -857,26 +875,40 @@
 
       const row = document.createElement("tr");
       row.dataset.price = price;
-      row.innerHTML = `
-    <td></td>
-    <td>
-      ${name}
-      <input type="hidden" name="drug_name" value="${name}">
-    </td>
-    <td class="quantity">
-      ${qty}
-      <input type="hidden" name="drug_quantity" value="${qty}">
-    </td>
-    <td>
-      ${note}
-      <input type="hidden" name="drug_note" value="${note}">
-    </td>
-    <td hidden>
-      ${price}
-      <input type="hidden" name="drug_price" value="${price}">
-    </td>
-    <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
-  `;
+
+      const indexCell = document.createElement("td");
+      const nameCell = document.createElement("td");
+      const quantityCell = document.createElement("td");
+      const noteCell = document.createElement("td");
+      const priceCell = document.createElement("td");
+      const actionCell = document.createElement("td");
+      const removeBtn = document.createElement("button");
+
+      nameCell.textContent = name;
+      appendHiddenInput(nameCell, "drug_name", name);
+
+      quantityCell.className = "quantity";
+      quantityCell.textContent = String(qty);
+      appendHiddenInput(quantityCell, "drug_quantity", qty);
+
+      noteCell.textContent = note;
+      appendHiddenInput(noteCell, "drug_note", note);
+
+      priceCell.hidden = true;
+      priceCell.textContent = String(price);
+      appendHiddenInput(priceCell, "drug_price", price);
+
+      removeBtn.type = "button";
+      removeBtn.className = "button is-small is-danger removeRow";
+      removeBtn.textContent = "X";
+      actionCell.appendChild(removeBtn);
+
+      row.appendChild(indexCell);
+      row.appendChild(nameCell);
+      row.appendChild(quantityCell);
+      row.appendChild(noteCell);
+      row.appendChild(priceCell);
+      row.appendChild(actionCell);
       tableBody.appendChild(row);
       updateRowNumbers();
       calculateTotals();

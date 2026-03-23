@@ -6,7 +6,15 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.secret_key = os.getenv('SECRET_KEY', 'default_dev_key')
+
+secret_key = os.getenv('SECRET_KEY')
+if not secret_key:
+    # Use a per-process random secret instead of a fixed fallback value.
+    secret_key = os.urandom(32).hex()
+app.secret_key = secret_key
+
+# Security hardening: only enable debug when explicitly requested.
+app.config['DEBUG'] = os.getenv('FLASK_DEBUG', '0') == '1'
 
 # include blueprint
 from routes.core import core_bp

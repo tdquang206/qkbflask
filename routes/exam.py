@@ -235,12 +235,29 @@ def edit_exam(exam_id):
                 if not _is_allowed_image_ext(ext):
                     return jsonify({"status": "error", "message": "Định dạng ảnh không hợp lệ"}), 400
 
+                try:
+                    # Validate that the uploaded file is a real image
+                    image.stream.seek(0)
+                    pil_image = Image.open(image.stream)
+                    pil_image.verify()
+                    # Re-open after verify() to get a usable image object
+                    image.stream.seek(0)
+                    pil_image = Image.open(image.stream)
+                except Exception:
+                    return jsonify({"status": "error", "message": "File ảnh không hợp lệ"}), 400
+
                 folder = _safe_patient_image_folder(patient_found.get('phone'))
                 patient_token = _safe_filename_token(patient_found.get('phone'), fallback='patient')
                 date_token = _safe_filename_token(exam_date, fallback='date')
                 filename = f"{patient_token}_{date_token}_image_1{ext}"
                 image_path = os.path.join(folder, filename)
-                image.save(image_path)
+
+                # Save processed/validated image to disk
+                save_format = pil_image.format or None
+                if save_format is not None:
+                    pil_image.save(image_path, format=save_format)
+                else:
+                    pil_image.save(image_path)
                 exam_data['image_path'] = image_path
 
             exams = patient_found.get("exams", [])

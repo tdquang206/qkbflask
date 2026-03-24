@@ -63,13 +63,13 @@
 							<td class="is-vcentered has-text-right">
 								<div class="buttons is-right">
 									<button class="button is-small is-info is-light"
-										onclick="openDiffModal('{{ group.tag }}', '{{ group.timestamp }}', '{{ group.display_time }}')"
+										onclick="openDiffModal({{ group.tag|tojson }}, {{ group.timestamp|tojson }}, {{ group.display_time|tojson }})"
 										data-tag="{{ group.tag }}" data-ts="{{ group.timestamp }}">
 										<span class="icon"><i class="fas fa-code-branch"></i></span>
 										<span>Preview Diff</span>
 									</button>
 									<button class="button is-small is-danger is-light"
-										onclick="openRestoreConfirm('{{ group.tag }}', '{{ group.timestamp }}', '{{ group.display_time }}')">
+										onclick="openRestoreConfirm({{ group.tag|tojson }}, {{ group.timestamp|tojson }}, {{ group.display_time|tojson }})">
 										<span class="icon"><i class="fas fa-undo"></i></span>
 										<span>Restore</span>
 									</button>

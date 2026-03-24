@@ -6,7 +6,22 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.secret_key = os.getenv('SECRET_KEY', 'default_dev_key')
+
+# Determine debug mode once and reuse it for configuration decisions.
+is_debug = os.getenv('FLASK_DEBUG', '0') == '1'
+
+secret_key = os.getenv('SECRET_KEY')
+if not secret_key:
+    if is_debug:
+        # In debug mode, allow an ephemeral per-process secret key.
+        secret_key = os.urandom(32).hex()
+    else:
+        # In non-debug environments, require an explicit SECRET_KEY.
+        raise RuntimeError("SECRET_KEY environment variable must be set in non-debug environments.")
+app.secret_key = secret_key
+
+# Security hardening: only enable debug when explicitly requested.
+app.config['DEBUG'] = is_debug
 
 # include blueprint
 from routes.core import core_bp

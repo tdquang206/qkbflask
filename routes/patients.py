@@ -202,6 +202,7 @@ def _build_phone_rename_plan(patient_doc, old_phone, new_phone):
                     plan.append({
                         'kind': 'image',
                         'exam_id': exam_id,
+                        'image_idx': idx,  # original 1-based index in exam['images']
                         'old_name': os.path.basename(old_abs),
                         'new_name': os.path.basename(new_abs),
                         'old_abs': old_abs,
@@ -274,7 +275,6 @@ def _rename_patient_assets(patient_doc, old_phone, new_phone):
         return
 
     plan = _build_phone_rename_plan(patient_doc, old_phone, new_phone)
-    image_counter = {}
     for step in plan:
         kind = step.get('kind')
         old_abs = step.get('old_abs')
@@ -286,15 +286,14 @@ def _rename_patient_assets(patient_doc, old_phone, new_phone):
                 continue
 
             exam_id = step.get('exam_id')
-            if kind == 'image':
-                image_counter[exam_id] = image_counter.get(exam_id, 0) + 1
             for exam in exams:
                 if str(exam.get('id') or '') != exam_id:
                     continue
                 if kind == 'image':
-                    idx = image_counter[exam_id]
+                    # Use the original image index from the plan to avoid counter drift
+                    idx = step.get('image_idx')
                     images = exam.get('images', [])
-                    if idx <= len(images) and isinstance(images[idx - 1], dict):
+                    if idx and idx <= len(images) and isinstance(images[idx - 1], dict):
                         images[idx - 1]['filename'] = os.path.basename(new_abs)
                         images[idx - 1]['path'] = os.path.relpath(new_abs, _APP_ROOT)
                 else:

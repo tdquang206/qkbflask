@@ -306,12 +306,54 @@ def edit_exam_info():
 
 _ADM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ADM_CP_DIR = os.path.abspath(os.path.join(_ADM_ROOT, 'backups', 'checkpoints'))
+_ADM_BACKUP_DIR = os.path.abspath(os.path.join(_ADM_ROOT, 'backups'))
 _ADM_DB_FILES = ['db.json', 'db_services.json', 'money_log.json', 'db_mua_thuoc.json']
+_DB_BASE_TO_LIVE = {
+    'db': 'db.json',
+    'db_services': 'db_services.json',
+    'money_log': 'money_log.json',
+    'db_mua_thuoc': 'db_mua_thuoc.json',
+}
 _CP_FNAME_RE = re.compile(
     r'^(.+)_(\d{8}_\d{6})_(db\.json|db_services\.json|money_log\.json|db_mua_thuoc\.json)$'
 )
 _SAFE_TAG_RE = re.compile(r'^[\w][\w\-]{0,80}$')
 _SAFE_TS_RE = re.compile(r'^\d{8}_\d{6}$')
+_WEEKLY_BACKUP_RE = re.compile(r'^(db|db_services|money_log|db_mua_thuoc)_backup_(\d{4}_\d{2})\.json$')
+_WEEK_ID_RE = re.compile(r'^\d{4}_\d{2}$')
+_SAFE_FILENAME_RE = re.compile(r'^[A-Za-z0-9._-]+\.json$')
+
+
+def _format_timestamp(ts_text):
+    if not ts_text or len(ts_text) != 15:
+        return ts_text
+    return f"{ts_text[0:4]}-{ts_text[4:6]}-{ts_text[6:8]} {ts_text[9:11]}:{ts_text[11:13]}:{ts_text[13:15]}"
+
+
+def _infer_live_db_from_backup_name(fname):
+    for base, live_db in _DB_BASE_TO_LIVE.items():
+        if fname.startswith(base + '_') or fname == (base + '.json'):
+            return live_db
+    return None
+
+
+def _read_db_snapshot(path):
+    from utils.storage import decrypt_file
+
+    # Newer backups are encrypted; old migration backups may be plaintext JSON.
+    try:
+        return decrypt_file(path)
+    except Exception:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+
+def _write_live_db_snapshot(path, data):
+    from utils.storage import EncryptedJSONStorage
+
+    storage = EncryptedJSONStorage(path)
+    storage.write(data)
+    storage.close()
 
 
 def _list_checkpoint_groups():
@@ -326,11 +368,15 @@ def _list_checkpoint_groups():
         key = f"{tag}||{ts}"
         if key not in groups:
             groups[key] = {
+                'source': 'checkpoint',
+                'kind_label': 'Checkpoint',
+                'group_key': key,
                 'tag': tag,
                 'timestamp': ts,
-                'display_time': f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}",
+                'display_time': _format_timestamp(ts),
                 'files': [],
                 'key': key,
+                'sort_key': ts,
             }
         fpath = os.path.join(_ADM_CP_DIR, fname)
         groups[key]['files'].append({
@@ -338,7 +384,110 @@ def _list_checkpoint_groups():
             'filename': fname,
             'size': os.path.getsize(fpath),
         })
-    return sorted(groups.values(), key=lambda x: x['timestamp'], reverse=True)
+    return sorted(groups.values(), key=lambda x: x.get('sort_key', ''), reverse=True)
+
+
+def _list_regular_backup_groups():
+    if not os.path.exists(_ADM_BACKUP_DIR):
+        return []
+
+    weekly_groups = {}
+    legacy_groups = []
+
+    for fname in os.listdir(_ADM_BACKUP_DIR):
+        fpath = os.path.join(_ADM_BACKUP_DIR, fname)
+        if not os.path.isfile(fpath) or not fname.endswith('.json'):
+            continue
+
+        weekly_match = _WEEKLY_BACKUP_RE.match(fname)
+        if weekly_match:
+            base, week_id = weekly_match.group(1), weekly_match.group(2)
+            group_key = week_id
+            if group_key not in weekly_groups:
+                weekly_groups[group_key] = {
+                    'source': 'weekly_backup',
+                    'kind_label': 'Weekly Backup',
+                    'group_key': group_key,
+                    'tag': f'week_{week_id}',
+                    'timestamp': week_id,
+                    'display_time': f'Week {week_id}',
+                    'files': [],
+                    'sort_key': week_id,
+                }
+            weekly_groups[group_key]['files'].append({
+                'db_file': _DB_BASE_TO_LIVE.get(base, base + '.json'),
+                'filename': fname,
+                'size': os.path.getsize(fpath),
+            })
+            continue
+
+        # Include old non-weekly snapshots (for example pre-uuid migration files).
+        inferred_live = _infer_live_db_from_backup_name(fname)
+        if inferred_live:
+            mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
+            legacy_groups.append({
+                'source': 'legacy_backup',
+                'kind_label': 'Legacy Backup',
+                'group_key': fname,
+                'tag': fname,
+                'timestamp': mtime.strftime('%Y%m%d_%H%M%S'),
+                'display_time': mtime.strftime('%Y-%m-%d %H:%M:%S'),
+                'files': [{
+                    'db_file': inferred_live,
+                    'filename': fname,
+                    'size': os.path.getsize(fpath),
+                }],
+                'sort_key': mtime.strftime('%Y%m%d_%H%M%S'),
+            })
+
+    combined = list(weekly_groups.values()) + legacy_groups
+    return sorted(combined, key=lambda x: x.get('sort_key', ''), reverse=True)
+
+
+def _list_restore_groups():
+    combined = _list_checkpoint_groups() + _list_regular_backup_groups()
+    return sorted(combined, key=lambda x: x.get('sort_key', ''), reverse=True)
+
+
+def _resolve_snapshot_files(source, group_key):
+    snapshot_files = []
+
+    if source == 'checkpoint':
+        parts = str(group_key or '').split('||')
+        if len(parts) != 2:
+            return []
+        tag, ts = parts[0], parts[1]
+        if not _SAFE_TAG_RE.match(tag) or not _SAFE_TS_RE.match(ts):
+            return []
+        for db_file in _ADM_DB_FILES:
+            snap_path = os.path.join(_ADM_CP_DIR, f"{tag}_{ts}_{db_file}")
+            if os.path.exists(snap_path):
+                snapshot_files.append((db_file, snap_path))
+        return snapshot_files
+
+    if source == 'weekly_backup':
+        week_id = str(group_key or '')
+        if not _WEEK_ID_RE.match(week_id):
+            return []
+        for base, db_file in _DB_BASE_TO_LIVE.items():
+            snap_path = os.path.join(_ADM_BACKUP_DIR, f"{base}_backup_{week_id}.json")
+            if os.path.exists(snap_path):
+                snapshot_files.append((db_file, snap_path))
+        return snapshot_files
+
+    if source == 'legacy_backup':
+        fname = os.path.basename(str(group_key or ''))
+        if not _SAFE_FILENAME_RE.match(fname):
+            return []
+        db_file = _infer_live_db_from_backup_name(fname)
+        if not db_file:
+            return []
+        snap_path = os.path.join(_ADM_BACKUP_DIR, fname)
+        if os.path.exists(snap_path):
+            snapshot_files.append((db_file, snap_path))
+        return snapshot_files
+
+    return []
 
 
 def _get_record_label(record):
@@ -406,32 +555,34 @@ def _compute_db_diff(db_file, checkpoint_data, live_data):
 
 @admin_bp.route('/admin/checkpoints')
 def checkpoints_page():
-    groups = _list_checkpoint_groups()
+    groups = _list_restore_groups()
     return render_template('admin_checkpoint_restore.html', groups=groups)
 
 
 @admin_bp.route('/api/admin/checkpoint/diff', methods=['POST'])
 def checkpoint_diff():
-    from utils.storage import decrypt_file
     body = request.get_json(silent=True) or {}
-    tag = body.get('tag', '')
-    ts = body.get('timestamp', '')
-    if not _SAFE_TAG_RE.match(tag):
-        return jsonify({'error': 'Invalid tag'}), 400
-    if not _SAFE_TS_RE.match(ts):
-        return jsonify({'error': 'Invalid timestamp'}), 400
+    source = body.get('source', '')
+    group_key = body.get('group_key', '')
+
+    # Backward compatibility for already-open page scripts.
+    if not source and body.get('tag') and body.get('timestamp'):
+        source = 'checkpoint'
+        group_key = f"{body.get('tag')}||{body.get('timestamp')}"
+
+    snapshot_files = _resolve_snapshot_files(source, group_key)
+    if not snapshot_files:
+        return jsonify({'error': 'No matching backup files found'}), 400
+
     summary = {
         'total_changed': 0, 'total_added': 0, 'total_removed': 0, 'files_compared': []
     }
     diffs = []
-    for db_file in _ADM_DB_FILES:
-        cp_path = os.path.join(_ADM_CP_DIR, f"{tag}_{ts}_{db_file}")
+    for db_file, cp_path in snapshot_files:
         live_path = os.path.join(_ADM_ROOT, db_file)
-        if not os.path.exists(cp_path):
-            continue
         try:
-            cp_data = decrypt_file(cp_path)
-            live_data = decrypt_file(live_path) if os.path.exists(live_path) else {}
+            cp_data = _read_db_snapshot(cp_path)
+            live_data = _read_db_snapshot(live_path) if os.path.exists(live_path) else {}
         except Exception as exc:
             diffs.append({'db_file': db_file, 'error': str(exc), 'records': []})
             continue
@@ -447,15 +598,21 @@ def checkpoint_diff():
 @admin_bp.route('/api/admin/checkpoint/restore', methods=['POST'])
 def restore_checkpoint():
     body = request.get_json(silent=True) or {}
-    tag = body.get('tag', '')
-    ts = body.get('timestamp', '')
+    source = body.get('source', '')
+    group_key = body.get('group_key', '')
+
+    # Backward compatibility for already-open page scripts.
+    if not source and body.get('tag') and body.get('timestamp'):
+        source = 'checkpoint'
+        group_key = f"{body.get('tag')}||{body.get('timestamp')}"
+
+    snapshot_files = _resolve_snapshot_files(source, group_key)
+    if not snapshot_files:
+        return jsonify({'error': 'No matching backup files found'}), 400
+
     confirmed = body.get('confirm', False)
     if not confirmed:
         return jsonify({'error': 'Must confirm restore'}), 400
-    if not _SAFE_TAG_RE.match(tag):
-        return jsonify({'error': 'Invalid tag'}), 400
-    if not _SAFE_TS_RE.match(ts):
-        return jsonify({'error': 'Invalid timestamp'}), 400
 
     now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     safety_dir = os.path.abspath(os.path.join(_ADM_ROOT, 'backups', 'pre_restore_safety'))
@@ -467,13 +624,11 @@ def restore_checkpoint():
 
     restored = []
     errors = []
-    for db_file in _ADM_DB_FILES:
-        cp_path = os.path.join(_ADM_CP_DIR, f"{tag}_{ts}_{db_file}")
-        if not os.path.exists(cp_path):
-            continue
+    for db_file, cp_path in snapshot_files:
         live_path = os.path.join(_ADM_ROOT, db_file)
         try:
-            shutil.copy(cp_path, live_path)
+            snapshot_data = _read_db_snapshot(cp_path)
+            _write_live_db_snapshot(live_path, snapshot_data)
             restored.append(db_file)
         except Exception as exc:
             errors.append(f"{db_file}: {str(exc)}")
@@ -483,8 +638,8 @@ def restore_checkpoint():
 
     from utils.db_logger import log_action
     log_action('db_restore', {
-        'checkpoint_tag': tag,
-        'checkpoint_timestamp': ts,
+        'restore_source': source,
+        'restore_group_key': group_key,
         'restored_files': restored,
         'safety_backup_ts': now_ts,
         'restored_by': current_user.username,

@@ -4,21 +4,6 @@
 <section class="section">
 	<div class="container is-fluid">
 
-		<nav class="breadcrumb" aria-label="breadcrumbs">
-			<ul>
-				<li><a href="{{ url_for('admin.index') }}">Admin</a></li>
-				<li class="is-active"><a href="#">Checkpoint Restore</a></li>
-			</ul>
-		</nav>
-
-		<h1 class="title">
-			<span class="icon"><i class="fas fa-history"></i></span>
-			Checkpoint Restore
-		</h1>
-		<p class="subtitle has-text-grey">
-			Restore database to an earlier state. Preview what changed before applying.
-		</p>
-
 		{% with messages = get_flashed_messages(with_categories=true) %}
 		{% for category, message in messages %}
 		<div class="message is-{{ 'danger' if category == 'error' else category }}">
@@ -27,21 +12,26 @@
 		{% endfor %}
 		{% endwith %}
 
-		<!-- Checkpoint list -->
+		<!-- Restore source list -->
 		<div class="box">
 			<h2 class="subtitle mb-3">
 				<span class="icon"><i class="fas fa-archive"></i></span>
-				Available Checkpoints
+				Restore Snapshots
 				<span class="tag is-light ml-2">{{ groups | length }}</span>
 			</h2>
+			<p class="is-size-7 has-text-grey mb-3">
+				Includes manual checkpoints in <code>backups/checkpoints/</code> and regular files in
+				<code>backups/</code> (weekly + legacy/pre-uuid backups).
+			</p>
 
 			{% if groups %}
 			<div class="table-container">
 				<table class="table is-fullwidth is-striped is-hoverable">
 					<thead>
 						<tr>
+							<th>Source</th>
 							<th>Timestamp</th>
-							<th>Reason / Tag</th>
+							<th>Snapshot</th>
 							<th>Files</th>
 							<th class="has-text-right">Actions</th>
 						</tr>
@@ -49,6 +39,9 @@
 					<tbody>
 						{% for group in groups %}
 						<tr>
+							<td class="is-vcentered">
+								<span class="tag is-link is-light">{{ group.kind_label }}</span>
+							</td>
 							<td class="is-vcentered">
 								<span class="has-text-weight-semibold">{{ group.display_time }}</span>
 							</td>
@@ -62,14 +55,15 @@
 							</td>
 							<td class="is-vcentered has-text-right">
 								<div class="buttons is-right">
-									<button class="button is-small is-info is-light"
-										onclick="openDiffModal('{{ group.tag }}', '{{ group.timestamp }}', '{{ group.display_time }}')"
-										data-tag="{{ group.tag }}" data-ts="{{ group.timestamp }}">
+									<button class="button is-small is-info is-light" data-source="{{ group.source }}"
+										data-group="{{ group.group_key }}" data-label="{{ group.tag }}"
+										data-dt="{{ group.display_time }}" onclick="openDiffModal(this)">
 										<span class="icon"><i class="fas fa-code-branch"></i></span>
 										<span>Preview Diff</span>
 									</button>
-									<button class="button is-small is-danger is-light"
-										onclick="openRestoreConfirm('{{ group.tag }}', '{{ group.timestamp }}', '{{ group.display_time }}')">
+									<button class="button is-small is-danger is-light" data-source="{{ group.source }}"
+										data-group="{{ group.group_key }}" data-label="{{ group.tag }}"
+										data-dt="{{ group.display_time }}" onclick="openRestoreConfirm(this)">
 										<span class="icon"><i class="fas fa-undo"></i></span>
 										<span>Restore</span>
 									</button>
@@ -82,9 +76,7 @@
 			</div>
 			{% else %}
 			<div class="notification is-light">
-				<p>No checkpoints found. Checkpoints are created automatically when phone numbers are changed, or when
-					the admin triggers a DB checkpoint.</p>
-				<p class="mt-2 has-text-grey">Files are stored in <code>backups/checkpoints/</code>.</p>
+				<p>No restore snapshots found in <code>backups/checkpoints/</code> or <code>backups/</code>.</p>
 			</div>
 			{% endif %}
 		</div>
@@ -179,7 +171,8 @@
 			<div class="notification is-warning is-light">
 				<p><strong>⚠ This will overwrite the current live database.</strong></p>
 				<p class="mt-1">The current state will be automatically saved to
-					<code>backups/pre_restore_safety/</code> before the restore is applied.</p>
+					<code>backups/pre_restore_safety/</code> before the restore is applied.
+				</p>
 			</div>
 			<p class="mt-3">Restore to checkpoint:</p>
 			<p class="mt-1">
@@ -370,18 +363,24 @@
 		'use strict';
 
 		// Current context for the diff modal
-		let _currentDiffTag = '';
-		let _currentDiffTs = '';
+		let _currentDiffSource = '';
+		let _currentDiffGroup = '';
+		let _currentDiffLabel = '';
 		let _currentDiffTime = '';
 
 		/* ── Diff modal ─────────────────────────────────────────────────── */
 
-		window.openDiffModal = function (tag, ts, displayTime) {
-			_currentDiffTag = tag;
-			_currentDiffTs = ts;
+		window.openDiffModal = function (el) {
+			const source = el.dataset.source;
+			const groupKey = el.dataset.group;
+			const label = el.dataset.label;
+			const displayTime = el.dataset.dt;
+			_currentDiffSource = source;
+			_currentDiffGroup = groupKey;
+			_currentDiffLabel = label;
 			_currentDiffTime = displayTime;
 
-			document.getElementById('diffModalTitle').textContent = displayTime + ' (' + tag + ')';
+			document.getElementById('diffModalTitle').textContent = displayTime + ' (' + label + ')';
 			document.getElementById('diffSummaryBar').style.display = 'none';
 			document.getElementById('diffLoading').style.display = 'block';
 			document.getElementById('diffError').style.display = 'none';
@@ -391,19 +390,19 @@
 			document.getElementById('diffContent').innerHTML = '';
 
 			document.getElementById('diffModal').classList.add('is-active');
-			fetchDiff(tag, ts);
+			fetchDiff(source, groupKey);
 		};
 
 		window.closeDiffModal = function () {
 			document.getElementById('diffModal').classList.remove('is-active');
 		};
 
-		async function fetchDiff(tag, ts) {
+		async function fetchDiff(source, groupKey) {
 			try {
 				const resp = await fetch('/api/admin/checkpoint/diff', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ tag, timestamp: ts }),
+					body: JSON.stringify({ source: source, group_key: groupKey }),
 				});
 				const data = await resp.json();
 				document.getElementById('diffLoading').style.display = 'none';
@@ -553,11 +552,16 @@
 
 		/* ── Restore confirm modal ──────────────────────────────────────── */
 
-		window.openRestoreConfirm = function (tag, ts, displayTime) {
-			_currentDiffTag = tag;
-			_currentDiffTs = ts;
+		window.openRestoreConfirm = function (el) {
+			const source = el.dataset.source;
+			const groupKey = el.dataset.group;
+			const label = el.dataset.label;
+			const displayTime = el.dataset.dt;
+			_currentDiffSource = source;
+			_currentDiffGroup = groupKey;
+			_currentDiffLabel = label;
 			_currentDiffTime = displayTime;
-			document.getElementById('restoreTag').textContent = tag;
+			document.getElementById('restoreTag').textContent = label;
 			document.getElementById('restoreTime').textContent = displayTime;
 			document.getElementById('restoreConfirmCheck').checked = false;
 			document.getElementById('doRestoreBtn').disabled = true;
@@ -566,7 +570,11 @@
 
 		window.openRestoreFromDiff = function () {
 			closeDiffModal();
-			openRestoreConfirm(_currentDiffTag, _currentDiffTs, _currentDiffTime);
+			document.getElementById('restoreTag').textContent = _currentDiffLabel;
+			document.getElementById('restoreTime').textContent = _currentDiffTime;
+			document.getElementById('restoreConfirmCheck').checked = false;
+			document.getElementById('doRestoreBtn').disabled = true;
+			document.getElementById('restoreModal').classList.add('is-active');
 		};
 
 		window.closeRestoreModal = function () {
@@ -588,8 +596,8 @@
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						tag: _currentDiffTag,
-						timestamp: _currentDiffTs,
+						source: _currentDiffSource,
+						group_key: _currentDiffGroup,
 						confirm: true,
 					}),
 				});

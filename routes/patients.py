@@ -179,7 +179,7 @@ def _build_phone_rename_plan(patient_doc, old_phone, new_phone):
 
         images = exam.get('images', [])
         if isinstance(images, list):
-            for idx, img in enumerate(images, start=1):
+            for img_idx, img in enumerate(images):
                 if not isinstance(img, dict):
                     continue
 
@@ -193,7 +193,7 @@ def _build_phone_rename_plan(patient_doc, old_phone, new_phone):
                     _, ext = os.path.splitext(old_rel_path)
                 ext = (ext or '.jpg').lower()
 
-                new_filename = f"{new_image_name_token}_{date_token}_image_{idx}{ext}"
+                new_filename = f"{new_image_name_token}_{date_token}_image_{img_idx + 1}{ext}"
                 new_rel_path = os.path.join('uploads', 'patient_image', new_folder_token, new_filename)
 
                 old_abs = _resolve_to_abs(old_rel_path)
@@ -202,6 +202,7 @@ def _build_phone_rename_plan(patient_doc, old_phone, new_phone):
                     plan.append({
                         'kind': 'image',
                         'exam_id': exam_id,
+                        'image_idx': img_idx,
                         'old_name': os.path.basename(old_abs),
                         'new_name': os.path.basename(new_abs),
                         'old_abs': old_abs,
@@ -274,7 +275,6 @@ def _rename_patient_assets(patient_doc, old_phone, new_phone):
         return
 
     plan = _build_phone_rename_plan(patient_doc, old_phone, new_phone)
-    image_counter = {}
     for step in plan:
         kind = step.get('kind')
         old_abs = step.get('old_abs')
@@ -286,17 +286,15 @@ def _rename_patient_assets(patient_doc, old_phone, new_phone):
                 continue
 
             exam_id = step.get('exam_id')
-            if kind == 'image':
-                image_counter[exam_id] = image_counter.get(exam_id, 0) + 1
             for exam in exams:
                 if str(exam.get('id') or '') != exam_id:
                     continue
                 if kind == 'image':
-                    idx = image_counter[exam_id]
+                    img_idx = step.get('image_idx', 0)
                     images = exam.get('images', [])
-                    if idx <= len(images) and isinstance(images[idx - 1], dict):
-                        images[idx - 1]['filename'] = os.path.basename(new_abs)
-                        images[idx - 1]['path'] = os.path.relpath(new_abs, _APP_ROOT)
+                    if img_idx < len(images) and isinstance(images[img_idx], dict):
+                        images[img_idx]['filename'] = os.path.basename(new_abs)
+                        images[img_idx]['path'] = os.path.relpath(new_abs, _APP_ROOT)
                 else:
                     exam['image_path'] = os.path.relpath(new_abs, _APP_ROOT)
                 break

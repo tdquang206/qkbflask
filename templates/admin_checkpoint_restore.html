@@ -1,0 +1,650 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+	<div class="container is-fluid">
+
+		<nav class="breadcrumb" aria-label="breadcrumbs">
+			<ul>
+				<li><a href="{{ url_for('admin.index') }}">Admin</a></li>
+				<li class="is-active"><a href="#">Checkpoint Restore</a></li>
+			</ul>
+		</nav>
+
+		<h1 class="title">
+			<span class="icon"><i class="fas fa-history"></i></span>
+			Checkpoint Restore
+		</h1>
+		<p class="subtitle has-text-grey">
+			Restore database to an earlier state. Preview what changed before applying.
+		</p>
+
+		{% with messages = get_flashed_messages(with_categories=true) %}
+		{% for category, message in messages %}
+		<div class="message is-{{ 'danger' if category == 'error' else category }}">
+			<div class="message-body">{{ message }}</div>
+		</div>
+		{% endfor %}
+		{% endwith %}
+
+		<!-- Checkpoint list -->
+		<div class="box">
+			<h2 class="subtitle mb-3">
+				<span class="icon"><i class="fas fa-archive"></i></span>
+				Available Checkpoints
+				<span class="tag is-light ml-2">{{ groups | length }}</span>
+			</h2>
+
+			{% if groups %}
+			<div class="table-container">
+				<table class="table is-fullwidth is-striped is-hoverable">
+					<thead>
+						<tr>
+							<th>Timestamp</th>
+							<th>Reason / Tag</th>
+							<th>Files</th>
+							<th class="has-text-right">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for group in groups %}
+						<tr>
+							<td class="is-vcentered">
+								<span class="has-text-weight-semibold">{{ group.display_time }}</span>
+							</td>
+							<td class="is-vcentered">
+								<span class="tag is-info is-light">{{ group.tag }}</span>
+							</td>
+							<td class="is-vcentered">
+								{% for f in group.files %}
+								<span class="tag is-dark is-small mr-1">{{ f.db_file }}</span>
+								{% endfor %}
+							</td>
+							<td class="is-vcentered has-text-right">
+								<div class="buttons is-right">
+									<button class="button is-small is-info is-light"
+										onclick="openDiffModal('{{ group.tag }}', '{{ group.timestamp }}', '{{ group.display_time }}')"
+										data-tag="{{ group.tag }}" data-ts="{{ group.timestamp }}">
+										<span class="icon"><i class="fas fa-code-branch"></i></span>
+										<span>Preview Diff</span>
+									</button>
+									<button class="button is-small is-danger is-light"
+										onclick="openRestoreConfirm('{{ group.tag }}', '{{ group.timestamp }}', '{{ group.display_time }}')">
+										<span class="icon"><i class="fas fa-undo"></i></span>
+										<span>Restore</span>
+									</button>
+								</div>
+							</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			{% else %}
+			<div class="notification is-light">
+				<p>No checkpoints found. Checkpoints are created automatically when phone numbers are changed, or when
+					the admin triggers a DB checkpoint.</p>
+				<p class="mt-2 has-text-grey">Files are stored in <code>backups/checkpoints/</code>.</p>
+			</div>
+			{% endif %}
+		</div>
+
+	</div>
+</section>
+
+<!-- ─── Diff Modal ─────────────────────────────────────────────────────────── -->
+<div class="modal" id="diffModal">
+	<div class="modal-background" onclick="closeDiffModal()"></div>
+	<div class="modal-card" style="width:90vw; max-width:1200px;">
+		<header class="modal-card-head">
+			<p class="modal-card-title">
+				<span class="icon"><i class="fas fa-code-branch"></i></span>
+				Diff Preview &mdash; <span id="diffModalTitle" class="has-text-info"></span>
+			</p>
+			<button class="delete" aria-label="close" onclick="closeDiffModal()"></button>
+		</header>
+
+		<section class="modal-card-body" style="padding:0;">
+
+			<!-- Summary bar -->
+			<div id="diffSummaryBar" class="px-4 py-3"
+				style="background:#f5f5f5; border-bottom:1px solid #ddd; display:none;">
+				<div class="level is-mobile">
+					<div class="level-left">
+						<div class="level-item">
+							<span class="icon has-text-warning"><i class="fas fa-exchange-alt"></i></span>
+							<strong id="summaryChanged">0</strong>&nbsp;changed
+						</div>
+						<div class="level-item">
+							<span class="icon has-text-success"><i class="fas fa-plus-circle"></i></span>
+							<strong id="summaryAdded">0</strong>&nbsp;added (since checkpoint)
+						</div>
+						<div class="level-item">
+							<span class="icon has-text-danger"><i class="fas fa-minus-circle"></i></span>
+							<strong id="summaryRemoved">0</strong>&nbsp;removed (since checkpoint)
+						</div>
+					</div>
+					<div class="level-right">
+						<div class="level-item has-text-grey is-size-7" id="summaryFiles"></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Loading spinner -->
+			<div id="diffLoading" class="has-text-centered py-6" style="display:none;">
+				<span class="icon is-large has-text-info"><i class="fas fa-spinner fa-spin fa-2x"></i></span>
+				<p class="mt-3 has-text-grey">Computing diff…</p>
+			</div>
+
+			<!-- Error area -->
+			<div id="diffError" class="notification is-danger m-4" style="display:none;"></div>
+
+			<!-- "No changes" banner -->
+			<div id="diffNoChanges" class="notification is-success m-4" style="display:none;">
+				<span class="icon"><i class="fas fa-check-circle"></i></span>
+				<strong>No changes detected</strong> — current database matches this checkpoint.
+			</div>
+
+			<!-- Diff content -->
+			<div id="diffContent" style="display:none; overflow-y:auto; max-height:65vh; padding:1rem 1.5rem;"></div>
+		</section>
+
+		<footer class="modal-card-foot" style="justify-content:space-between;">
+			<div>
+				<button class="button" onclick="closeDiffModal()">Close</button>
+			</div>
+			<div>
+				<button id="diffRestoreBtn" class="button is-danger" style="display:none;"
+					onclick="openRestoreFromDiff()">
+					<span class="icon"><i class="fas fa-undo"></i></span>
+					<span>Restore to this checkpoint</span>
+				</button>
+			</div>
+		</footer>
+	</div>
+</div>
+
+<!-- ─── Restore Confirm Modal ─────────────────────────────────────────────── -->
+<div class="modal" id="restoreModal">
+	<div class="modal-background" onclick="closeRestoreModal()"></div>
+	<div class="modal-card" style="max-width:560px;">
+		<header class="modal-card-head has-background-danger-light">
+			<p class="modal-card-title has-text-danger">
+				<span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+				Confirm Restore
+			</p>
+			<button class="delete" aria-label="close" onclick="closeRestoreModal()"></button>
+		</header>
+		<section class="modal-card-body">
+			<div class="notification is-warning is-light">
+				<p><strong>⚠ This will overwrite the current live database.</strong></p>
+				<p class="mt-1">The current state will be automatically saved to
+					<code>backups/pre_restore_safety/</code> before the restore is applied.</p>
+			</div>
+			<p class="mt-3">Restore to checkpoint:</p>
+			<p class="mt-1">
+				<span class="tag is-info is-light" id="restoreTag"></span>
+				&nbsp;
+				<strong id="restoreTime"></strong>
+			</p>
+			<div class="field mt-4">
+				<label class="checkbox">
+					<input type="checkbox" id="restoreConfirmCheck" onchange="toggleRestoreBtn()">
+					I understand this will <strong>overwrite the current database</strong> and cannot be undone (except
+					via safety backup).
+				</label>
+			</div>
+		</section>
+		<footer class="modal-card-foot" style="justify-content:space-between;">
+			<button class="button" onclick="closeRestoreModal()">Cancel</button>
+			<button id="doRestoreBtn" class="button is-danger" disabled onclick="executeRestore()">
+				<span class="icon"><i class="fas fa-undo-alt"></i></span>
+				<span>Restore Now</span>
+			</button>
+		</footer>
+	</div>
+</div>
+
+<!-- ─── Restore Result Modal ─────────────────────────────────────────────── -->
+<div class="modal" id="restoreResultModal">
+	<div class="modal-background"></div>
+	<div class="modal-card" style="max-width:480px;">
+		<header class="modal-card-head" id="restoreResultHead">
+			<p class="modal-card-title" id="restoreResultTitle">Restore Complete</p>
+		</header>
+		<section class="modal-card-body">
+			<div id="restoreResultBody"></div>
+		</section>
+		<footer class="modal-card-foot">
+			<button class="button is-primary" onclick="location.reload()">Reload Page</button>
+		</footer>
+	</div>
+</div>
+
+<style>
+	/* ── Diff line coloring ──────────────────────────────────────────────── */
+	.diff-view {
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		font-size: 12px;
+		line-height: 1.5;
+		white-space: pre-wrap;
+		word-break: break-all;
+		margin: 0;
+		background: #f8f8f8;
+		border: 1px solid #e0e0e0;
+		border-radius: 4px;
+		overflow-x: auto;
+		padding: 0;
+	}
+
+	.diff-line {
+		display: block;
+		padding: 1px 8px;
+		min-height: 1.5em;
+	}
+
+	.diff-line-add {
+		background: #e6ffed;
+		color: #22863a;
+	}
+
+	.diff-line-remove {
+		background: #ffebe9;
+		color: #b31d28;
+	}
+
+	.diff-line-hunk {
+		background: #dbedff;
+		color: #0056b3;
+		font-weight: bold;
+	}
+
+	.diff-line-file {
+		background: #f0f0f0;
+		color: #666;
+		font-weight: bold;
+	}
+
+	.diff-line-ctx {
+		background: transparent;
+		color: #333;
+	}
+
+	/* ── Record diff block ───────────────────────────────────────────────── */
+	.diff-record {
+		border: 1px solid #e0e0e0;
+		border-radius: 4px;
+		margin-bottom: 8px;
+		overflow: hidden;
+	}
+
+	.diff-record-header {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 12px;
+		background: #fafafa;
+		cursor: pointer;
+		user-select: none;
+		border-bottom: 1px solid #e0e0e0;
+	}
+
+	.diff-record-header:hover {
+		background: #f0f0f0;
+	}
+
+	.diff-record-header .toggle-icon {
+		margin-left: auto;
+		color: #888;
+	}
+
+	.diff-record-body {
+		display: none;
+	}
+
+	.diff-record-body.is-open {
+		display: block;
+	}
+
+	.status-badge {
+		font-size: 11px;
+		font-weight: 700;
+		padding: 2px 6px;
+		border-radius: 3px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		white-space: nowrap;
+	}
+
+	.status-changed {
+		background: #fff3cd;
+		color: #856404;
+	}
+
+	.status-added {
+		background: #d1e7dd;
+		color: #0f5132;
+	}
+
+	.status-removed {
+		background: #f8d7da;
+		color: #842029;
+	}
+
+	.truncate-note {
+		font-size: 11px;
+		color: #888;
+		padding: 4px 8px;
+		background: #fffff0;
+		border-top: 1px solid #e0e0e0;
+	}
+
+	/* ── DB file section ─────────────────────────────────────────────────── */
+	.diff-file-section {
+		margin-bottom: 1.5rem;
+	}
+
+	.diff-file-header-bar {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 12px;
+		background: #24292f;
+		color: #e6edf3;
+		border-radius: 4px 4px 0 0;
+		font-family: monospace;
+		font-size: 13px;
+		font-weight: bold;
+	}
+
+	.diff-file-header-bar .count-badge {
+		font-size: 11px;
+		padding: 2px 6px;
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.15);
+	}
+</style>
+
+<script>
+	(function () {
+		'use strict';
+
+		// Current context for the diff modal
+		let _currentDiffTag = '';
+		let _currentDiffTs = '';
+		let _currentDiffTime = '';
+
+		/* ── Diff modal ─────────────────────────────────────────────────── */
+
+		window.openDiffModal = function (tag, ts, displayTime) {
+			_currentDiffTag = tag;
+			_currentDiffTs = ts;
+			_currentDiffTime = displayTime;
+
+			document.getElementById('diffModalTitle').textContent = displayTime + ' (' + tag + ')';
+			document.getElementById('diffSummaryBar').style.display = 'none';
+			document.getElementById('diffLoading').style.display = 'block';
+			document.getElementById('diffError').style.display = 'none';
+			document.getElementById('diffNoChanges').style.display = 'none';
+			document.getElementById('diffContent').style.display = 'none';
+			document.getElementById('diffRestoreBtn').style.display = 'none';
+			document.getElementById('diffContent').innerHTML = '';
+
+			document.getElementById('diffModal').classList.add('is-active');
+			fetchDiff(tag, ts);
+		};
+
+		window.closeDiffModal = function () {
+			document.getElementById('diffModal').classList.remove('is-active');
+		};
+
+		async function fetchDiff(tag, ts) {
+			try {
+				const resp = await fetch('/api/admin/checkpoint/diff', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ tag, timestamp: ts }),
+				});
+				const data = await resp.json();
+				document.getElementById('diffLoading').style.display = 'none';
+
+				if (!resp.ok || data.error) {
+					showDiffError(data.error || 'Server error ' + resp.status);
+					return;
+				}
+				renderDiff(data);
+			} catch (err) {
+				document.getElementById('diffLoading').style.display = 'none';
+				showDiffError('Network error: ' + err.message);
+			}
+		}
+
+		function showDiffError(msg) {
+			const el = document.getElementById('diffError');
+			el.textContent = msg;
+			el.style.display = 'block';
+		}
+
+		function renderDiff(data) {
+			const summary = data.summary || {};
+			const diffs = data.diffs || [];
+
+			// Summary bar
+			document.getElementById('summaryChanged').textContent = summary.total_changed || 0;
+			document.getElementById('summaryAdded').textContent = summary.total_added || 0;
+			document.getElementById('summaryRemoved').textContent = summary.total_removed || 0;
+			const filesEl = document.getElementById('summaryFiles');
+			filesEl.textContent = (summary.files_compared || []).join(', ');
+			document.getElementById('diffSummaryBar').style.display = '';
+
+			const totalChanges = (summary.total_changed || 0) + (summary.total_added || 0) + (summary.total_removed || 0);
+			if (totalChanges === 0) {
+				document.getElementById('diffNoChanges').style.display = '';
+				return;
+			}
+
+			// Restore button visible
+			document.getElementById('diffRestoreBtn').style.display = '';
+
+			const container = document.getElementById('diffContent');
+			container.innerHTML = '';
+
+			diffs.forEach(function (fileDiff) {
+				if (fileDiff.error) {
+					const errDiv = document.createElement('div');
+					errDiv.className = 'notification is-danger is-light mb-3';
+					errDiv.textContent = fileDiff.db_file + ': ' + fileDiff.error;
+					container.appendChild(errDiv);
+					return;
+				}
+				if (!fileDiff.records || fileDiff.records.length === 0) return;
+
+				const section = document.createElement('div');
+				section.className = 'diff-file-section';
+
+				// File header bar
+				const header = document.createElement('div');
+				header.className = 'diff-file-header-bar';
+				header.innerHTML =
+					'<span class="icon has-text-warning" style="margin-right:6px"><i class="fas fa-database"></i></span>' +
+					'<span>' + escHtml(fileDiff.db_file) + '</span>' +
+					(fileDiff.changed ? '<span class="count-badge">⚡ ' + fileDiff.changed + ' changed</span>' : '') +
+					(fileDiff.added ? '<span class="count-badge ml-1">+ ' + fileDiff.added + ' added</span>' : '') +
+					(fileDiff.removed ? '<span class="count-badge ml-1">- ' + fileDiff.removed + ' removed</span>' : '');
+				section.appendChild(header);
+
+				// Records
+				fileDiff.records.forEach(function (rec, idx) {
+					const recDiv = buildRecordDiv(rec, fileDiff.db_file + '_' + idx);
+					section.appendChild(recDiv);
+				});
+
+				container.appendChild(section);
+			});
+
+			container.style.display = '';
+		}
+
+		function buildRecordDiv(rec, uid) {
+			const recDiv = document.createElement('div');
+			recDiv.className = 'diff-record';
+
+			const headerDiv = document.createElement('div');
+			headerDiv.className = 'diff-record-header';
+			headerDiv.setAttribute('onclick', 'toggleRecord("body_' + uid + '", this)');
+
+			const statusClass = { changed: 'status-changed', added: 'status-added', removed: 'status-removed' }[rec.status] || '';
+			const statusText = { changed: '⚡ Changed', added: '+ Added', removed: '− Removed' }[rec.status] || rec.status;
+
+			headerDiv.innerHTML =
+				'<span class="status-badge ' + statusClass + '">' + statusText + '</span>' +
+				'<span class="has-text-grey is-size-7" style="font-family:monospace">' + escHtml(rec.key) + '</span>' +
+				'<span class="has-text-weight-semibold">' + escHtml(rec.label || '') + '</span>' +
+				(rec.diff_lines && rec.diff_lines.length > 0 ? '<span class="toggle-icon">▼</span>' : '');
+
+			recDiv.appendChild(headerDiv);
+
+			if (rec.diff_lines && rec.diff_lines.length > 0) {
+				const bodyDiv = document.createElement('div');
+				bodyDiv.className = 'diff-record-body';
+				bodyDiv.id = 'body_' + uid;
+
+				const pre = document.createElement('pre');
+				pre.className = 'diff-view';
+
+				rec.diff_lines.forEach(function (line) {
+					const span = document.createElement('span');
+					span.className = 'diff-line ' + classifyLine(line);
+					span.textContent = line;
+					pre.appendChild(span);
+				});
+
+				if (rec.truncated) {
+					const note = document.createElement('div');
+					note.className = 'truncate-note';
+					note.textContent = '… truncated. Showing 300 of ' + rec.total_lines + ' lines. Full diff available in the checkpoint files.';
+					bodyDiv.appendChild(pre);
+					bodyDiv.appendChild(note);
+				} else {
+					bodyDiv.appendChild(pre);
+				}
+
+				recDiv.appendChild(bodyDiv);
+			}
+
+			return recDiv;
+		}
+
+		window.toggleRecord = function (bodyId, headerEl) {
+			const body = document.getElementById(bodyId);
+			if (!body) return;
+			const isOpen = body.classList.toggle('is-open');
+			const icon = headerEl.querySelector('.toggle-icon');
+			if (icon) icon.textContent = isOpen ? '▲' : '▼';
+		};
+
+		function classifyLine(line) {
+			if (line.startsWith('+++') || line.startsWith('---')) return 'diff-line-file';
+			if (line.startsWith('@@')) return 'diff-line-hunk';
+			if (line.startsWith('+')) return 'diff-line-add';
+			if (line.startsWith('-')) return 'diff-line-remove';
+			return 'diff-line-ctx';
+		}
+
+		/* ── Restore confirm modal ──────────────────────────────────────── */
+
+		window.openRestoreConfirm = function (tag, ts, displayTime) {
+			_currentDiffTag = tag;
+			_currentDiffTs = ts;
+			_currentDiffTime = displayTime;
+			document.getElementById('restoreTag').textContent = tag;
+			document.getElementById('restoreTime').textContent = displayTime;
+			document.getElementById('restoreConfirmCheck').checked = false;
+			document.getElementById('doRestoreBtn').disabled = true;
+			document.getElementById('restoreModal').classList.add('is-active');
+		};
+
+		window.openRestoreFromDiff = function () {
+			closeDiffModal();
+			openRestoreConfirm(_currentDiffTag, _currentDiffTs, _currentDiffTime);
+		};
+
+		window.closeRestoreModal = function () {
+			document.getElementById('restoreModal').classList.remove('is-active');
+		};
+
+		window.toggleRestoreBtn = function () {
+			const checked = document.getElementById('restoreConfirmCheck').checked;
+			document.getElementById('doRestoreBtn').disabled = !checked;
+		};
+
+		window.executeRestore = async function () {
+			const btn = document.getElementById('doRestoreBtn');
+			btn.classList.add('is-loading');
+			btn.disabled = true;
+
+			try {
+				const resp = await fetch('/api/admin/checkpoint/restore', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						tag: _currentDiffTag,
+						timestamp: _currentDiffTs,
+						confirm: true,
+					}),
+				});
+				const data = await resp.json();
+				closeRestoreModal();
+
+				if (resp.ok && data.success) {
+					showRestoreResult(true, data);
+				} else {
+					showRestoreResult(false, data);
+				}
+			} catch (err) {
+				closeRestoreModal();
+				showRestoreResult(false, { errors: [err.message] });
+			}
+		};
+
+		function showRestoreResult(success, data) {
+			const head = document.getElementById('restoreResultHead');
+			const title = document.getElementById('restoreResultTitle');
+			const body = document.getElementById('restoreResultBody');
+
+			head.className = 'modal-card-head ' + (success ? 'has-background-success-light' : 'has-background-danger-light');
+			title.className = 'modal-card-title ' + (success ? 'has-text-success' : 'has-text-danger');
+
+			if (success) {
+				title.textContent = '✅ Restore Complete';
+				body.innerHTML =
+					'<p>Restored successfully.</p>' +
+					'<ul class="mt-2">' +
+					(data.restored || []).map(function (f) { return '<li><code>' + escHtml(f) + '</code></li>'; }).join('') +
+					'</ul>' +
+					'<p class="mt-3 has-text-grey is-size-7">Pre-restore safety copy saved at <code>backups/pre_restore_safety/pre_restore_' + escHtml(data.safety_backup_ts || '') + '_*.json</code></p>' +
+					'<p class="mt-2 has-text-warning"><strong>Click "Reload Page" to see the restored data.</strong></p>';
+			} else {
+				title.textContent = '❌ Restore Failed';
+				const errs = (data.errors || []).concat(data.error ? [data.error] : []);
+				body.innerHTML =
+					'<p>Restore encountered errors:</p>' +
+					'<ul class="mt-2">' + errs.map(function (e) { return '<li class="has-text-danger">' + escHtml(e) + '</li>'; }).join('') + '</ul>' +
+					(data.restored && data.restored.length ? '<p class="mt-2 has-text-warning">Partially restored: ' + data.restored.join(', ') + '</p>' : '');
+			}
+
+			document.getElementById('restoreResultModal').classList.add('is-active');
+		}
+
+		/* ── Utilities ──────────────────────────────────────────────────── */
+
+		function escHtml(str) {
+			return String(str || '')
+				.replace(/&/g, '&amp;')
+				.replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;')
+				.replace(/"/g, '&quot;');
+		}
+	})();
+</script>
+{% endblock %}

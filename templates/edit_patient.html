@@ -4,17 +4,281 @@
 
 <form method="POST" class="box">
   <input type="hidden" name="id" value="{{ patient.id }}">
+    <input type="hidden" name="rename_confirmed" id="rename_confirmed" value="0">
+
+    {% if error_message %}
+    <article class="message is-danger">
+        <div class="message-body">{{ error_message }}</div>
+    </article>
+    {% endif %}
+
+    {% if duplicate_patients %}
+    <article class="message is-warning">
+        <div class="message-body">
+            <strong>Trùng SĐT/Mã với bệnh nhân khác:</strong>
+            <ul>
+                {% for p in duplicate_patients %}
+                <li>{{ p.kid_name }} - {{ p.parent_name }} - {{ p.phone }}</li>
+                {% endfor %}
+            </ul>
+            <p>Placeholder xử lý trùng: tạm thời chặn lưu để tránh ghi đè nhầm dữ liệu.</p>
+        </div>
+    </article>
+    {% endif %}
+
   <div class="field"><label class="label">Tên bé</label><input class="input" name="kid_name"
       value="{{ patient.kid_name }}"></div>
   <div class="field"><label class="label">Ngày sinh bé</label><input class="input" name="kid_birthday"
       value="{{ patient.kid_birthday }}"></div>
   <div class="field"><label class="label">Tên Ba Mẹ</label><input class="input" name="name" value="{{ patient.name }}">
   </div>
-  <div class="field"><label class="label">SĐT</label><input class="input" name="phone" value="{{ patient.phone }}">
+    <div class="field"><label class="label">SĐT</label><input class="input" id="phone_input" name="phone" value="{{ patient.phone }}">
   </div>
   <div class="field"><label class="label">Địa chỉ</label><input class="input" name="address"
       value="{{ patient.address }}"></div>
-  <button class="button is-success" name="action" value="update">Update</button>
+    <div class="buttons">
+        <button class="button is-link" type="button" id="previewRenameBtn">Xem trước đổi tên file</button>
+        <button class="button is-success" name="action" value="update" id="updateBtn">Update</button>
+    </div>
   <button class="button is-danger" name="action" value="delete">Delete (Xóa)</button>
 </form>
+
+<div class="modal" id="renamePreviewModal">
+    <div class="modal-background"></div>
+    <div class="modal-card" style="width: min(1200px, 96vw);">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Xem trước đổi tên file theo SĐT/Mã</p>
+            <button class="delete" aria-label="close" id="closeRenamePreview"></button>
+        </header>
+        <section class="modal-card-body">
+            <article class="message is-warning" id="duplicateWarnBox" style="display:none;">
+                <div class="message-body" id="duplicateWarnText"></div>
+            </article>
+
+            <div class="table-container">
+                <table class="table is-striped is-fullwidth is-hoverable is-size-7">
+                    <thead>
+                        <tr>
+                            <th>Loại</th>
+                            <th>Old name</th>
+                            <th>New name</th>
+                            <th>View old</th>
+                            <th>View new</th>
+                        </tr>
+                    </thead>
+                    <tbody id="renamePreviewBody"></tbody>
+                </table>
+            </div>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-primary" id="confirmRenameBtn">Tôi xác nhận đổi tên và lưu</button>
+            <button class="button" id="cancelRenameBtn">Đóng</button>
+        </footer>
+    </div>
+</div>
+
+<div class="modal" id="filePreviewModal">
+    <div class="modal-background"></div>
+    <div class="modal-content" style="width:min(1200px,96vw);height:min(90vh,900px);background:#fff;border-radius:8px;padding:10px;">
+        <img id="filePreviewImage" src="" alt="preview" style="max-width:100%;max-height:100%;display:none;">
+        <iframe id="filePreviewPdf" src="" style="width:100%;height:100%;display:none;border:0;"></iframe>
+    </div>
+    <button class="modal-close is-large" aria-label="close" id="closeFilePreview"></button>
+</div>
+
+<script>
+    (function () {
+        const originalPhone = "{{ patient.phone or '' }}";
+        const patientId = "{{ patient.id }}";
+        const form = document.querySelector('form.box');
+        const phoneInput = document.getElementById('phone_input');
+        const renameConfirmedInput = document.getElementById('rename_confirmed');
+        const previewBtn = document.getElementById('previewRenameBtn');
+        const updateBtn = document.getElementById('updateBtn');
+
+        const previewModal = document.getElementById('renamePreviewModal');
+        const closePreviewBtn = document.getElementById('closeRenamePreview');
+        const cancelPreviewBtn = document.getElementById('cancelRenameBtn');
+        const confirmPreviewBtn = document.getElementById('confirmRenameBtn');
+        const previewBody = document.getElementById('renamePreviewBody');
+        const duplicateWarnBox = document.getElementById('duplicateWarnBox');
+        const duplicateWarnText = document.getElementById('duplicateWarnText');
+
+        const fileModal = document.getElementById('filePreviewModal');
+        const closeFilePreviewBtn = document.getElementById('closeFilePreview');
+        const previewImage = document.getElementById('filePreviewImage');
+        const previewPdf = document.getElementById('filePreviewPdf');
+
+        let hasDuplicate = false;
+        let didPreviewCurrentValue = false;
+
+        function normalizeInput(value) {
+            return String(value || '').trim().replace(/\s+/g, '_');
+        }
+
+        function closePreviewModal() {
+            previewModal.classList.remove('is-active');
+        }
+
+        function openPreviewModal() {
+            previewModal.classList.add('is-active');
+        }
+
+        function closeFileModal() {
+            fileModal.classList.remove('is-active');
+            previewImage.style.display = 'none';
+            previewPdf.style.display = 'none';
+            previewImage.src = '';
+            previewPdf.src = '';
+        }
+
+        function openFileViewer(url) {
+            if (!url) {
+                alert('Không có đường dẫn để xem.');
+                return;
+            }
+            const lower = url.toLowerCase();
+            if (lower.endsWith('.pdf')) {
+                previewPdf.src = url;
+                previewPdf.style.display = 'block';
+            } else {
+                previewImage.src = url;
+                previewImage.style.display = 'block';
+            }
+            fileModal.classList.add('is-active');
+        }
+
+        function createViewButton(url, exists) {
+            if (!exists || !url) {
+                return '<span class="tag is-light">N/A</span>';
+            }
+            return `<button type="button" class="button is-small is-info is-light view-file-btn" data-url="${url}">Xem</button>`;
+        }
+
+        async function loadPreview() {
+            const normalizedPhone = normalizeInput(phoneInput.value);
+            const normalizedOriginal = normalizeInput(originalPhone);
+            renameConfirmedInput.value = '0';
+            didPreviewCurrentValue = false;
+
+            if (normalizedPhone === normalizedOriginal) {
+                previewBody.innerHTML = '<tr><td colspan="5">Không đổi SĐT/Mã, không có file cần rename.</td></tr>';
+                duplicateWarnBox.style.display = 'none';
+                hasDuplicate = false;
+                openPreviewModal();
+                didPreviewCurrentValue = true;
+                return;
+            }
+
+            previewBody.innerHTML = '<tr><td colspan="5">Đang tải...</td></tr>';
+            duplicateWarnBox.style.display = 'none';
+            hasDuplicate = false;
+            openPreviewModal();
+
+            try {
+                const response = await fetch(`/api/patient/${patientId}/phone-rename-preview`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ new_phone: phoneInput.value })
+                });
+                const data = await response.json();
+                if (!response.ok || data.status !== 'success') {
+                    throw new Error(data.message || 'Preview failed');
+                }
+
+                hasDuplicate = !!data.duplicate;
+                didPreviewCurrentValue = true;
+
+                if (hasDuplicate) {
+                    const names = (data.duplicates || []).map(d => `${d.kid_name} - ${d.parent_name} - ${d.phone}`).join('<br>');
+                    duplicateWarnText.innerHTML = `Phát hiện trùng SĐT/Mã với bệnh nhân khác:<br>${names}<br><br>Placeholder hiện tại: hệ thống chặn lưu.`;
+                    duplicateWarnBox.style.display = '';
+                    confirmPreviewBtn.disabled = true;
+                } else {
+                    duplicateWarnBox.style.display = 'none';
+                    confirmPreviewBtn.disabled = false;
+                }
+
+                const rows = data.rows || [];
+                if (!rows.length) {
+                    previewBody.innerHTML = '<tr><td colspan="5">Không có file cần đổi tên.</td></tr>';
+                    return;
+                }
+
+                previewBody.innerHTML = rows.map(row => {
+                    return `
+                    <tr>
+                        <td>${row.kind}</td>
+                        <td>${row.old_name || ''}</td>
+                        <td>${row.new_name || ''}</td>
+                        <td>${createViewButton(row.old_url, row.old_exists)}</td>
+                        <td>${createViewButton(row.new_url, row.new_exists)}</td>
+                    </tr>`;
+                }).join('');
+            } catch (err) {
+                previewBody.innerHTML = `<tr><td colspan="5">Lỗi xem trước: ${err.message}</td></tr>`;
+                didPreviewCurrentValue = false;
+            }
+        }
+
+        previewBtn.addEventListener('click', loadPreview);
+        closePreviewBtn.addEventListener('click', closePreviewModal);
+        cancelPreviewBtn.addEventListener('click', closePreviewModal);
+        confirmPreviewBtn.addEventListener('click', function () {
+            if (hasDuplicate) {
+                alert('Đang bị trùng SĐT/Mã. Không thể xác nhận.');
+                return;
+            }
+            renameConfirmedInput.value = '1';
+            closePreviewModal();
+            alert('Đã xác nhận. Bấm Update để lưu.');
+        });
+
+        previewBody.addEventListener('click', function (evt) {
+            const btn = evt.target.closest('.view-file-btn');
+            if (!btn) {
+                return;
+            }
+            openFileViewer(btn.dataset.url);
+        });
+
+        closeFilePreviewBtn.addEventListener('click', closeFileModal);
+        fileModal.querySelector('.modal-background').addEventListener('click', closeFileModal);
+
+        phoneInput.addEventListener('input', function () {
+            renameConfirmedInput.value = '0';
+            didPreviewCurrentValue = false;
+        });
+
+        form.addEventListener('submit', function (evt) {
+            const submitter = evt.submitter;
+            if (!submitter || submitter.value !== 'update') {
+                return;
+            }
+
+            const normalizedPhone = normalizeInput(phoneInput.value);
+            const normalizedOriginal = normalizeInput(originalPhone);
+            if (normalizedPhone === normalizedOriginal) {
+                return;
+            }
+
+            if (!didPreviewCurrentValue) {
+                evt.preventDefault();
+                alert('Vui lòng bấm "Xem trước đổi tên file" trước khi lưu.');
+                return;
+            }
+            if (renameConfirmedInput.value !== '1') {
+                evt.preventDefault();
+                alert('Vui lòng xác nhận trong cửa sổ xem trước trước khi bấm Update.');
+                return;
+            }
+            if (hasDuplicate) {
+                evt.preventDefault();
+                alert('SĐT/Mã mới đang trùng với bệnh nhân khác. Placeholder hiện tại: chặn lưu.');
+            }
+        });
+    })();
+</script>
 {% endblock %}

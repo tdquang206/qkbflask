@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from shared_db import users_table
@@ -7,6 +7,11 @@ from routes.settings import load_settings
 from utils.storage import export_decrypted_databases, get_json_database_files
 import os
 import io
+import re
+import json
+import difflib
+import shutil
+from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -293,3 +298,195 @@ def edit_exam_info():
                          patient=patient_found,
                          doctors=all_doctors, 
                          departments=departments)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Checkpoint Restore
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ADM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ADM_CP_DIR = os.path.abspath(os.path.join(_ADM_ROOT, 'backups', 'checkpoints'))
+_ADM_DB_FILES = ['db.json', 'db_services.json', 'money_log.json', 'db_mua_thuoc.json']
+_CP_FNAME_RE = re.compile(
+    r'^(.+)_(\d{8}_\d{6})_(db\.json|db_services\.json|money_log\.json|db_mua_thuoc\.json)$'
+)
+_SAFE_TAG_RE = re.compile(r'^[\w][\w\-]{0,80}$')
+_SAFE_TS_RE = re.compile(r'^\d{8}_\d{6}$')
+
+
+def _list_checkpoint_groups():
+    if not os.path.exists(_ADM_CP_DIR):
+        return []
+    groups = {}
+    for fname in os.listdir(_ADM_CP_DIR):
+        m = _CP_FNAME_RE.match(fname)
+        if not m:
+            continue
+        tag, ts, db_file = m.group(1), m.group(2), m.group(3)
+        key = f"{tag}||{ts}"
+        if key not in groups:
+            groups[key] = {
+                'tag': tag,
+                'timestamp': ts,
+                'display_time': f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}",
+                'files': [],
+                'key': key,
+            }
+        fpath = os.path.join(_ADM_CP_DIR, fname)
+        groups[key]['files'].append({
+            'db_file': db_file,
+            'filename': fname,
+            'size': os.path.getsize(fpath),
+        })
+    return sorted(groups.values(), key=lambda x: x['timestamp'], reverse=True)
+
+
+def _get_record_label(record):
+    if not isinstance(record, dict):
+        return str(record)[:60]
+    for field in ['name', 'full_name', 'username', 'phone', 'service_name', 'drug_name']:
+        val = record.get(field)
+        if val:
+            return str(val)[:60]
+    keys = list(record.keys())[:3]
+    return ', '.join(keys)
+
+
+def _flatten_tinydb(data):
+    flat = {}
+    if not isinstance(data, dict):
+        return flat
+    for table_name, table_data in data.items():
+        if isinstance(table_data, dict):
+            for doc_id, record in table_data.items():
+                flat[f"{table_name}/{doc_id}"] = record
+    return flat
+
+
+def _compute_db_diff(db_file, checkpoint_data, live_data):
+    result = {'db_file': db_file, 'changed': 0, 'added': 0, 'removed': 0, 'records': []}
+    cp_flat = _flatten_tinydb(checkpoint_data)
+    live_flat = _flatten_tinydb(live_data)
+    all_keys = sorted(set(cp_flat.keys()) | set(live_flat.keys()))
+    for key in all_keys:
+        cp_val = cp_flat.get(key)
+        live_val = live_flat.get(key)
+        if cp_val is None:
+            result['added'] += 1
+            result['records'].append({
+                'key': key, 'status': 'added',
+                'label': _get_record_label(live_val), 'diff_lines': [],
+            })
+        elif live_val is None:
+            result['removed'] += 1
+            result['records'].append({
+                'key': key, 'status': 'removed',
+                'label': _get_record_label(cp_val), 'diff_lines': [],
+            })
+        elif cp_val != live_val:
+            result['changed'] += 1
+            cp_lines = json.dumps(cp_val, ensure_ascii=False, indent=2).splitlines(keepends=True)
+            live_lines = json.dumps(live_val, ensure_ascii=False, indent=2).splitlines(keepends=True)
+            diff = list(difflib.unified_diff(
+                cp_lines, live_lines,
+                fromfile=f"checkpoint/{key}",
+                tofile=f"current/{key}",
+                lineterm='',
+            ))
+            truncated = len(diff) > 300
+            result['records'].append({
+                'key': key, 'status': 'changed',
+                'label': _get_record_label(live_val),
+                'diff_lines': diff[:300],
+                'truncated': truncated,
+                'total_lines': len(diff),
+            })
+    return result
+
+
+@admin_bp.route('/admin/checkpoints')
+def checkpoints_page():
+    groups = _list_checkpoint_groups()
+    return render_template('admin_checkpoint_restore.html', groups=groups)
+
+
+@admin_bp.route('/api/admin/checkpoint/diff', methods=['POST'])
+def checkpoint_diff():
+    from utils.storage import decrypt_file
+    body = request.get_json(silent=True) or {}
+    tag = body.get('tag', '')
+    ts = body.get('timestamp', '')
+    if not _SAFE_TAG_RE.match(tag):
+        return jsonify({'error': 'Invalid tag'}), 400
+    if not _SAFE_TS_RE.match(ts):
+        return jsonify({'error': 'Invalid timestamp'}), 400
+    summary = {
+        'total_changed': 0, 'total_added': 0, 'total_removed': 0, 'files_compared': []
+    }
+    diffs = []
+    for db_file in _ADM_DB_FILES:
+        cp_path = os.path.join(_ADM_CP_DIR, f"{tag}_{ts}_{db_file}")
+        live_path = os.path.join(_ADM_ROOT, db_file)
+        if not os.path.exists(cp_path):
+            continue
+        try:
+            cp_data = decrypt_file(cp_path)
+            live_data = decrypt_file(live_path) if os.path.exists(live_path) else {}
+        except Exception as exc:
+            diffs.append({'db_file': db_file, 'error': str(exc), 'records': []})
+            continue
+        file_diff = _compute_db_diff(db_file, cp_data, live_data)
+        summary['total_changed'] += file_diff['changed']
+        summary['total_added'] += file_diff['added']
+        summary['total_removed'] += file_diff['removed']
+        summary['files_compared'].append(db_file)
+        diffs.append(file_diff)
+    return jsonify({'summary': summary, 'diffs': diffs})
+
+
+@admin_bp.route('/api/admin/checkpoint/restore', methods=['POST'])
+def restore_checkpoint():
+    body = request.get_json(silent=True) or {}
+    tag = body.get('tag', '')
+    ts = body.get('timestamp', '')
+    confirmed = body.get('confirm', False)
+    if not confirmed:
+        return jsonify({'error': 'Must confirm restore'}), 400
+    if not _SAFE_TAG_RE.match(tag):
+        return jsonify({'error': 'Invalid tag'}), 400
+    if not _SAFE_TS_RE.match(ts):
+        return jsonify({'error': 'Invalid timestamp'}), 400
+
+    now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    safety_dir = os.path.abspath(os.path.join(_ADM_ROOT, 'backups', 'pre_restore_safety'))
+    os.makedirs(safety_dir, exist_ok=True)
+    for db_file in _ADM_DB_FILES:
+        live_path = os.path.join(_ADM_ROOT, db_file)
+        if os.path.exists(live_path):
+            shutil.copy(live_path, os.path.join(safety_dir, f"pre_restore_{now_ts}_{db_file}"))
+
+    restored = []
+    errors = []
+    for db_file in _ADM_DB_FILES:
+        cp_path = os.path.join(_ADM_CP_DIR, f"{tag}_{ts}_{db_file}")
+        if not os.path.exists(cp_path):
+            continue
+        live_path = os.path.join(_ADM_ROOT, db_file)
+        try:
+            shutil.copy(cp_path, live_path)
+            restored.append(db_file)
+        except Exception as exc:
+            errors.append(f"{db_file}: {str(exc)}")
+
+    if errors:
+        return jsonify({'success': False, 'errors': errors, 'restored': restored}), 500
+
+    from utils.db_logger import log_action
+    log_action('db_restore', {
+        'checkpoint_tag': tag,
+        'checkpoint_timestamp': ts,
+        'restored_files': restored,
+        'safety_backup_ts': now_ts,
+        'restored_by': current_user.username,
+    })
+    return jsonify({'success': True, 'restored': restored, 'safety_backup_ts': now_ts})

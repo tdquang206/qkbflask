@@ -1,3 +1,25 @@
+# Version 0.13.260325 (2026-03-25)
+==================================================
+
+## Project Analysis & Summary
+- Improved the patient exam history page to show both **drugs and services** for each exam.
+- Added a dedicated services block with per-exam service totals for better billing visibility.
+
+## Improvement
+- **Patient Exam History (`/patient/<patient_id>/exams`)**:
+  - Added a services section under each exam card in the history view.
+  - Each service row now displays:
+    - Service name
+    - Unit price
+  - Added **"Tổng tiền dịch vụ"** (total service amount) per exam.
+  - Added empty-state text **"Toa không dịch vụ"** when no services are recorded.
+
+## Technical Notes
+- Updated template rendering in `templates/previous_exams.html`:
+  - Uses `exam.get('services', [])` for backward compatibility with older exams.
+  - Filters invalid entries via `selectattr("name")` before render.
+  - Computes service total in-template using a local namespace accumulator.
+
 # Version 0.12.260324 (2026-03-24)
 ==================================================
 

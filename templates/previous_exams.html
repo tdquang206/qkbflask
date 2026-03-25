@@ -247,6 +247,16 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    // When users navigate back from edit/new exam, the browser can restore a stale
+    // bfcache snapshot of this page. Force a reload so newly created exams appear.
+    window.addEventListener('pageshow', function (event) {
+      const navEntry = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      const isBackForward = navEntry && navEntry.type === 'back_forward';
+      if (event.persisted || isBackForward) {
+        window.location.reload();
+      }
+    });
+
     // 1. Initialize Viewer for each exam gallery (Quick View)
     document.querySelectorAll('.images-gallery').forEach(gallery => {
       new Viewer(gallery, {

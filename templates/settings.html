@@ -4,138 +4,92 @@
     <div class="container">
         <h1 class="title">Cài đặt</h1>
 
-        <!-- Submenu Tabs -->
-        <div class="tabs is-boxed">
-            <ul>
-                <li class="is-active" id="tab-overview">
-                    <a href="#overview" onclick="switchTab('overview')">Tổng quan</a>
-                </li>
-                <li id="tab-services">
-                    <a href="#services" onclick="switchTab('services')">Khoa / Dịch vụ</a>
-                </li>
-                <li id="tab-template">
-                    <a href="{{ url_for('settings.manage_template') }}">Mẫu đơn thuốc in ra</a>
-                </li>
-            </ul>
-        </div>
+        <form method="POST" action="/settings">
+            <div class="box" id="discord">
+                <h2 class="subtitle">Discord</h2>
 
-        <!-- Overview Section -->
-        <div id="overview-content" class="tab-content is-active">
-            <form method="POST" action="/settings">
-                <div class="box">
-                    <h2 class="subtitle">Cấu hình Discord</h2>
-
-                    <div class="field">
-                        <label class="label">Webhook URL</label>
-                        <div class="control">
-                            <input class="input" type="text" name="discord_webhook_url"
-                                value="{{ settings.discord_webhook_url }}"
-                                placeholder="https://discord.com/api/webhooks/...">
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label">Mặc định gửi kèm:</label>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_date" {% if settings.include_date %}checked{% endif
-                                    %}>
-                                Ngày khám
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_kid_name" {% if settings.include_kid_name
-                                    %}checked{% endif %}> Tên bé
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_parent_name" {% if settings.include_parent_name
-                                    %}checked{% endif %}> Phụ huynh
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_phone" {% if settings.include_phone %}checked{%
-                                    endif %}> SĐT
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_address" {% if settings.include_address %}checked{%
-                                    endif %}> Địa chỉ
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_total_money" {% if settings.include_total_money
-                                    %}checked{% endif %}> Tổng tiền
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="include_table" {% if settings.include_table %}checked{%
-                                    endif %}> 💊 Kèm bảng thuốc (text)
-                            </label>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox">
-                                <input type="checkbox" name="attach_image" {% if settings.attach_image %}checked{% endif
-                                    %}>
-                                🖼️ Đính kèm ảnh đơn thuốc
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="box">
-                    <h2 class="subtitle">Danh sách Khoa / Loại khám</h2>
-                    <div class="field">
-                        <label class="label">Nhập mỗi dòng một tên khoa (Ví dụ: Nhi khoa, Da liễu, ...)</label>
-                        <div class="control">
-                            <textarea class="textarea" name="departments"
-                                rows="5">{{ settings.departments | join('\n') }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="field is-grouped">
+                <div class="field">
+                    <label class="label">Webhook URL</label>
                     <div class="control">
-                        <button class="button is-link">Lưu cài đặt</button>
+                        <input class="input" type="text" name="discord_webhook_url"
+                            value="{{ settings.discord_webhook_url }}"
+                            placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label">Mặc định gửi kèm:</label>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_date" {% if settings.include_date %}checked{% endif %}>
+                            Ngày khám
+                        </label>
                     </div>
                     <div class="control">
-                        <a href="/" class="button is-light">Hủy</a>
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_kid_name" {% if settings.include_kid_name %}checked{%
+                                endif %}> Tên bé
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_parent_name" {% if settings.include_parent_name
+                                %}checked{% endif %}> Phụ huynh
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_phone" {% if settings.include_phone %}checked{% endif
+                                %}> SĐT
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_address" {% if settings.include_address %}checked{%
+                                endif %}> Địa chỉ
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_total_money" {% if settings.include_total_money
+                                %}checked{% endif %}> Tổng tiền
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="include_table" {% if settings.include_table %}checked{% endif
+                                %}> 💊 Kèm bảng thuốc (text)
+                        </label>
+                    </div>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" name="attach_image" {% if settings.attach_image %}checked{% endif %}>
+                            🖼️ Đính kèm ảnh đơn thuốc
+                        </label>
                     </div>
                 </div>
-            </form>
-        </div>
-
-        <!-- Services Section -->
-        <div id="services-content" class="tab-content" style="display: none;">
-            <div class="box">
-                <h2 class="subtitle">Quản lý Dịch vụ</h2>
-                <p>
-                    <a href="/settings/services" class="button is-link">Quản lý chi tiết</a>
-                </p>
             </div>
-        </div>
+
+            <div class="box" id="departments">
+                <h2 class="subtitle">Khoa / Phòng khám</h2>
+                <div class="field">
+                    <label class="label">Nhập mỗi dòng một tên khoa (Ví dụ: Nhi khoa, Da liễu, ...)</label>
+                    <div class="control">
+                        <textarea class="textarea" name="departments"
+                            rows="5">{{ settings.departments | join('\n') }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-link">Lưu cài đặt</button>
+                </div>
+                <div class="control">
+                    <a href="/" class="button is-light">Hủy</a>
+                </div>
+            </div>
+        </form>
     </div>
 </section>
-
-<script>
-    function switchTab(tabName) {
-        // Hide all tab contents
-        const tabs = document.querySelectorAll('.tab-content');
-        tabs.forEach(tab => tab.style.display = 'none');
-
-        // Remove active class from all tab items
-        const tabItems = document.querySelectorAll('.tabs li');
-        tabItems.forEach(item => item.classList.remove('is-active'));
-
-        // Show selected tab content and mark as active
-        document.getElementById(tabName + '-content').style.display = 'block';
-        document.getElementById('tab-' + tabName).classList.add('is-active');
-    }
-</script>
 {% endblock %}

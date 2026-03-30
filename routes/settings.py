@@ -3,6 +3,7 @@ import json
 import os
 import uuid
 from tinydb import Query
+from flask_login import login_required, current_user
 from utils.template_renderer import load_exam_template, save_exam_template, get_default_template
 
 settings_bp = Blueprint('settings', __name__)
@@ -37,10 +38,17 @@ def save_settings(settings):
         print(f"Error saving settings: {e}")
         return False
 
-@settings_bp.route('/settings', methods=['GET', 'POST'])
+@settings_bp.route('/settings', methods=['GET'])
+@login_required
 def index():
+    return redirect(url_for('settings.discord_settings'))
+
+
+@settings_bp.route('/settings/discord', methods=['GET', 'POST'])
+@login_required
+def discord_settings():
     settings = load_settings()
-    
+
     if request.method == 'POST':
         settings['discord_webhook_url'] = request.form.get('discord_webhook_url', '')
         settings['include_date'] = 'include_date' in request.form
@@ -51,44 +59,76 @@ def index():
         settings['include_total_money'] = 'include_total_money' in request.form
         settings['include_table'] = 'include_table' in request.form
         settings['attach_image'] = 'attach_image' in request.form
-        
-        # Handle departments (textarea, one per line)
+
+        if save_settings(settings):
+            flash("Đã lưu cài đặt thành công", "success")
+        else:
+            flash("Lỗi khi lưu cài đặt", "error")
+
+        return redirect(url_for('settings.discord_settings'))
+
+    return render_template('settings_discord.html', settings=settings)
+
+
+@settings_bp.route('/settings/departments', methods=['GET', 'POST'])
+@login_required
+def departments_settings():
+    settings = load_settings()
+
+    from shared_db import users_table
+    users = users_table.all()
+
+    if request.method == 'POST':
+        if current_user.role != 'admin':
+            flash("Bạn không có quyền chỉnh sửa danh sách khoa/phòng khám.", "error")
+            return redirect(url_for('settings.departments_settings'))
+
         departments_raw = request.form.get('departments', '')
-        
-        # Logic to handle cascading delete/reset
         old_departments = set(settings.get('departments', []))
         new_departments_list = [line.strip() for line in departments_raw.split('\n') if line.strip()]
         new_departments = set(new_departments_list)
-        
-        settings['departments'] = new_departments_list
 
+        settings['departments'] = new_departments_list
         removed_departments = old_departments - new_departments
-        
+
         if save_settings(settings):
-            flash("Đã lưu cài đặt thành công", "success")
-            
-            # Cascading update for removed departments
+            flash("Đã lưu danh sách khoa/phòng khám", "success")
+
             if removed_departments:
-                from shared_db import users_table
-                from tinydb import Query
                 UserQuery = Query()
-                
-                # Find users with removed departments
                 users_to_update = users_table.search(UserQuery.department.one_of(list(removed_departments)))
                 count = 0
                 for user in users_to_update:
                     users_table.update({'department': 'Chưa có PK'}, doc_ids=[user.doc_id])
                     count += 1
-                
+
                 if count > 0:
                     flash(f"Đã cập nhật {count} người dùng về trạng thái 'Chưa có PK' do xóa phòng khám.", "warning")
-
         else:
             flash("Lỗi khi lưu cài đặt", "error")
-            
-        return redirect(url_for('settings.index'))
-        
-    return render_template('settings.html', settings=settings)
+
+        return redirect(url_for('settings.departments_settings'))
+
+    departments = settings.get('departments', [])
+    doctors_by_department = {}
+    for department in departments:
+        doctors_by_department[department] = [
+            user for user in users
+            if user.get('department') == department and user.get('role') in ('doctor', 'admin')
+        ]
+
+    unassigned_users = [
+        user for user in users
+        if user.get('department') not in departments
+    ]
+
+    return render_template(
+        'settings_departments.html',
+        settings=settings,
+        doctors_by_department=doctors_by_department,
+        unassigned_users=unassigned_users,
+        is_admin=(current_user.role == 'admin')
+    )
 
 @settings_bp.route('/changelog')
 def changelog():

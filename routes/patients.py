@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
+from flask_login import login_required
 from tinydb import Query
 from werkzeug.utils import secure_filename
 import os
@@ -319,6 +320,7 @@ def _rename_patient_assets(patient_doc, old_phone, new_phone):
 
 
 @patients_bp.route('/api/patient/<patient_id>/phone-rename-preview', methods=['POST'])
+@login_required
 def phone_rename_preview(patient_id):
     try:
         results = patients.search(Query().id == patient_id)

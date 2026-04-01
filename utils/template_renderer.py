@@ -86,7 +86,7 @@ def get_default_template():
             "header": "# Phiếu Khám Bệnh - {exam_date}\n\n**Bé:** {kid_name} ({kid_birthday}) - {weight}kg {height}cm\n**Phụ huynh:** {parent_name}\n**SĐT:** {phone}\n**Địa chỉ:** {address}\n\n**Ghi chú / Khám bệnh:** {history}\n**Hẹn tái khám:** {expected_date}\n\n",
             "drugs_section": "## Thuốc\n\n| # | Tên thuốc | SL | Ghi chú |\n|---|----------|----|---------|\n{drug_rows}\n\n",
             "drug_row_template": "| {index} | {name} | {quantity} | {note} |",
-            "services_section": "## Dịch vụ\n\n| # | Tên dịch vụ | Giá |\n|---|-------------|-----|\n{service_rows}\n\n",
+            "services_section": "## Dịch vụ\n\n| # | Tên dịch vụ | SL | Giá | Thanh toán trước |\n|---|-------------|----|-----|------------------|\n{service_rows}\n\n",
             "service_row_template": "| {index} | {name} | {quantity} | {price} | {prepaid_status} |",
             "footer": "**Tổng tiền:** {total_money} VND\n\n*Bác sĩ khám: {doctor_name}*\n\n`{footer_code}`"
         },

@@ -30,6 +30,9 @@ def test_safe_join_under_rejects_traversal(tmp_path):
     base.mkdir()
 
     with pytest.raises(ValueError):
+        _safe_join_under(str(base), '../evil.pdf', '.pdf')
+
+    with pytest.raises(ValueError):
         _safe_join_under(str(base), '..\\evil.pdf', '.pdf')
 
 

@@ -1,0 +1,141 @@
+/* ── Diff line coloring ──────────────────────────────────────────────── */
+.diff-view {
+	font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-all;
+	margin: 0;
+	background: #f8f8f8;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	overflow-x: auto;
+	padding: 0;
+}
+
+.diff-line {
+	display: block;
+	padding: 1px 8px;
+	min-height: 1.5em;
+}
+
+.diff-line-add {
+	background: #e6ffed;
+	color: #22863a;
+}
+
+.diff-line-remove {
+	background: #ffebe9;
+	color: #b31d28;
+}
+
+.diff-line-hunk {
+	background: #dbedff;
+	color: #0056b3;
+	font-weight: bold;
+}
+
+.diff-line-file {
+	background: #f0f0f0;
+	color: #666;
+	font-weight: bold;
+}
+
+.diff-line-ctx {
+	background: transparent;
+	color: #333;
+}
+
+/* ── Record diff block ───────────────────────────────────────────────── */
+.diff-record {
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	margin-bottom: 8px;
+	overflow: hidden;
+}
+
+.diff-record-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	background: #fafafa;
+	cursor: pointer;
+	user-select: none;
+	border-bottom: 1px solid #e0e0e0;
+}
+
+.diff-record-header:hover {
+	background: #f0f0f0;
+}
+
+.diff-record-header .toggle-icon {
+	margin-left: auto;
+	color: #888;
+}
+
+.diff-record-body {
+	display: none;
+}
+
+.diff-record-body.is-open {
+	display: block;
+}
+
+.status-badge {
+	font-size: 11px;
+	font-weight: 700;
+	padding: 2px 6px;
+	border-radius: 3px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	white-space: nowrap;
+}
+
+.status-changed {
+	background: #fff3cd;
+	color: #856404;
+}
+
+.status-added {
+	background: #d1e7dd;
+	color: #0f5132;
+}
+
+.status-removed {
+	background: #f8d7da;
+	color: #842029;
+}
+
+.truncate-note {
+	font-size: 11px;
+	color: #888;
+	padding: 4px 8px;
+	background: #fffff0;
+	border-top: 1px solid #e0e0e0;
+}
+
+/* ── DB file section ─────────────────────────────────────────────────── */
+.diff-file-section {
+	margin-bottom: 1.5rem;
+}
+
+.diff-file-header-bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	background: #24292f;
+	color: #e6edf3;
+	border-radius: 4px 4px 0 0;
+	font-family: monospace;
+	font-size: 13px;
+	font-weight: bold;
+}
+
+.diff-file-header-bar .count-badge {
+	font-size: 11px;
+	padding: 2px 6px;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.15);
+}

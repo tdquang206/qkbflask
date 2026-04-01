@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
+from flask_login import login_required
 from tinydb import Query, TinyDB
 from rapidfuzz import fuzz
 from shared_db import drugs_table as drugs
@@ -9,7 +10,6 @@ import html as _html
 import requests as _requests
 from datetime import datetime
 from unicodedata import normalize
-from collections import defaultdict
 
 drugs_bp = Blueprint('drugs', __name__)
 
@@ -243,6 +243,7 @@ tbody tr:hover{{background:rgba(255,255,255,.03)}}
 
 
 @drugs_bp.route('/api/drugs/send_discord', methods=['POST'])
+@login_required
 def api_send_drugs_discord():
     SETTINGS_FILE = 'user_settings.json'
     if not os.path.exists(SETTINGS_FILE):

@@ -151,6 +151,7 @@ def changelog():
 # ============================================================================
 
 @settings_bp.route('/settings/services', methods=['GET'])
+@login_required
 def services_management():
     """Display services management page"""
     settings = load_settings()

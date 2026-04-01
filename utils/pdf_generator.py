@@ -14,7 +14,8 @@ def _safe_path_segment(value, fallback="x"):
 
 def _safe_join_under(base_dir, relative_name, allowed_ext):
     base_abs = os.path.realpath(os.path.abspath(base_dir))
-    candidate = os.path.realpath(os.path.abspath(os.path.join(base_abs, relative_name)))
+    normalized_name = relative_name.replace("\\", "/")
+    candidate = os.path.realpath(os.path.abspath(os.path.join(base_abs, normalized_name)))
     if os.path.commonpath([base_abs, candidate]) != base_abs:
         raise ValueError("Invalid artifact path")
     if os.path.splitext(candidate)[1].lower() != allowed_ext.lower():

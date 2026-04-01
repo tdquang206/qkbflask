@@ -1013,26 +1013,57 @@
 
       const row = document.createElement("tr");
       row.dataset.price = price;
-      row.innerHTML = `
-    <td></td>
-    <td>
-      ${name}
-      <input type="hidden" name="drug_name" value="${name}">
-    </td>
-    <td class="quantity">
-      ${qty}
-      <input type="hidden" name="drug_quantity" value="${qty}">
-    </td>
-    <td>
-      ${note}
-      <input type="hidden" name="drug_note" value="${note}">
-    </td>
-    <td class="drug-price-col" hidden>
-      ${price}
-      <input type="hidden" name="drug_price" value="${price}">
-    </td>
-    <td><button type="button" class="button is-small is-danger removeRow">X</button></td>
-  `;
+
+      const tdIndex = document.createElement("td");
+
+      const tdName = document.createElement("td");
+      tdName.textContent = name;
+      const nameInput = document.createElement("input");
+      nameInput.type = "hidden";
+      nameInput.name = "drug_name";
+      nameInput.value = name;
+      tdName.appendChild(nameInput);
+
+      const tdQty = document.createElement("td");
+      tdQty.className = "quantity";
+      tdQty.textContent = String(qty);
+      const qtyInput = document.createElement("input");
+      qtyInput.type = "hidden";
+      qtyInput.name = "drug_quantity";
+      qtyInput.value = String(qty);
+      tdQty.appendChild(qtyInput);
+
+      const tdNote = document.createElement("td");
+      tdNote.textContent = note;
+      const noteInput = document.createElement("input");
+      noteInput.type = "hidden";
+      noteInput.name = "drug_note";
+      noteInput.value = note;
+      tdNote.appendChild(noteInput);
+
+      const tdPrice = document.createElement("td");
+      tdPrice.className = "drug-price-col";
+      tdPrice.hidden = true;
+      tdPrice.textContent = String(price);
+      const priceInput = document.createElement("input");
+      priceInput.type = "hidden";
+      priceInput.name = "drug_price";
+      priceInput.value = String(price);
+      tdPrice.appendChild(priceInput);
+
+      const tdAction = document.createElement("td");
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "button is-small is-danger removeRow";
+      removeBtn.textContent = "X";
+      tdAction.appendChild(removeBtn);
+
+      row.appendChild(tdIndex);
+      row.appendChild(tdName);
+      row.appendChild(tdQty);
+      row.appendChild(tdNote);
+      row.appendChild(tdPrice);
+      row.appendChild(tdAction);
       tableBody.appendChild(row);
       if (window.applyDrugPriceVisibility) {
         window.applyDrugPriceVisibility(document.body.dataset.drugPricesVisible === "1");
@@ -1088,21 +1119,43 @@
       const row = document.createElement("tr");
       row.dataset.price = servicePrice;
       row.dataset.serviceId = serviceId;
-      row.innerHTML = `
-        <td>${serviceTableBody.querySelectorAll("tr").length + 1}</td>
-        <td>
-          ${serviceName}
-          <input type="hidden" name="service_name" value="${serviceName}">
-          <input type="hidden" name="service_id" value="${serviceId}">
-        </td>
-        <td class="has-text-right">
-          ${servicePrice.toLocaleString()}
-          <input type="hidden" name="service_price" value="${servicePrice}">
-        </td>
-        <td>
-          <button type="button" class="button is-small is-danger removeServiceRow">X</button>
-        </td>
-      `;
+
+      const tdIdx = document.createElement("td");
+      tdIdx.textContent = String(serviceTableBody.querySelectorAll("tr").length + 1);
+
+      const tdService = document.createElement("td");
+      tdService.textContent = serviceName;
+      const serviceNameInput = document.createElement("input");
+      serviceNameInput.type = "hidden";
+      serviceNameInput.name = "service_name";
+      serviceNameInput.value = serviceName;
+      const serviceIdInput = document.createElement("input");
+      serviceIdInput.type = "hidden";
+      serviceIdInput.name = "service_id";
+      serviceIdInput.value = serviceId;
+      tdService.appendChild(serviceNameInput);
+      tdService.appendChild(serviceIdInput);
+
+      const tdServicePrice = document.createElement("td");
+      tdServicePrice.className = "has-text-right";
+      tdServicePrice.textContent = servicePrice.toLocaleString();
+      const servicePriceInput = document.createElement("input");
+      servicePriceInput.type = "hidden";
+      servicePriceInput.name = "service_price";
+      servicePriceInput.value = String(servicePrice);
+      tdServicePrice.appendChild(servicePriceInput);
+
+      const tdRemove = document.createElement("td");
+      const removeServiceBtn = document.createElement("button");
+      removeServiceBtn.type = "button";
+      removeServiceBtn.className = "button is-small is-danger removeServiceRow";
+      removeServiceBtn.textContent = "X";
+      tdRemove.appendChild(removeServiceBtn);
+
+      row.appendChild(tdIdx);
+      row.appendChild(tdService);
+      row.appendChild(tdServicePrice);
+      row.appendChild(tdRemove);
 
       serviceTableBody.appendChild(row);
       serviceSelect.value = "";
@@ -1117,7 +1170,11 @@
         // if no services left, show placeholder
         if (serviceTableBody.querySelectorAll("tr").length === 0) {
           const placeholder = document.createElement("tr");
-          placeholder.innerHTML = '<td colspan="4" class="has-text-grey">Không có dịch vụ</td>';
+          const placeholderTd = document.createElement("td");
+          placeholderTd.colSpan = 4;
+          placeholderTd.className = "has-text-grey";
+          placeholderTd.textContent = "Không có dịch vụ";
+          placeholder.appendChild(placeholderTd);
           serviceTableBody.appendChild(placeholder);
         }
         calculateTotals();
@@ -1268,8 +1325,18 @@
 
 <!-- Image Management JavaScript -->
 <!-- Page data for edit_exam_images.js (tojson ensures XSS-safe encoding) -->
+<script id="editExamData" type="application/json">
+  {{ {'patient_id': patient.id, 'exam_id': exam.id, 'images': (exam.images or [])} | tojson }}
+</script>
 <script>
-  window._editExamData = {{ { 'patient_id': patient.id, 'exam_id': exam.id, 'images': (exam.images or[]) } | tojson }};
+  (() => {
+    const dataEl = document.getElementById("editExamData");
+    try {
+      window._editExamData = dataEl ? JSON.parse(dataEl.textContent || "{}") : {};
+    } catch (_) {
+      window._editExamData = {};
+    }
+  })();
 </script>
 <script src="{{ url_for('static', filename='edit_exam_images.js') }}"></script>
 

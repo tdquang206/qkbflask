@@ -85,4 +85,4 @@ def setup_default_admin():
             'department': 'Chưa có PK',
             'display_name': 'Admin'
         })
-        print(f"Default admin created. Username: admin, Password: {default_password}")
+        print("Default admin created. Username: admin")

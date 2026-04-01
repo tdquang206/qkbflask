@@ -47,9 +47,12 @@ def _safe_exam_date_token(value):
 
 
 def _is_within(base_dir, candidate_path):
-    base_abs = os.path.abspath(base_dir)
-    cand_abs = os.path.abspath(candidate_path)
-    return cand_abs == base_abs or cand_abs.startswith(base_abs + os.sep)
+    try:
+        base_abs = os.path.realpath(os.path.abspath(base_dir))
+        cand_abs = os.path.realpath(os.path.abspath(candidate_path))
+        return os.path.commonpath([base_abs, cand_abs]) == base_abs
+    except Exception:
+        return False
 
 
 def _resolve_to_abs(path_value):
@@ -71,6 +74,16 @@ def _rename_path_safe(old_abs, new_abs, allowed_root):
     if not os.path.exists(old_abs):
         return False
     if os.path.exists(new_abs):
+        return False
+
+    old_ext = os.path.splitext(old_abs)[1].lower()
+    new_ext = os.path.splitext(new_abs)[1].lower()
+    if old_ext and new_ext and old_ext != new_ext:
+        return False
+
+    # Defense-in-depth: do not create/write through symlinked destination parents.
+    dest_parent = os.path.dirname(new_abs)
+    if os.path.islink(dest_parent):
         return False
 
     os.makedirs(os.path.dirname(new_abs), exist_ok=True)

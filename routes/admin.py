@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from shared_db import users_table
@@ -145,25 +145,26 @@ def export_databases():
 @admin_bp.route('/admin/database/download/<filename>')
 def download_decrypted_file(filename):
     """Download a decrypted database file"""
-    # Validate filename to prevent directory traversal
-    if '/' in filename or '\\' in filename or '..' in filename:
-        flash('Invalid filename', 'error')
-        return redirect(url_for('admin.decrypt_database_page'))
-    
-    if not filename.startswith('decrypted_'):
+    # Strict allowlist keeps names deterministic and blocks traversal payloads.
+    if not re.fullmatch(r'decrypted_[A-Za-z0-9._-]+\.json', filename):
         flash('Invalid file', 'error')
         return redirect(url_for('admin.decrypt_database_page'))
-    
-    export_dir = 'decrypted_exports'
-    filepath = os.path.join(export_dir, filename)
-    
+
+    export_dir = os.path.realpath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'decrypted_exports'))
+    filepath = os.path.realpath(os.path.join(export_dir, filename))
+
+    if os.path.commonpath([export_dir, filepath]) != export_dir:
+        flash('Invalid file path', 'error')
+        return redirect(url_for('admin.decrypt_database_page'))
+
     if not os.path.exists(filepath):
         flash('File not found', 'error')
         return redirect(url_for('admin.decrypt_database_page'))
-    
+
     try:
-        return send_file(
-            filepath,
+        return send_from_directory(
+            export_dir,
+            filename,
             as_attachment=True,
             download_name=filename,
             mimetype='application/json'

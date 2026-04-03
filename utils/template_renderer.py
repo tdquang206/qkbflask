@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 
 TEMPLATE_FILE = 'exam_template.json'
 
@@ -83,9 +84,9 @@ def get_default_template():
     return {
         "default": {
             "header": "# Phiếu Khám Bệnh - {exam_date}\n\n**Bé:** {kid_name} ({kid_birthday}) - {weight}kg {height}cm\n**Phụ huynh:** {parent_name}\n**SĐT:** {phone}\n**Địa chỉ:** {address}\n\n**Ghi chú / Khám bệnh:** {history}\n**Hẹn tái khám:** {expected_date}\n\n",
-            "drugs_section": "## 💊 Thuốc\n\n| # | Tên thuốc | SL | Ghi chú |\n|---|----------|----|---------|\n{drug_rows}\n\n",
+            "drugs_section": "## Thuốc\n\n| # | Tên thuốc | SL | Ghi chú |\n|---|----------|----|---------|\n{drug_rows}\n\n",
             "drug_row_template": "| {index} | {name} | {quantity} | {note} |",
-            "services_section": "## 🛎️ Dịch vụ\n\n| # | Tên dịch vụ | Giá |\n|---|-------------|-----|\n{service_rows}\n\n",
+            "services_section": "## Dịch vụ\n\n| # | Tên dịch vụ | Giá |\n|---|-------------|-----|\n{service_rows}\n\n",
             "service_row_template": "| {index} | {name} | {quantity} | {price} | {prepaid_status} |",
             "footer": "**Tổng tiền:** {total_money} VND\n\n*Bác sĩ khám: {doctor_name}*\n\n`{footer_code}`"
         },
@@ -204,20 +205,21 @@ def build_service_rows_html(services, show_quantities=False, show_prepaid=False)
     
     return rows
 
-def calculate_footer_code(exam_data):
+def calculate_footer_code(exam_data, doctor_name=None):
     """Calculate the footer code for the exam"""
-    total_money = str(exam_data.get('total_money', '0'))
-    total_money = ''.join(filter(str.isdigit, total_money))
-    if len(total_money) > 3:
-        total_short = total_money[:-3]
-    else:
-        total_short = "0"
+    total_value = int(round(_to_number(exam_data.get('total_money', 0), default=0.0)))
+    total_short = int((Decimal(total_value) / Decimal(1000)).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+
+    if doctor_name is None:
+        doctor_name = exam_data.get('created_by_name') or exam_data.get('doctor_name') or exam_data.get('created_by') or ''
+    doctor_name = str(doctor_name).strip()
+    doctor_initial = doctor_name[:1].upper() if doctor_name else 'Q'
 
     submit_time = exam_data.get('submit_time')
     if not submit_time:
         submit_time = datetime.now().strftime('%y%m%d%H%M%S')
 
-    return f"{submit_time}H{total_short}"
+    return f"{submit_time}{doctor_initial}{total_short}"
 
 def render_exam_markdown(patient, exam_data, doctor_name=None, custom_template=None, department=None):
     """Render exam data as markdown for Discord"""
@@ -234,9 +236,8 @@ def render_exam_markdown(patient, exam_data, doctor_name=None, custom_template=N
 
     drug_rows = build_drug_rows_markdown(exam_data.get('drugs', []), row_template=drug_row_template)
     service_rows = build_service_rows_markdown(exam_data.get('services', []), row_template=service_row_template)
-    footer_code = calculate_footer_code(exam_data)
-
     doctor_name = doctor_name or "BS. Quang"
+    footer_code = calculate_footer_code(exam_data, doctor_name=doctor_name)
 
     # Format data
     data = {
@@ -381,9 +382,8 @@ def render_exam_html(patient, exam_data, doctor_name=None, custom_template=None,
     # Prepare data
     drug_rows = build_drug_rows_html(exam_data.get('drugs', []))
     service_rows = build_service_rows_html(exam_data.get('services', []), show_quantities=True, show_prepaid=True)
-    footer_code = calculate_footer_code(exam_data)
-
     doctor_name = doctor_name or "BS. Quang"
+    footer_code = calculate_footer_code(exam_data, doctor_name=doctor_name)
     signature_text = f"Bác sĩ khám: {doctor_name}"
 
     # Build HTML
@@ -425,7 +425,7 @@ def render_exam_html(patient, exam_data, doctor_name=None, custom_template=None,
         <p><strong>Ghi chú / Khám bệnh:</strong> {exam_data.get('history', '')}</p>
         <p>Hẹn tái khám: {exam_data.get('expected_date', '')}</p>
 
-        <h3>💊 Thuốc</h3>
+        <h3>Thuốc</h3>
         <table>
           <thead>
             <tr>
@@ -439,7 +439,7 @@ def render_exam_html(patient, exam_data, doctor_name=None, custom_template=None,
           </tbody>
         </table>
 
-        {"<h3>🛎️ Dịch vụ</h3><table><thead><tr><th>#</th><th>Tên dịch vụ</th><th>SL</th><th>Giá</th><th>Trạng thái</th></tr></thead><tbody>" + service_rows + "</tbody></table>" if exam_data.get('services') else ""}
+        {"<h3>Dịch vụ</h3><table><thead><tr><th>#</th><th>Tên dịch vụ</th><th>SL</th><th>Giá</th><th>Trạng thái</th></tr></thead><tbody>" + service_rows + "</tbody></table>" if exam_data.get('services') else ""}
 
         <div class="footer">
           <p>{signature_text}</p>

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section">
+	<div class="container">
+		<h1 class="title">Khoa / Phòng khám</h1>
+
+		<div class="box">
+			<h2 class="subtitle">Danh sách khoa và bác sĩ</h2>
+
+			{% if doctors_by_department %}
+			{% for department, doctors in doctors_by_department.items() %}
+			<div class="content" style="margin-bottom: 1.25rem;">
+				<h3 class="is-size-5 has-text-weight-semibold">{{ department }}</h3>
+				{% if doctors %}
+				<ul>
+					{% for doctor in doctors %}
+					<li>
+						{{ doctor.get('display_name', doctor.get('username', '')) }}
+						<span class="has-text-grey">({{ doctor.get('username', '') }})</span>
+					</li>
+					{% endfor %}
+				</ul>
+				{% else %}
+				<p class="has-text-grey">Chưa có bác sĩ thuộc khoa này.</p>
+				{% endif %}
+			</div>
+			{% endfor %}
+			{% else %}
+			<p class="has-text-grey">Chưa có khoa/phòng khám nào được cấu hình.</p>
+			{% endif %}
+
+			{% if unassigned_users %}
+			<hr>
+			<h3 class="is-size-6 has-text-weight-semibold">Người dùng chưa gán khoa</h3>
+			<ul>
+				{% for user in unassigned_users %}
+				<li>
+					{{ user.get('display_name', user.get('username', '')) }}
+					<span class="has-text-grey">({{ user.get('username', '') }}) - {{ user.get('department', 'Chưa có
+						PK') }}</span>
+				</li>
+				{% endfor %}
+			</ul>
+			{% endif %}
+		</div>
+
+		{% if is_admin %}
+		<form method="POST" action="{{ url_for('settings.departments_settings') }}">
+			<div class="box" id="departments">
+				<h2 class="subtitle">Chỉnh sửa danh sách khoa / phòng khám</h2>
+				<div class="field">
+					<label class="label">Nhập mỗi dòng một tên khoa (Ví dụ: Nhi khoa, Da liễu, ...)</label>
+					<div class="control">
+						<textarea class="textarea" name="departments"
+							rows="6">{{ settings.departments | join('\n') }}</textarea>
+					</div>
+				</div>
+			</div>
+
+			<div class="field is-grouped">
+				<div class="control">
+					<button class="button is-link">Lưu danh sách khoa/phòng khám</button>
+				</div>
+				<div class="control">
+					<a href="{{ url_for('admin.index') }}" class="button is-light">Thêm / Sửa / Xóa user</a>
+				</div>
+			</div>
+		</form>
+		{% else %}
+		<article class="message is-info">
+			<div class="message-body">
+				Bạn đang ở chế độ xem. Chỉ tài khoản admin mới có quyền thêm, sửa, xóa user và chỉnh sửa danh sách
+				khoa/phòng khám.
+			</div>
+		</article>
+		{% endif %}
+	</div>
+</section>
+{% endblock %}

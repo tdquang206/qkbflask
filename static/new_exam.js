@@ -106,7 +106,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       // STEP 1: Save Data
+      // Replace any file-input lab_image entries with our DataTransfer-managed pending files
       const formData = new FormData(this);
+      formData.delete('lab_image');
+      for (const f of pendingDT.files) formData.append('lab_image', f);
+
       const res1 = await fetch(this.action, {
         method: "POST",
         body: formData
@@ -677,31 +681,87 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Image preview before upload
+// ── Image Gallery (new exam) ──────────────────────────────────────────────
+// Files accumulate in pendingDT across multiple file-picker opens.
+// On form submit the files are synced into FormData (see submit handler).
+let pendingDT = new DataTransfer();
+
 document.addEventListener("DOMContentLoaded", () => {
   const labImages = document.getElementById("lab_images");
   if (!labImages) return;
+
+  document.getElementById("addImagesBtn").addEventListener("click", () => labImages.click());
+  document.getElementById("clearAllImagesBtn").addEventListener("click", clearAllNewExamImages);
+
   labImages.addEventListener("change", function () {
-    const files = this.files;
-    const thumbnailRow = document.getElementById("thumbnailRow");
-    thumbnailRow.innerHTML = "";
-
-    if (!files.length) return;
-
-    Array.from(files).forEach((file, idx) => {
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const wrapper = document.createElement("div");
-        wrapper.style.cssText = "position:relative; display:inline-block;";
-
-        const img = document.createElement("img");
-        img.src = e.target.result;
-        img.style.cssText = "height:150px; width:150px; object-fit:cover; border-radius:4px; margin:5px;";
-        img.title = file.name;
-
-        wrapper.appendChild(img);
-        thumbnailRow.appendChild(wrapper);
-      };
-      reader.readAsDataURL(file);
-    });
+    if (this.files.length) addNewExamFiles(this.files);
+    this.value = ""; // reset so the same file can be re-selected after removal
   });
+
+  // Modal close wiring
+  document.getElementById("newExamModalBg").addEventListener("click", closeNewExamModal);
+  document.getElementById("newExamModalClose").addEventListener("click", closeNewExamModal);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNewExamModal(); });
 });
+
+function addNewExamFiles(fileList) {
+  const gallery = document.getElementById("imageGallery");
+  Array.from(fileList).forEach((file) => {
+    // Skip exact duplicates already queued
+    for (const existing of pendingDT.files) {
+      if (existing.name === file.name && existing.size === file.size) return;
+    }
+    pendingDT.items.add(file);
+    const reader = new FileReader();
+    reader.onload = (e) => gallery.appendChild(buildNewExamThumb(file, e.target.result));
+    reader.readAsDataURL(file);
+  });
+}
+
+function buildNewExamThumb(file, dataUrl) {
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "position:relative; display:inline-block;";
+  wrapper.dataset.pendingName = file.name;
+
+  const img = document.createElement("img");
+  img.src = dataUrl;
+  img.style.cssText = "height:150px; width:150px; object-fit:cover; border-radius:4px; border:2px dashed #3298dc; cursor:pointer;";
+  img.title = file.name + " — click để phóng to";
+  img.addEventListener("click", () => openNewExamModal(dataUrl));
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "delete is-small";
+  delBtn.style.cssText = "position:absolute; top:5px; right:5px;";
+  delBtn.title = "Bỏ ảnh này";
+  delBtn.addEventListener("click", (e) => { e.stopPropagation(); removeNewExamFile(file.name, wrapper); });
+
+  wrapper.appendChild(img);
+  wrapper.appendChild(delBtn);
+  return wrapper;
+}
+
+function removeNewExamFile(filename, wrapperEl) {
+  const newDT = new DataTransfer();
+  for (const f of pendingDT.files) {
+    if (f.name !== filename) newDT.items.add(f);
+  }
+  pendingDT = newDT;
+  if (wrapperEl) wrapperEl.remove();
+}
+
+function clearAllNewExamImages() {
+  pendingDT = new DataTransfer();
+  const gallery = document.getElementById("imageGallery");
+  if (gallery) gallery.innerHTML = "";
+}
+
+function openNewExamModal(src) {
+  document.getElementById("newExamModalImg").src = src;
+  document.getElementById("newExamImageModal").classList.add("is-active");
+}
+
+function closeNewExamModal() {
+  document.getElementById("newExamImageModal").classList.remove("is-active");
+  document.getElementById("newExamModalImg").src = "";
+}

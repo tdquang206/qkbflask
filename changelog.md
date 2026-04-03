@@ -1,3 +1,113 @@
+# Version 0.14.260403 (2026-04-03)
+==================================================
+
+## Project Analysis & Summary
+- Security hardening pass driven by CodeQL static analysis and manual audit.
+- Fixed clear-text credential logging, Discord webhook SSRF, and added global CSRF protection.
+
+## Security Fixes
+
+- **Clear-text Logging (`routes/auth.py`)**:
+  - Removed `default_password` variable that stored the admin password in plain text.
+  - Removed `print()` statements that leaked credential context to logs.
+  - Password is now passed inline to `generate_password_hash()`.
+
+- **Discord Webhook SSRF (`routes/drugs.py`, `routes/exam.py`, `routes/settings.py`)**:
+  - Added URL allowlist validation — only `https://discord.com/api/webhooks/` and `https://discordapp.com/api/webhooks/` prefixes are accepted.
+  - Validation applied at both save time (settings page) and use time (drugs + exam Discord senders).
+  - Invalid URLs are rejected with a flash error or JSON error response.
+
+- **CSRF Protection (`app.py`, `templates/base.html`)**:
+  - Integrated `Flask-WTF` `CSRFProtect` globally — all POST/PUT/PATCH/DELETE requests now require a valid token.
+  - Added `<meta name="csrf-token">` tag in `base.html` for JS access.
+  - Auto-injects hidden `csrf_token` input into all `<form>` elements on page load.
+  - Extended the existing global `fetch` interceptor to attach `X-CSRFToken` header to all mutating AJAX requests.
+  - Zero changes required in individual templates or JS files — fully handled from `base.html`.
+
+## Technical Notes
+- Added `flask-wtf` to `requirements.txt`.
+- CodeQL alerts for "DOM text reinterpreted as HTML" in `edit_exam.html` and `mua_thuoc.html` confirmed as false positives — all dynamic data uses `textContent` / DOM APIs.
+- CodeQL alerts for "Uncontrolled data in path expression" in `pdf_generator.py` and `admin.py` confirmed as already mitigated by `_safe_join_under()` and regex allowlists.
+- Global `before_app_request` login guard in `core.py` confirmed to cover all non-auth routes — per-route `@login_required` is redundant (kept where already present as defense-in-depth).
+
+# Version 0.13.260325 (2026-03-25)
+==================================================
+
+## Project Analysis & Summary
+- Improved the patient exam history page to show both **drugs and services** for each exam.
+- Added a dedicated services block with per-exam service totals for better billing visibility.
+
+## Improvement
+- **Patient Exam History (`/patient/<patient_id>/exams`)**:
+  - Added a services section under each exam card in the history view.
+  - Each service row now displays:
+    - Service name
+    - Unit price
+  - Added **"Tổng tiền dịch vụ"** (total service amount) per exam.
+  - Added empty-state text **"Toa không dịch vụ"** when no services are recorded.
+
+## Technical Notes
+- Updated template rendering in `templates/previous_exams.html`:
+  - Uses `exam.get('services', [])` for backward compatibility with older exams.
+  - Filters invalid entries via `selectattr("name")` before render.
+  - Computes service total in-template using a local namespace accumulator.
+
+# Version 0.12.260324 (2026-03-24)
+==================================================
+
+## Project Analysis & Summary
+- Added **phone number sanitization** for patient records (trim + spaces → underscore).
+- Implemented **batch asset rename** when a patient's phone number changes (images, PDFs, JPEGs).
+- Introduced a **preview / confirm modal** showing old → new filenames before applying, with clickable file viewer.
+- Added **duplicate phone detection** to block accidental overwrites.
+- Built **DB checkpoint system** — snapshot all databases before any rename operation.
+- Added **admin-only Checkpoint Restore page** with GitHub-style diff view.
+
+## New Features
+
+- **Phone Input Sanitization**:
+  - All patient create/edit forms now normalize the phone field: trimmed, spaces converted to `_`, special characters stripped.
+  - Applied consistently across `manage_patients` (POST), `add_patient` (POST), and `edit_patient` (POST).
+
+- **Batch Asset Rename on Phone Change**:
+  - When a patient's phone number is edited, all associated files are renamed atomically:
+    - `uploads/patient_image/<old_token>/` folder → `<new_token>/`
+    - Individual image filenames within the folder
+    - Legacy `image_path` field in exam records
+    - `files/pdf/<old_token>_*.pdf` → new token
+    - `files/jpeg/<old_token>_*.jpg` → new token
+
+- **Preview / Confirm Rename Modal**:
+  - "Xem trước đổi tên file" button triggers a fetch to `/api/patient/<id>/phone-rename-preview`.
+  - Modal table shows: Type / Old name / New name / View old / View new.
+  - Clickable file view: images enlarge in an overlay; PDFs open in an iframe panel.
+  - Form submit is blocked unless the user has previewed and explicitly confirmed the rename.
+
+- **Duplicate Phone Detection**:
+  - Before saving an edit, the server scans all patients for a matching normalized phone.
+  - If a duplicate exists, the save is blocked and conflicting patient records are listed in the UI.
+
+- **DB Checkpoint System**:
+  - `_create_db_checkpoint(tag)` snapshots all four DB files to `backups/checkpoints/` with a `{tag}_{timestamp}` prefix before any rename is applied.
+  - A safety backup is also written to `backups/pre_restore_safety/` immediately before a restore is executed.
+  - All checkpoint and restore actions are logged via `log_action()`.
+
+- **Admin Checkpoint Restore Page (`/admin/checkpoints`)**:
+  - Lists all checkpoint groups (tag, timestamp, files covered).
+  - **"Preview Diff"** button fetches `/api/admin/checkpoint/diff` and renders a per-record unified diff with GitHub-style line coloring (green added, red removed, blue hunk headers).
+  - Summary bar shows total changed / added / removed records across all DB files.
+  - Diff lines are expandable per record; long diffs are capped at 300 lines with a truncation note.
+  - **"Restore"** button (two-step confirm with checkbox) calls `/api/admin/checkpoint/restore`, which writes a pre-restore safety copy then overwrites the live DB files.
+  - Access restricted to users with `admin` role via existing `before_request` guard.
+  - Navigation link added to Admin Dashboard → Database Management section.
+
+## Refactoring
+- **`routes/patients.py`**: Added helpers `_normalize_phone_input`, `_safe_image_folder_token`, `_safe_image_name_token`, `_safe_exam_date_token`, `_is_within`, `_resolve_to_abs`, `_rename_path_safe`, `_web_url_from_abs`, `_file_exists_abs`, `_is_duplicate_phone`, `_create_db_checkpoint`, `_validate_patient_exam_shape`, `_build_phone_rename_plan`, `_rename_patient_assets`; new API endpoint `phone_rename_preview`.
+- **`routes/admin.py`**: Added `_list_checkpoint_groups`, `_compute_db_diff`, `_flatten_tinydb`, `_get_record_label`; new routes `checkpoints_page`, `checkpoint_diff`, `restore_checkpoint`.
+- **`templates/edit_patient.html`**: Full rewrite adding error/duplicate banners, hidden `rename_confirmed` field, preview modal, file viewer modal, and supporting JavaScript.
+- **`templates/admin_checkpoint_restore.html`**: New template with checkpoint table, diff modal (unified diff renderer), and restore confirm flow.
+- **`templates/admin_dashboard.html`**: Added Checkpoint Restore button to Database Management section.
+
 # Version 0.11.260318 (2026-03-18)
 ==================================================
 

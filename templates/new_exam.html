@@ -70,15 +70,21 @@
       </div>
 
       <!-- Image upload and view -->
-      <div class="box">
-        <div class="field">
-          <label class="label">📷 Hình ảnh, kết quả xét nghiệm</label>
+      <!-- Image upload and view -->
+      <div class="box" id="imageBox">
+        <label class="label">📷 Hình ảnh, kết quả xét nghiệm</label>
+        <!-- Hidden file input — opened by button click; name kept for FormData capture -->
+        <input type="file" id="lab_images" name="lab_image" multiple accept="image/*" style="display:none;">
+        <div class="field is-grouped is-flex-wrap-wrap" style="gap:8px;">
           <div class="control">
-            <input type="file" id="lab_images" name="lab_image" multiple accept="image/*">
+            <button type="button" class="button is-info" id="addImagesBtn">➕ Chọn ảnh</button>
           </div>
-          <progress id="uploadProgress" class="progress is-info" value="0" max="100" style="display:none;"></progress>
-          <div id="thumbnailRow" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
+          <div class="control">
+            <button type="button" class="button is-danger is-light" id="clearAllImagesBtn">🗑 Xóa tất cả</button>
+          </div>
         </div>
+        <p class="help is-info" style="margin-bottom:8px;">Ảnh sẽ được tải lên khi lưu hồ sơ.</p>
+        <div id="imageGallery" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
       </div>
       <!-- Service Selector and Department -->
       <div class="box">
@@ -351,6 +357,18 @@
 <!-- input hdsd thuốc -->
 
 <!-- Image preview before upload -->
+
+
+<!-- Image enlarge modal -->
+<div class="modal" id="newExamImageModal">
+  <div class="modal-background" id="newExamModalBg"></div>
+  <div class="modal-content" style="max-width:90vw; max-height:90vh;">
+    <p class="image">
+      <img id="newExamModalImg" src="" alt="Full size" style="max-width:100%; max-height:90vh; object-fit:contain;">
+    </p>
+  </div>
+  <button class="modal-close is-large" id="newExamModalClose"></button>
+</div>
 
 <script src="{{ url_for('static', filename='new_exam.js') }}" defer></script>
 

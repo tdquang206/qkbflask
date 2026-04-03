@@ -167,6 +167,41 @@
       {% else %}
       <p class="has-text-grey">💊 Toa không thuốc</p>
       {% endif %}
+
+      {% set valid_services = exam.get('services', []) | selectattr("name") | list %}
+      {% if valid_services %}
+      <div class="table-container mt-3">
+        <table class="table is-narrow is-striped is-fullwidth">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Dịch vụ</th>
+              <th>Đơn giá</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set svc = namespace(total=0) %}
+            {% for service in valid_services %}
+            {% set p = (service.price | float(0)) %}
+            {% set svc.total = svc.total + p %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ service.name }}</td>
+              <td>{{ service.price }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="2" class="has-text-right">Tổng tiền dịch vụ</th>
+              <th>{{ svc.total|int(0) }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <p class="has-text-grey">🧪 Toa không dịch vụ</p>
+      {% endif %}
     </div>
     {% endfor %}
     {% else %}
@@ -247,6 +282,16 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    // When users navigate back from edit/new exam, the browser can restore a stale
+    // bfcache snapshot of this page. Force a reload so newly created exams appear.
+    window.addEventListener('pageshow', function (event) {
+      const navEntry = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      const isBackForward = navEntry && navEntry.type === 'back_forward';
+      if (event.persisted || isBackForward) {
+        window.location.reload();
+      }
+    });
+
     // 1. Initialize Viewer for each exam gallery (Quick View)
     document.querySelectorAll('.images-gallery').forEach(gallery => {
       new Viewer(gallery, {

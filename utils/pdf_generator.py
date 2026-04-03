@@ -11,6 +11,16 @@ def _safe_path_segment(value, fallback="x"):
     text = text.strip("._-")
     return text or fallback
 
+
+def _safe_join_under(base_dir, relative_name, allowed_ext):
+    base_abs = os.path.realpath(os.path.abspath(base_dir))
+    candidate = os.path.realpath(os.path.abspath(os.path.join(base_abs, relative_name)))
+    if os.path.commonpath([base_abs, candidate]) != base_abs:
+        raise ValueError("Invalid artifact path")
+    if os.path.splitext(candidate)[1].lower() != allowed_ext.lower():
+        raise ValueError("Invalid artifact extension")
+    return candidate
+
 # generate filename for pdf and jpeg on server
 def generate_exam_file_name(phone, exam_date, exam_id):
     # phone_date_hex[:8]
@@ -59,8 +69,8 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
         os.makedirs(pdf_dir, exist_ok=True)
         os.makedirs(jpeg_dir, exist_ok=True)
 
-        pdf_path = os.path.join(pdf_dir, f"{filename}.pdf")
-        jpeg_path = os.path.join(jpeg_dir, f"{filename}.jpg")
+        pdf_path = _safe_join_under(pdf_dir, f"{filename}.pdf", ".pdf")
+        jpeg_path = _safe_join_under(jpeg_dir, f"{filename}.jpg", ".jpg")
 
         # HTML to PDF
         options = {
@@ -135,8 +145,10 @@ def delete_exam_files(phone, exam_date, short_exam_id):
     
     # Calculate absolute paths (same as above)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    pdf_path = os.path.join(base_dir, "files", "pdf", f"{filename}.pdf")
-    jpeg_path = os.path.join(base_dir, "files", "jpeg", f"{filename}.jpg")
+    pdf_dir = os.path.join(base_dir, "files", "pdf")
+    jpeg_dir = os.path.join(base_dir, "files", "jpeg")
+    pdf_path = _safe_join_under(pdf_dir, f"{filename}.pdf", ".pdf")
+    jpeg_path = _safe_join_under(jpeg_dir, f"{filename}.jpg", ".jpg")
     
     deleted = []
     

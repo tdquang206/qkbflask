@@ -415,15 +415,51 @@
       const pricePerUnit = parseFloat(cost / qty).toFixed(0);
 
       const row = document.createElement("tr");
-      row.innerHTML = `
-      <td></td>
-      <td>${name}</td>
-      <td><input type="number" class="input quantityInput" value="${qty}" step="1" /></td>
-      <td>${note}</td>
-      <td><input type="number" class="input priceInput" value="${cost}" /></td>
-      <td><input type="number" class="input ppuInput" value="${pricePerUnit}" readonly /></td>
-      <td><button class="button is-small is-danger removeRow">X</button></td>
-    `;
+
+      const tdIdx = document.createElement("td");
+
+      const tdName = document.createElement("td");
+      tdName.textContent = name;
+
+      const tdQty = document.createElement("td");
+      const qtyInput = document.createElement("input");
+      qtyInput.type = "number";
+      qtyInput.className = "input quantityInput";
+      qtyInput.value = String(qty);
+      qtyInput.step = "1";
+      tdQty.appendChild(qtyInput);
+
+      const tdNote = document.createElement("td");
+      tdNote.textContent = note;
+
+      const tdCost = document.createElement("td");
+      const costInput = document.createElement("input");
+      costInput.type = "number";
+      costInput.className = "input priceInput";
+      costInput.value = String(cost);
+      tdCost.appendChild(costInput);
+
+      const tdPpu = document.createElement("td");
+      const ppuInput = document.createElement("input");
+      ppuInput.type = "number";
+      ppuInput.className = "input ppuInput";
+      ppuInput.value = String(pricePerUnit);
+      ppuInput.readOnly = true;
+      tdPpu.appendChild(ppuInput);
+
+      const tdAction = document.createElement("td");
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "button is-small is-danger removeRow";
+      removeBtn.textContent = "X";
+      tdAction.appendChild(removeBtn);
+
+      row.appendChild(tdIdx);
+      row.appendChild(tdName);
+      row.appendChild(tdQty);
+      row.appendChild(tdNote);
+      row.appendChild(tdCost);
+      row.appendChild(tdPpu);
+      row.appendChild(tdAction);
       tableBody.appendChild(row);
       updateRowNumbers();
 

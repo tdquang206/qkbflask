@@ -6,6 +6,11 @@ from tinydb import Query
 from flask_login import login_required, current_user
 from utils.template_renderer import load_exam_template, save_exam_template, get_default_template
 
+_DISCORD_WEBHOOK_PREFIXES = (
+    'https://discord.com/api/webhooks/',
+    'https://discordapp.com/api/webhooks/',
+)
+
 settings_bp = Blueprint('settings', __name__)
 
 SETTINGS_FILE = 'user_settings.json'
@@ -50,7 +55,11 @@ def discord_settings():
     settings = load_settings()
 
     if request.method == 'POST':
-        settings['discord_webhook_url'] = request.form.get('discord_webhook_url', '')
+        raw_url = request.form.get('discord_webhook_url', '').strip()
+        if raw_url and not raw_url.startswith(_DISCORD_WEBHOOK_PREFIXES):
+            flash("URL webhook không hợp lệ. Chỉ chấp nhận URL Discord.", "error")
+            return redirect(url_for('settings.discord_settings'))
+        settings['discord_webhook_url'] = raw_url
         settings['include_date'] = 'include_date' in request.form
         settings['include_kid_name'] = 'include_kid_name' in request.form
         settings['include_parent_name'] = 'include_parent_name' in request.form

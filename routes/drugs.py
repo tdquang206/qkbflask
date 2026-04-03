@@ -252,6 +252,11 @@ def api_send_drugs_discord():
     webhook_url = settings.get('discord_webhook_url', '').strip()
     if not webhook_url:
         return jsonify({'error': 'Discord webhook URL is not configured'}), 400
+    if not webhook_url.startswith((
+        'https://discord.com/api/webhooks/',
+        'https://discordapp.com/api/webhooks/',
+    )):
+        return jsonify({'error': 'Invalid Discord webhook URL'}), 400
 
     # Load all drugs and sort alphabetically
     all_drugs = sorted(drugs.all(), key=lambda d: d.get('name', '').strip().lower())

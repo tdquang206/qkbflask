@@ -1,3 +1,35 @@
+# Version 0.14.260403 (2026-04-03)
+==================================================
+
+## Project Analysis & Summary
+- Security hardening pass driven by CodeQL static analysis and manual audit.
+- Fixed clear-text credential logging, Discord webhook SSRF, and added global CSRF protection.
+
+## Security Fixes
+
+- **Clear-text Logging (`routes/auth.py`)**:
+  - Removed `default_password` variable that stored the admin password in plain text.
+  - Removed `print()` statements that leaked credential context to logs.
+  - Password is now passed inline to `generate_password_hash()`.
+
+- **Discord Webhook SSRF (`routes/drugs.py`, `routes/exam.py`, `routes/settings.py`)**:
+  - Added URL allowlist validation — only `https://discord.com/api/webhooks/` and `https://discordapp.com/api/webhooks/` prefixes are accepted.
+  - Validation applied at both save time (settings page) and use time (drugs + exam Discord senders).
+  - Invalid URLs are rejected with a flash error or JSON error response.
+
+- **CSRF Protection (`app.py`, `templates/base.html`)**:
+  - Integrated `Flask-WTF` `CSRFProtect` globally — all POST/PUT/PATCH/DELETE requests now require a valid token.
+  - Added `<meta name="csrf-token">` tag in `base.html` for JS access.
+  - Auto-injects hidden `csrf_token` input into all `<form>` elements on page load.
+  - Extended the existing global `fetch` interceptor to attach `X-CSRFToken` header to all mutating AJAX requests.
+  - Zero changes required in individual templates or JS files — fully handled from `base.html`.
+
+## Technical Notes
+- Added `flask-wtf` to `requirements.txt`.
+- CodeQL alerts for "DOM text reinterpreted as HTML" in `edit_exam.html` and `mua_thuoc.html` confirmed as false positives — all dynamic data uses `textContent` / DOM APIs.
+- CodeQL alerts for "Uncontrolled data in path expression" in `pdf_generator.py` and `admin.py` confirmed as already mitigated by `_safe_join_under()` and regex allowlists.
+- Global `before_app_request` login guard in `core.py` confirmed to cover all non-auth routes — per-route `@login_required` is redundant (kept where already present as defense-in-depth).
+
 # Version 0.13.260325 (2026-03-25)
 ==================================================
 

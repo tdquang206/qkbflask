@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='bulma.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -18,7 +19,7 @@
   <nav class="navbar is-primary is-fixed-top" role="navigation" aria-label="main navigation">
     <div class="navbar-brand">
       <a class="navbar-item" href="/">
-        <strong>QKB v0.13.260325</strong>
+        <strong>QKB v0.14.260403</strong>
       </a>
 
       <!-- Hamburger menu for mobile -->
@@ -220,8 +221,20 @@
   // Intercept fetch responses globally
   (function () {
     const origFetch = window.fetch;
-    window.fetch = function () {
-      return origFetch.apply(this, arguments).then(async res => {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    window.fetch = function (url, opts) {
+      opts = opts || {};
+      const method = (opts.method || 'GET').toUpperCase();
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        opts.headers = opts.headers || {};
+        // Support both Headers object and plain object
+        if (opts.headers instanceof Headers) {
+          if (!opts.headers.has('X-CSRFToken')) opts.headers.set('X-CSRFToken', csrfToken);
+        } else {
+          if (!opts.headers['X-CSRFToken']) opts.headers['X-CSRFToken'] = csrfToken;
+        }
+      }
+      return origFetch.apply(this, [url, opts]).then(async res => {
         try {
           const clone = res.clone();
           const data = await clone.json();
@@ -233,6 +246,20 @@
       });
     };
   })();
+
+  // Auto-inject CSRF token into all forms
+  document.addEventListener('DOMContentLoaded', () => {
+    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    document.querySelectorAll('form').forEach(form => {
+      if (!form.querySelector('input[name="csrf_token"]')) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrf_token';
+        input.value = token;
+        form.prepend(input);
+      }
+    });
+  });
 
 </script>
 <!-- detect if page is from back button, if so refresh  -->

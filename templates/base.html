@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='bulma.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -14,11 +15,11 @@
   <title>QKB</title>
 </head>
 
-<body>
-  <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
+<body class="has-navbar-fixed-top">
+  <nav class="navbar is-primary is-fixed-top" role="navigation" aria-label="main navigation">
     <div class="navbar-brand">
       <a class="navbar-item" href="/">
-        <strong>QKB v0.11.260318</strong>
+        <strong>QKB v0.14.260403</strong>
       </a>
 
       <!-- Hamburger menu for mobile -->
@@ -37,7 +38,11 @@
         <div class="navbar-item has-dropdown is-hoverable">
           <a class="navbar-link">Cài đặt</a>
           <div class="navbar-dropdown">
-            <a class="navbar-item" href="/settings">Cài đặt chung</a>
+            <a class="navbar-item" href="{{ url_for('settings.discord_settings') }}">Discord</a>
+            <a class="navbar-item" href="{{ url_for('settings.departments_settings') }}">Khoa / Phòng khám</a>
+            <a class="navbar-item" href="{{ url_for('settings.services_management') }}">Dịch vụ</a>
+            <a class="navbar-item" href="{{ url_for('settings.manage_template') }}">Mẫu đơn thuốc in</a>
+            <hr class="navbar-divider">
             <a class="navbar-item" href="/changelog">Changelog</a>
           </div>
         </div>
@@ -216,8 +221,20 @@
   // Intercept fetch responses globally
   (function () {
     const origFetch = window.fetch;
-    window.fetch = function () {
-      return origFetch.apply(this, arguments).then(async res => {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    window.fetch = function (url, opts) {
+      opts = opts || {};
+      const method = (opts.method || 'GET').toUpperCase();
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        opts.headers = opts.headers || {};
+        // Support both Headers object and plain object
+        if (opts.headers instanceof Headers) {
+          if (!opts.headers.has('X-CSRFToken')) opts.headers.set('X-CSRFToken', csrfToken);
+        } else {
+          if (!opts.headers['X-CSRFToken']) opts.headers['X-CSRFToken'] = csrfToken;
+        }
+      }
+      return origFetch.apply(this, [url, opts]).then(async res => {
         try {
           const clone = res.clone();
           const data = await clone.json();
@@ -229,6 +246,20 @@
       });
     };
   })();
+
+  // Auto-inject CSRF token into all forms
+  document.addEventListener('DOMContentLoaded', () => {
+    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    document.querySelectorAll('form').forEach(form => {
+      if (!form.querySelector('input[name="csrf_token"]')) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrf_token';
+        input.value = token;
+        form.prepend(input);
+      }
+    });
+  });
 
 </script>
 <!-- detect if page is from back button, if so refresh  -->

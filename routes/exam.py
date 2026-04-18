@@ -96,6 +96,11 @@ def send_discord_helper(patient, exam_data):
     webhook_url = settings.get('discord_webhook_url')
     if not webhook_url:
         return
+    if not webhook_url.startswith((
+        'https://discord.com/api/webhooks/',
+        'https://discordapp.com/api/webhooks/',
+    )):
+        return
 
     # Use template renderer to build message content
     department = exam_data.get('department')

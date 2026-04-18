@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 import os
 
 from dotenv import load_dotenv
@@ -19,6 +20,9 @@ if not secret_key:
         # In non-debug environments, require an explicit SECRET_KEY.
         raise RuntimeError("SECRET_KEY environment variable must be set in non-debug environments.")
 app.secret_key = secret_key
+
+# CSRF protection for all POST/PUT/PATCH/DELETE requests
+csrf = CSRFProtect(app)
 
 # Security hardening: only enable debug when explicitly requested.
 app.config['DEBUG'] = is_debug

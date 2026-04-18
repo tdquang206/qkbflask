@@ -30,7 +30,7 @@
     align-items: center;
     gap: 1.5rem;
     position: sticky;
-    top: 1rem;
+    top: 3.25rem;
     z-index: 10;
     border: 1px solid var(--border-color);
   }
@@ -52,7 +52,7 @@
     border-color: var(--border-color);
     color: var(--text-color);
     border-radius: 8px;
-    padding-left: 2.5rem;
+    padding-left: 0.75rem;
     transition: all 0.3s ease;
   }
 
@@ -63,13 +63,7 @@
   }
 
   .search-wrapper::before {
-    content: "🔍";
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    opacity: 0.5;
-    font-size: 0.9rem;
+    content: "";
   }
 
   .table-container {
@@ -212,8 +206,11 @@
   <h1 class="title is-4" style="letter-spacing: -0.5px;">Manage Drugs</h1>
   <div class="header-actions">
     <button class="button is-primary" id="addDrugModalBtn">
-      <span class="icon">➕</span>
       <span>Add New Drug</span>
+    </button>
+    <button class="button" id="sendDrugsDiscordBtn"
+      style="background:#5865F2;color:#fff;border:none;border-radius:8px;font-weight:600;">
+      <span>Send Discord</span>
     </button>
 
     <div class="search-wrapper">
@@ -339,6 +336,7 @@
   </table>
 </div>
 
+<script src="{{ url_for('static', filename='drugs_discord.js') }}"></script>
 <script>
   // Function for filtering the table (unchanged)
   // filtertable() with fuzzy search

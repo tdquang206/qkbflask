@@ -47,7 +47,7 @@ class User(UserMixin):
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('core.index'))
 
     if request.method == 'POST':
         username = request.form['username']
@@ -59,7 +59,7 @@ def login():
             login_user(user)
             flash('Logged in successfully.', 'success')
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+            return redirect(next_page or url_for('core.index'))
         else:
             flash('Invalid username or password.', 'error')
 
@@ -75,14 +75,12 @@ def logout():
 # Keep setup_default_admin separate or call it from app.py
 def setup_default_admin():
     if not users_table.all():
-        print("Creating default admin user...")
-        # Hardcoded default for initial setup only
-        default_password = 'admin' 
+        # Hardcoded default for initial setup only — change immediately after first login.
         users_table.insert({
             'username': 'admin',
-            'password_hash': generate_password_hash(default_password),
+            'password_hash': generate_password_hash('admin'),
             'role': 'admin',
             'department': 'Chưa có PK',
             'display_name': 'Admin'
         })
-        print(f"Default admin created. Username: admin, Password: {default_password}")
+        print("Default admin user created. Change the password after first login.")

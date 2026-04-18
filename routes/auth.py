@@ -47,7 +47,7 @@ class User(UserMixin):
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('core.index'))
 
     if request.method == 'POST':
         username = request.form['username']
@@ -59,7 +59,7 @@ def login():
             login_user(user)
             flash('Logged in successfully.', 'success')
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+            return redirect(next_page or url_for('core.index'))
         else:
             flash('Invalid username or password.', 'error')
 

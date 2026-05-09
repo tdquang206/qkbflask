@@ -67,9 +67,44 @@ login_manager.login_view = 'auth.login'
 def load_user(user_id):
     return User.get(user_id)
 
+import threading
+import webbrowser
+from pystray import Icon, Menu, MenuItem
+from PIL import Image
+import waitress
+
 # Setup default admin on startup
 setup_default_admin()
 
 # Comment out for waitress
 # if __name__ == '__main__':
 #     app.run(debug=True)
+
+def run_server():
+    # Run the Flask app with Waitress on localhost:5000
+    waitress.serve(app, host='127.0.0.1', port=5000)
+
+def open_browser(icon, item):
+    webbrowser.open('http://127.0.0.1:5000')
+
+def exit_app(icon, item):
+    icon.stop()
+    # Stop the server thread if needed (Waitress handles shutdown on exit)
+
+if __name__ == '__main__':
+    # Start the server in a background thread
+    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread.start()
+
+    # Load icon (assuming app_icon.ico exists in the same directory)
+    icon_image = Image.open('app_icon.ico')
+
+    # Create tray icon menu
+    menu = Menu(
+        MenuItem('Open in Browser', open_browser),
+        MenuItem('Exit', exit_app)
+    )
+
+    # Create and run the tray icon
+    icon = Icon('QKBFlask', icon_image, 'QKBFlask App', menu)
+    icon.run()

@@ -431,63 +431,176 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
-  // ===== service management =====
-  const serviceSelect = document.getElementById("serviceSelect");
-  const addServiceBtn = document.getElementById("addServiceBtn");
-  const serviceTableBody = document.getElementById("serviceTableBody");
 
-  function updateServiceRowNumbers() {
-    serviceTableBody.querySelectorAll("tr").forEach((row, idx) => {
-      row.querySelector("td").textContent = idx + 1;
+    // ===== Enhanced service management =====
+    let serviceList = [];
+    try {
+      const res = await fetch("/api/services");
+      serviceList = await res.json();
+      serviceList.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (err) {
+      console.error("Failed to load services", err);
+    }
+
+    const serviceInput = document.getElementById("serviceInput");
+    const serviceDropdown = document.getElementById("serviceDropdown");
+    const serviceQty = document.getElementById("serviceQty");
+    const serviceNote = document.getElementById("serviceNote");
+    const addServiceBtn = document.getElementById("addServiceBtn");
+    const serviceTableBody = document.getElementById("serviceTableBody");
+    let activeServiceIndex = -1;
+    let currentSelectedService = null;
+
+    serviceInput.addEventListener("input", () => {
+      const value = serviceInput.value.toLowerCase();
+      serviceDropdown.innerHTML = "";
+      if (!value) {
+        serviceDropdown.style.display = "none";
+        return;
+      }
+      // Group by department
+      const grouped = {};
+      serviceList.forEach(s => {
+        if (s.name.toLowerCase().includes(value)) {
+          const dept = s.department || "Khác";
+          if (!grouped[dept]) grouped[dept] = [];
+          grouped[dept].push(s);
+        }
+      });
+      let hasAny = false;
+      Object.keys(grouped).forEach(dept => {
+        const deptDiv = document.createElement("div");
+        deptDiv.textContent = dept;
+        deptDiv.style.fontWeight = "bold";
+        deptDiv.style.background = "#f5f5f5";
+        deptDiv.style.padding = "4px 8px";
+        serviceDropdown.appendChild(deptDiv);
+        grouped[dept].forEach(s => {
+          const option = document.createElement("div");
+          option.className = "dropdown-item service-item";
+          option.textContent = `${s.name} (${s.department || ''}) - ${s.price.toLocaleString()}đ`;
+          option.style.backgroundColor = "white";
+          option.style.color = "black";
+          option.onclick = () => {
+            serviceInput.value = s.name;
+            serviceInput.dataset.serviceId = s.id;
+            serviceInput.dataset.price = s.price;
+            serviceInput.dataset.department = s.department || "";
+            currentSelectedService = s;
+            serviceDropdown.style.display = "none";
+            serviceQty.focus();
+          };
+          serviceDropdown.appendChild(option);
+          hasAny = true;
+        });
+      });
+      serviceDropdown.style.display = hasAny ? "block" : "none";
     });
-  }
 
-  addServiceBtn.addEventListener("click", () => {
-    const sid = serviceSelect.value;
-    if (!sid) return;
-    const option = serviceSelect.options[serviceSelect.selectedIndex];
-    const name = option.text;
-    const price = parseFloat(option.dataset.price) || 0;
+    serviceInput.addEventListener("keydown", (e) => {
+      const items = serviceDropdown.querySelectorAll(".service-item");
+      if (!items.length || serviceDropdown.style.display === "none") return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeServiceIndex = (activeServiceIndex + 1) % items.length;
+        updateActiveService(items);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeServiceIndex = (activeServiceIndex - 1 + items.length) % items.length;
+        updateActiveService(items);
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        if (activeServiceIndex >= 0 && activeServiceIndex < items.length) {
+          e.preventDefault();
+          items[activeServiceIndex].click();
+        }
+      }
+    });
 
-    const row = document.createElement("tr");
-    row.dataset.price = price;
-    row.dataset.serviceId = sid;
+    function updateActiveService(items) {
+      items.forEach((item, i) => {
+        item.classList.toggle("has-background-primary", i === activeServiceIndex);
+        item.classList.toggle("has-text-white", i === activeServiceIndex);
+      });
+    }
 
-    const indexCell = document.createElement("td");
-    const nameCell = document.createElement("td");
-    const priceCell = document.createElement("td");
-    const actionCell = document.createElement("td");
-    const removeBtn = document.createElement("button");
+    function updateServiceRowNumbers() {
+      serviceTableBody.querySelectorAll("tr").forEach((row, idx) => {
+        row.querySelector("td").textContent = idx + 1;
+      });
+    }
 
-    nameCell.textContent = name;
-    appendHiddenInput(nameCell, "service_name", name);
-    appendHiddenInput(nameCell, "service_id", sid);
+    addServiceBtn.addEventListener("click", () => {
+      const name = serviceInput.value.trim();
+      const qty = parseInt(serviceQty.value) || 1;
+      const note = serviceNote.value || "";
+      const s = currentSelectedService || serviceList.find(x => x.name === name);
+      if (!s) {
+        alert("Vui lòng chọn dịch vụ từ danh sách gợi ý.");
+        return;
+      }
+      const price = s.price;
+      const subtotal = qty * price;
+      const row = document.createElement("tr");
+      row.dataset.price = subtotal;
+      row.dataset.serviceId = s.id;
 
-    priceCell.className = "has-text-right";
-    priceCell.textContent = String(price);
-    appendHiddenInput(priceCell, "service_price", price);
+      const indexCell = document.createElement("td");
+      const nameCell = document.createElement("td");
+      const deptCell = document.createElement("td");
+      const qtyCell = document.createElement("td");
+      const noteCell = document.createElement("td");
+      const priceCell = document.createElement("td");
+      const subtotalCell = document.createElement("td");
+      const actionCell = document.createElement("td");
+      const removeBtn = document.createElement("button");
 
-    removeBtn.type = "button";
-    removeBtn.className = "button is-small is-danger removeServiceRow";
-    removeBtn.textContent = "X";
-    actionCell.appendChild(removeBtn);
+      nameCell.textContent = s.name;
+      appendHiddenInput(nameCell, "service_name", s.name);
+      appendHiddenInput(nameCell, "service_id", s.id);
+      deptCell.textContent = s.department || "";
+      appendHiddenInput(deptCell, "service_department", s.department || "");
+      qtyCell.textContent = String(qty);
+      appendHiddenInput(qtyCell, "service_quantity", qty);
+      noteCell.textContent = note;
+      appendHiddenInput(noteCell, "service_note", note);
+      priceCell.className = "has-text-right";
+      priceCell.textContent = price.toLocaleString();
+      appendHiddenInput(priceCell, "service_price", price);
+      subtotalCell.className = "has-text-right";
+      subtotalCell.textContent = subtotal.toLocaleString();
+      appendHiddenInput(subtotalCell, "service_subtotal", subtotal);
 
-    row.appendChild(indexCell);
-    row.appendChild(nameCell);
-    row.appendChild(priceCell);
-    row.appendChild(actionCell);
-    serviceTableBody.appendChild(row);
-    updateServiceRowNumbers();
-    calculateTotals();
-  });
+      removeBtn.type = "button";
+      removeBtn.className = "button is-small is-danger removeServiceRow";
+      removeBtn.textContent = "X";
+      actionCell.appendChild(removeBtn);
 
-  serviceTableBody.addEventListener("click", (e) => {
-    if (e.target.classList.contains("removeServiceRow")) {
-      e.target.closest("tr").remove();
+      row.appendChild(indexCell);
+      row.appendChild(nameCell);
+      row.appendChild(deptCell);
+      row.appendChild(qtyCell);
+      row.appendChild(noteCell);
+      row.appendChild(priceCell);
+      row.appendChild(subtotalCell);
+      row.appendChild(actionCell);
+      serviceTableBody.appendChild(row);
       updateServiceRowNumbers();
       calculateTotals();
-    }
-  });
+      // reset inputs
+      serviceInput.value = "";
+      serviceQty.value = "";
+      serviceNote.value = "";
+      currentSelectedService = null;
+      serviceDropdown.style.display = "none";
+    });
+
+    serviceTableBody.addEventListener("click", (e) => {
+      if (e.target.classList.contains("removeServiceRow")) {
+        e.target.closest("tr").remove();
+        updateServiceRowNumbers();
+        calculateTotals();
+      }
+    });
 
   // on service_fee changes
   document.querySelectorAll("input[name='service_fee']").forEach(radio => {

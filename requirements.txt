@@ -9,3 +9,5 @@ rapidfuzz
 requests
 Werkzeug
 mypy
+pystray
+waitress

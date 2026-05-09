@@ -93,20 +93,17 @@
           <div class="column is-4">
             <div class="field">
               <div class="control">
-                <div class="select is-fullwidth">
-                  <select id="serviceSelect">
-                    <option value="">-- Chọn dịch vụ --</option>
-                    {% for s in services %}
-                    <option data-price="{{ s.price }}" value="{{ s.id }}">{{ s.name }}{% if s.department %} ({{
-                      s.department }}){% endif %}</option>
-                    {% endfor %}
-                  </select>
-                </div>
+                <input class="input" type="text" id="serviceInput" placeholder="Nhập tên dịch vụ...">
+                <div id="serviceDropdown" class="dropdown-content box"
+                  style="display:none; position:absolute; z-index:1000; width:100%;"></div>
               </div>
             </div>
           </div>
           <div class="column is-1">
-            <!-- kept for alignment if quantity later needed -->
+            <input class="input" type="number" id="serviceQty" min="1" placeholder="1">
+          </div>
+          <div class="column is-4">
+            <input class="input" type="text" id="serviceNote" placeholder="Ghi chú (nếu có)">
           </div>
           <div class="column is-1">
             <button type="button" class="button is-link is-fullwidth" id="addServiceBtn">Thêm</button>
@@ -131,30 +128,16 @@
             <tr>
               <th>#</th>
               <th>Tên dịch vụ</th>
-              <th class="has-text-right">Giá</th>
+              <th>Phòng ban</th>
+              <th>Số lượng</th>
+              <th>Ghi chú</th>
+              <th class="has-text-right">Đơn giá</th>
+              <th class="has-text-right">Thành tiền</th>
               <th>Hành động</th>
             </tr>
           </thead>
           <tbody id="serviceTableBody">
-            {% if exam and exam.services %}
-            {% for s in exam.services %}
-            <tr data-price="{{ s.price }}" data-service-id="{{ s.id }}">
-              <td>{{ loop.index }}</td>
-              <td>
-                {{ s.name }}
-                <input type="hidden" name="service_name" value="{{ s.name }}">
-                <input type="hidden" name="service_id" value="{{ s.id }}">
-              </td>
-              <td class="has-text-right">
-                {{ s.price }}
-                <input type="hidden" name="service_price" value="{{ s.price }}">
-              </td>
-              <td>
-                <button type="button" class="button is-small is-danger removeServiceRow">X</button>
-              </td>
-            </tr>
-            {% endfor %}
-            {% endif %}
+            <!-- Rows will be dynamically added by JS -->
           </tbody>
         </table>
       </div>

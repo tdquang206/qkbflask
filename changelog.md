@@ -1,3 +1,33 @@
+# Version 15.260525 (2026-05-25)
+==================================================
+
+## Project Analysis & Summary
+- Fixed the `/danh_sach_kham_benh` pagination bug by replacing the server-side pages with a premium, offline-first client-side multi-month selector and stats dashboard.
+- Added comprehensive pre-paid package view, management, and usage tracking interfaces for patients.
+- Hardened unit tests and resolved pre-existing test mock bugs and CSRF validation blocks, achieving a fully passing test suite.
+
+## New Features
+
+- **Redesigned Exam List (`/danh_sach_kham_benh`)**:
+  - **Scrollable Pending Panel**: Displays all unpaid/unchecked ("chưa kiểm tra tiền") exams across all history in a clean, scrollable container (`max-height: 400px`) at the top of the page.
+  - **Interactive Sorting**: Added a client-side button that instantly toggles unpaid exam sorting between newest-first and oldest-first without page refreshes.
+  - **Multi-Month Selector**: A horizontal tag-bar/button-group of months that supports multi-month toggling. Reverts automatically to the default last 3 months if all are deselected.
+  - **Real-Time Stats Dashboard**: Interactive, dynamic cards (*Tổng số ca*, *Thực nhận (Đã thu)*, *Chưa thu*, *Tổng dự kiến*) calculating stats in real-time client-side as month selectors are toggled.
+  - **Synced payment changes**: Marking an exam as paid instantly updates its status tag and locks inputs across both the top scrollable table and the monthly details lists simultaneously.
+
+- **Pre-paid Packages Management & Usage**:
+  - Dedicated interfaces to manage (`/patient/<id>/packages`) and view usage history (`/patient/<id>/packages/usage`) for prepaid packages.
+  - Automatically handles session decrement and price allocations during exam billing.
+
+## Technical Improvements & Testing
+
+- **Decoupled JavaScript Assets**:
+  - Moved all client-side logic to a clean separate asset [exams_list.js](file:///d:/QuangPyApp/QKBFlask/static/exams_list.js), avoiding inline `<script>` tags in HTML template files.
+- **Robust Test Environment**:
+  - Created a debug runner script [run_tests.py](file:///d:/QuangPyApp/QKBFlask/debug/run_tests.py) inside the `debug` folder using `load_dotenv(encoding='utf-8')` for safe local execution.
+  - Resolved WTForms CSRF block in test client by explicitly setting `WTF_CSRF_ENABLED` to `False` and `TESTING` to `True` during execution.
+  - Patched and corrected test mock crashes in [test_money_logging.py](file:///d:/QuangPyApp/QKBFlask/tests/test_money_logging.py) by utilizing an in-memory database table with an `insert` method and sharing the mock with the reports blueprint to guarantee 100% test isolation and correctness.
+
 # Version 0.14.260403 (2026-04-03)
 ==================================================
 

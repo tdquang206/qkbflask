@@ -33,7 +33,7 @@ def test_ledger_entry_creation(monkeypatch):
     assert all_records[0]['amount'] == 500
 
 
-def test_money_map_generation():
+def test_money_map_generation(monkeypatch):
     """Verify that get_exam_list can build money_map dictionary properly."""
     # build some fake logs with out-of-order timestamps
     logs = [
@@ -51,6 +51,23 @@ def test_money_map_generation():
     import routes.reports as reports_module
     reports_module.money_log_table = temp_table
 
+    # Mock user and patient tables to use safe in-memory MemoryStorage and avoid truncating live database
+    temp_shared_db = TinyDB(storage=MemoryStorage)
+    temp_users_table = temp_shared_db.table('users')
+    temp_patients_table = temp_shared_db.table('patients')
+
+    import shared_db
+    monkeypatch.setattr(shared_db, 'db', temp_shared_db)
+    monkeypatch.setattr(shared_db, 'users_table', temp_users_table)
+    monkeypatch.setattr(shared_db, 'patients_table', temp_patients_table)
+
+    import routes.route_all_exams_page as route_all_exams_page_module
+    monkeypatch.setattr(route_all_exams_page_module, 'db', temp_shared_db)
+    monkeypatch.setattr(route_all_exams_page_module, 'patients', temp_patients_table)
+
+    import routes.auth as auth_module
+    monkeypatch.setattr(auth_module, 'users_table', temp_users_table)
+
     # call get_exam_list GET portion via test client to ensure money_map is
     # included in template context.  This is a light integration rather than
     # end-to-end render.
@@ -59,14 +76,9 @@ def test_money_map_generation():
     app.config['TESTING'] = True
 
     with app.test_client() as client:
-        # need to login first; create a dummy user and a dummy patient + exam
-        from shared_db import users_table, patients_table
-        users_table.truncate()
-        users_table.insert({'username': 'x', 'password_hash': 'irrelevant'})
-
-        # create patient record so /api/mark_paid has something to update
-        patients_table.truncate()
-        patients_table.insert({
+        # insert into safe mocked in-memory tables
+        temp_users_table.insert({'username': 'x', 'password_hash': 'irrelevant'})
+        temp_patients_table.insert({
             'id': 'pid1',
             'exams': [
                 {'id': 'e1', 'paid_status': False, 'service_fee': '0', 'drugs': []}
@@ -75,7 +87,7 @@ def test_money_map_generation():
 
         # manually authenticate by setting session user id
         with client.session_transaction() as sess:
-            sess['_user_id'] = str(users_table.all()[0].doc_id)
+            sess['_user_id'] = str(temp_users_table.all()[0].doc_id)
 
         # first make sure the exam list loads without error
         response = client.get('/danh_sach_kham_benh')
@@ -91,7 +103,7 @@ def test_money_map_generation():
         assert resp2.json.get('success')
 
         # the patient record should be updated
-        updated = patients_table.get(Query().id == 'pid1')
+        updated = temp_patients_table.get(Query().id == 'pid1')
         assert updated['exams'][0]['paid_status'] is True
 
         # ledger should contain 4 records (3 pre-seeded logs + 1 newly inserted log)

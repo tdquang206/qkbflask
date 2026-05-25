@@ -1,18 +1,31 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1 class="title has-text-centered">Danh sách toa thuốc</h1>
+
+<!-- Title -->
+<div class="mb-5">
+    <h1 class="title has-text-centered">Danh sách toa thuốc</h1>
+</div>
 
 <div class="container">
-    {% for month in current_months %}
-    <section class="section">
-        <div class="box">
-            <h2 class="title is-4 has-text-primary">Tháng {{ month }}</h2>
+    <!-- 1. Top Section: Pending Verification Table (All Unpaid Exams across all months) -->
+    <section class="section pt-0">
+        <div class="box" style="border-top: 4px solid #ffdd57;">
+            <div class="is-flex is-justify-content-between is-align-items-center mb-4">
+                <div>
+                    <h2 class="title is-4 has-text-warning-dark mb-1">Toa thuốc chờ kiểm tra tiền</h2>
+                    <p class="subtitle is-6 has-text-grey">Danh sách tất cả các ca khám chưa xác nhận đã nhận tiền</p>
+                </div>
+                <!-- Client-side sorting button (no icons) -->
+                <div>
+                    <button class="button is-small is-light" id="unpaid-sort-btn">
+                        Sắp xếp: Mới nhất ➔ Cũ nhất
+                    </button>
+                </div>
+            </div>
 
-            <!-- Unpaid Exams -->
-            <h3 class="subtitle is-5 has-text-danger">
-                Chưa trả: {{ "{:,}".format(grouped[month].subtotal_unpaid) }}
-            </h3>
-            <div class="table-container">
+            {% if unpaid_exams %}
+            <!-- Scrollable list wrapper -->
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
                 <table class="table is-striped is-hoverable is-fullwidth">
                     <thead>
                         <tr>
@@ -24,11 +37,11 @@
                             <th style="width: 200px;">Hành động</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for exam in grouped[month].unpaid %}
-                        <tr>
+                    <tbody id="unpaid-tbody">
+                        {% for exam in unpaid_exams %}
+                        <tr data-date="{{ exam.exam_date }}">
                             <td>{{ loop.index }}</td>
-                            <td>{{ exam.exam_date }}</td>
+                            <td class="has-text-grey-dark">{{ exam.exam_date }}</td>
                             <td>
                                 <div>
                                     <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
@@ -47,17 +60,16 @@
                                 {{ "{:,}".format(exam.total_money) }}
                             </td>
                             <td>
-                                {# input for actual amount, default to logged value or total_money #}
                                 <input type="number" min="0" class="input real_amount_input"
                                     value="{{ money_map[exam.exam_id].amount if money_map.get(exam.exam_id) else exam.total_money }}">
                             </td>
                             <td>
                                 <div class="buttons">
-                                    <a class="button is-info is-outlined"
+                                    <a class="button is-info is-outlined is-small"
                                         href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
                                         Edit
                                     </a>
-                                    <a class="button is-warning money_received_btn" data-exam-id="{{ exam.exam_id }}"
+                                    <a class="button is-warning is-small money_received_btn" data-exam-id="{{ exam.exam_id }}"
                                         data-patient-id="{{ exam.patient_id }}">
                                         Chưa kiểm tra tiền
                                     </a>
@@ -68,11 +80,136 @@
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <div class="notification is-success is-light has-text-centered py-5">
+                🎉 Tất cả các toa thuốc đã được kiểm tra và thanh toán đầy đủ!
+            </div>
+            {% endif %}
+        </div>
+    </section>
 
-            <!-- Paid Exams -->
-            <h3 class="subtitle is-5 has-text-success">
-                Đã trả: {{ "{:,}".format(grouped[month].subtotal_paid) }}
-            </h3>
+    <!-- 2. Middle Section: Month Multi-Selector Tab-Bar -->
+    <section class="section py-0 mb-5">
+        <div class="box">
+            <h3 class="title is-5 mb-3">Lọc theo tháng</h3>
+            <p class="subtitle is-6 has-text-grey mb-3">
+                Nhấp để chọn một hoặc nhiều tháng. Nếu bỏ chọn toàn bộ, hệ thống sẽ tự động hiển thị 3 tháng gần nhất.
+            </p>
+            <div class="field is-grouped is-grouped-multiline" id="month-tabs">
+                {% for month in sorted_months %}
+                <div class="control">
+                    <button class="button month-tab-btn is-rounded is-small" data-month="{{ month }}">
+                        Tháng {{ month }}
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Dynamic Interactive Stats Block -->
+    <section class="section py-0 mb-5">
+        <div class="columns is-multiline">
+            <div class="column is-one-quarter">
+                <div class="box has-text-centered" style="border-top: 4px solid #3273dc;">
+                    <p class="heading">Tổng số ca</p>
+                    <p class="title is-4" id="stat-total-records">0</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box has-text-centered" style="border-top: 4px solid #48c774;">
+                    <p class="heading">Thực nhận (Đã thu)</p>
+                    <p class="title is-4 has-text-success" id="stat-subtotal-paid">0đ</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box has-text-centered" style="border-top: 4px solid #f14668;">
+                    <p class="heading">Chưa thu</p>
+                    <p class="title is-4 has-text-danger" id="stat-subtotal-unpaid">0đ</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box has-text-centered" style="border-top: 4px solid #ffdd57;">
+                    <p class="heading">Tổng dự kiến</p>
+                    <p class="title is-4" id="stat-total-expected">0đ</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Bottom Section: Detailed Exam Lists by Month -->
+    <section class="section pt-0">
+        {% for month in sorted_months %}
+        <div class="month-section box mb-5" data-month="{{ month }}" 
+             data-total-records="{{ grouped[month].paid|length + grouped[month].unpaid|length }}"
+             data-subtotal-paid="{{ grouped[month].subtotal_paid }}"
+             data-subtotal-unpaid="{{ grouped[month].subtotal_unpaid }}">
+             
+            <h2 class="title is-4 has-text-link mb-4">Chi tiết Tháng {{ month }}</h2>
+
+            <!-- Unpaid list for this month -->
+            {% if grouped[month].unpaid %}
+            <h3 class="subtitle is-5 has-text-danger mt-4 mb-2">Chưa thu tiền</h3>
+            <div class="table-container mb-5">
+                <table class="table is-striped is-hoverable is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ngày</th>
+                            <th>Tên bé - Ba Mẹ</th>
+                            <th>Số tiền</th>
+                            <th>Thực nhận</th>
+                            <th style="width: 200px;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exam in grouped[month].unpaid %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td class="has-text-grey-dark">{{ exam.exam_date }}</td>
+                            <td>
+                                <div>
+                                    <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
+                                    --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+                                </div>
+                                <div class="mt-1 tags">
+                                    {% if exam.department %}
+                                    <span class="tag is-warning">{{ exam.department }}</span>
+                                    {% endif %}
+                                    {% if exam.created_by_name %}
+                                    <span class="tag is-warning">{{ exam.created_by_name }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="has-text-weight-semibold has-text-danger">
+                                {{ "{:,}".format(exam.total_money) }}
+                            </td>
+                            <td>
+                                <input type="number" min="0" class="input real_amount_input"
+                                    value="{{ money_map[exam.exam_id].amount if money_map.get(exam.exam_id) else exam.total_money }}">
+                            </td>
+                            <td>
+                                <div class="buttons">
+                                    <a class="button is-info is-outlined is-small"
+                                        href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
+                                        Edit
+                                    </a>
+                                    <a class="button is-warning is-small money_received_btn" data-exam-id="{{ exam.exam_id }}"
+                                        data-patient-id="{{ exam.patient_id }}">
+                                        Chưa kiểm tra tiền
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Paid list for this month -->
+            {% if grouped[month].paid %}
+            <h3 class="subtitle is-5 has-text-success mt-4 mb-2">Đã nhận tiền</h3>
             <div class="table-container">
                 <table class="table is-striped is-hoverable is-fullwidth">
                     <thead>
@@ -89,10 +226,12 @@
                         {% for exam in grouped[month].paid %}
                         <tr>
                             <td>{{ loop.index }}</td>
-                            <td>{{ exam.exam_date }}</td>
+                            <td class="has-text-grey-dark">{{ exam.exam_date }}</td>
                             <td>
-                                <div>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}
-                                    --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}</div>
+                                <div>
+                                    <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
+                                    --- {{ exam.parent_name }} --- {{ exam.phone }} --- {{ exam.address }}
+                                </div>
                                 <div class="mt-1 tags">
                                     {% if exam.department %}
                                     <span class="tag is-info">{{ exam.department }}</span>
@@ -106,19 +245,15 @@
                                 {{ "{:,}".format(exam.total_money) }}
                             </td>
                             <td class="has-text-weight-semibold">
-                                {# display logged amount, fall back to expected #}
-                                {{ "{:,}".format(money_map[exam.exam_id].amount) if money_map.get(exam.exam_id) else "-"
-                                }}
+                                {{ "{:,}".format(money_map[exam.exam_id].amount) if money_map.get(exam.exam_id) else "-" }}
                             </td>
                             <td>
                                 <div class="buttons">
-                                    <a class="button is-info is-outlined"
+                                    <a class="button is-info is-outlined is-small"
                                         href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
                                         Edit
                                     </a>
-                                    <button class="button is-success is-outlined money_received_status" disabled>
-                                        Đã nhận tiền
-                                    </button>
+                                    <span class="tag is-success">Đã nhận tiền</span>
                                 </div>
                             </td>
                         </tr>
@@ -126,102 +261,18 @@
                     </tbody>
                 </table>
             </div>
+            {% endif %}
         </div>
+        {% endfor %}
     </section>
-    {% endfor %}
-
-    <!-- Pagination for older months -->
-    {% if older_months %}
-    <nav class="pagination is-centered" role="navigation" aria-label="pagination">
-        {% if page > 1 %}
-        <a class="pagination-previous" href="?page={{ page - 1 }}">Trang trước</a>
-        {% else %}
-        <a class="pagination-previous" disabled>Trang trước</a>
-        {% endif %}
-
-        {% if has_next %}
-        <a class="pagination-next" href="?page={{ page + 1 }}">Trang sau</a>
-        {% else %}
-        <a class="pagination-next" disabled>Trang sau</a>
-        {% endif %}
-
-        <ul class="pagination-list">
-            {% for p in range(1, total_pages + 1) %}
-            <li>
-                <a class="pagination-link {% if p == page %}is-current{% endif %}" href="?page={{ p }}">
-                    {{ p }}
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 
-<!-- Toast notification -->
-<div id="toast" class="notification" style="display:none; position:fixed; top:20px; right:20px; z-index:1000;"></div>
-
-<script>
-    function showToast(message = "✅ Đã lưu thành công!", type = "is-success") {
-        const toast = document.getElementById("toast");
-        toast.textContent = message;
-        toast.className = `notification ${type}`;
-        toast.style.display = "block";
-        setTimeout(() => {
-            toast.style.display = "none";
-        }, 3000);
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll(".money_received_btn").forEach(function (btn) {
-            btn.addEventListener("click", async function () {
-                try {
-                    const examId = btn.getAttribute("data-exam-id");
-                    const patientId = btn.getAttribute("data-patient-id");
-                    // find the adjacent input field for real amount
-                    const row = btn.closest('tr');
-                    let realAmount = null;
-                    if (row) {
-                        const input = row.querySelector('.real_amount_input');
-                        if (input) {
-                            realAmount = input.value;
-                        }
-                    }
-
-                    const payload = { patient_id: patientId, exam_id: examId };
-                    if (realAmount !== null) {
-                        payload.real_amount = realAmount;
-                    }
-
-                    const response = await fetch('/api/mark_paid', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.error || `HTTP error! status: ${response.status}`);
-
-                    if (data.success) {
-                        // mark button and input as read-only
-                        const row = btn.closest('tr');
-                        if (row) {
-                            const input = row.querySelector('.real_amount_input');
-                            if (input) {
-                                input.disabled = true;
-                            }
-                        }
-                        this.outerHTML = '<span class="tag is-success">Đã nhận tiền</span>';
-                        showToast("✅ Đã lưu thành công!", "is-success");
-                    } else {
-                        throw new Error(data.error || "Unknown error");
-                    }
-                } catch (error) {
-                    console.error('Error', error);
-                    showToast(`Lỗi: ${error.message}`, "is-danger");
-                }
-            });
-        });
-    });
+<!-- Passed-in parameters securely using JSON element (avoids long script elements) -->
+<script id="default-selected-months-data" type="application/json">
+    {{ default_selected_months | tojson }}
 </script>
+
+<!-- External optimized script containing the interactive logic -->
+<script src="{{ url_for('static', filename='exams_list.js') }}"></script>
+
 {% endblock %}

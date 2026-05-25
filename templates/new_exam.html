@@ -112,11 +112,36 @@
         {% if packages %}
         <div class="content">
           <p><strong>Gói trả trước:</strong></p>
-          <ul>
-            {% for pkg in packages %}
-            <li>{{ pkg.remaining_sessions }}x {{ pkg.service_name }} ({{ pkg.unit_price }})</li>
-            {% endfor %}
-          </ul>
+          <div class="table-container">
+            <table class="table is-striped is-hoverable is-fullwidth" id="packageTable">
+              <thead>
+                <tr>
+                  <th>Tên dịch vụ</th>
+                  <th>Tổng lượt</th>
+                  <th>Còn lại</th>
+                  <th>Đơn giá</th>
+                  <th>Hết hạn</th>
+                  <th>Trạng thái</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pkg in packages %}
+                <tr data-service-id="{{ pkg.service_id }}" data-service-name="{{ pkg.service_name }}"
+                  data-unit-price="{{ pkg.unit_price }}" data-remaining="{{ pkg.remaining_sessions }}">
+                  <td>{{ pkg.service_name }}</td>
+                  <td>{{ pkg.total_sessions or pkg.remaining_sessions }}</td>
+                  <td>{{ pkg.remaining_sessions }}</td>
+                  <td>{{ pkg.unit_price }}</td>
+                  <td>{{ pkg.expires_at or 'Không giới hạn' }}</td>
+                  <td>{{ pkg.status }}</td>
+                  <td><button type="button" class="button is-small is-link usePackageBtn" {% if pkg.remaining_sessions
+                      <=0 or not pkg.is_active %}disabled{% endif %}>Sử dụng</button></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
         {% endif %}
       </div>

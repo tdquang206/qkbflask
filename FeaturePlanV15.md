@@ -18,12 +18,12 @@ Package data structure (stored in patient record):
 What's MISSING (Not implemented):
 ❌ No package creation/edit UI — The changelog explicitly states:
 
-"Package management (creation/edit) will be exposed on the patient profile page in an upcoming iteration."
+"Package management (creation/edit) will be exposed on the patient profile page in an upcoming iteration." ✅ IMPLEMENTED
 
-❌ No endpoint to create packages
-❌ No endpoint to edit/update packages
-❌ No UI on patient profile to manage packages
-❌ Packages can only exist if manually added to the database
+❌ No endpoint to create packages ✅ IMPLEMENTED
+❌ No endpoint to edit/update packages ✅ IMPLEMENTED
+❌ No UI on patient profile to manage packages ✅ IMPLEMENTED
+❌ Packages can only exist if manually added to the database ✅ FIXED
 Current State:
 The feature is a "read-only" partial implementation — packages work if they exist in a patient's record, but there's no way to create them through the UI. This would require adding package management endpoints and UI to the patient profile page.
 
@@ -174,3 +174,82 @@ package expiry + remaining session logic
 quantity-aware package consumption
 prepaid marker for print/PDF
 This keeps the existing service/drug flow intact and adds a clean package-first workflow that feeds into the existing exam save/print pipeline.
+
+# Processed
+
+## Implementation Summary (Completed May 9, 2026)
+
+### Files Modified:
+
+1. **`routes/exam.py`**:
+   - Added helper functions: `_package_is_active()`, `_package_display_status()`
+   - Updated `_collect_services_from_form()` to handle quantity, notes, and package application
+   - Modified `new_exam()` and `edit_exam()` routes to enrich package data with status
+   - Added logging after each function to show processing details (print statements)
+
+2. **`templates/new_exam.html`**:
+   - Replaced simple package list with a detailed table showing service name, total sessions, remaining, unit price, expiry, status, and "Use" button
+
+3. **`templates/edit_exam.html`**:
+   - Same package table as new_exam.html
+   - Added package "Use" button handler in inline JS
+
+4. **`static/new_exam.js`**:
+   - Added package "Use" button handler that prompts for quantity and adds service rows from packages
+   - Includes validation for remaining sessions
+
+5. **`routes/patients.py`**:
+   - Added `manage_packages()` route for CRUD operations on patient packages
+   - Added `view_package_usage()` route for package usage statistics and history
+   - Imported services_table for service selection in package creation
+
+6. **`templates/patients.html`**:
+   - Added "Quản lý gói" (Manage Packages) and "Xem sử dụng gói" (View Package Usage) buttons to the "Thao tác" column
+
+7. **`templates/manage_packages.html`** (New):
+   - Package creation form with service selection dropdown
+   - Current packages table with edit/delete functionality
+   - Modal dialog for editing existing packages
+   - JavaScript for auto-filling service details from selection
+
+8. **`templates/package_usage.html`** (New):
+   - Package purchase history table with session tracking
+   - Service usage statistics (total, package vs regular visits)
+   - Usage percentage calculations and status indicators
+
+### Key Features Implemented:
+
+- **Package Display**: Shows active packages in a table with expiry and status
+- **Package Usage**: "Use" button allows selecting quantity from available sessions
+- **Automatic Pricing**: Uses package unit_price when applying services
+- **Session Tracking**: Decrements `remaining_sessions` when packages are used
+- **Expiry Handling**: Checks `expires_at` against exam date
+- **Print Support**: Services include `prepaid_status` for PDF/JPEG templates
+- **Logging**: Added print statements after each function showing what was processed
+
+### Data Model:
+Packages now support:
+```json
+{
+  "service_id": "...",
+  "service_name": "...", 
+  "unit_price": 150000,
+  "remaining_sessions": 5,
+  "expires_at": "2027-03-07"  // optional
+}
+```
+
+### UI Flow:
+1. Doctor sees package table in exam page
+2. Clicks "Use" on active package
+3. Prompts for quantity (max = remaining)
+4. Adds service row with package pricing
+5. On save, decrements package sessions
+
+### Status:
+✅ Package usage in exams is fully functional
+✅ Package creation/edit UI implemented
+✅ Package management endpoints added
+✅ Package usage statistics implemented
+
+The package management feature is now complete with full CRUD operations and usage tracking.

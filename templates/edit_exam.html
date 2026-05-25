@@ -173,11 +173,36 @@
         {% if packages %}
         <div class="content">
           <p><strong>Gói trả trước:</strong></p>
-          <ul>
-            {% for pkg in packages %}
-            <li>{{ pkg.remaining_sessions }}x {{ pkg.service_name }} ({{ pkg.unit_price }})</li>
-            {% endfor %}
-          </ul>
+          <div class="table-container">
+            <table class="table is-striped is-hoverable is-fullwidth" id="packageTable">
+              <thead>
+                <tr>
+                  <th>Tên dịch vụ</th>
+                  <th>Tổng lượt</th>
+                  <th>Còn lại</th>
+                  <th>Đơn giá</th>
+                  <th>Hết hạn</th>
+                  <th>Trạng thái</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pkg in packages %}
+                <tr data-service-id="{{ pkg.service_id }}" data-service-name="{{ pkg.service_name }}"
+                  data-unit-price="{{ pkg.unit_price }}" data-remaining="{{ pkg.remaining_sessions }}">
+                  <td>{{ pkg.service_name }}</td>
+                  <td>{{ pkg.total_sessions or pkg.remaining_sessions }}</td>
+                  <td>{{ pkg.remaining_sessions }}</td>
+                  <td>{{ pkg.unit_price }}</td>
+                  <td>{{ pkg.expires_at or 'Không giới hạn' }}</td>
+                  <td>{{ pkg.status }}</td>
+                  <td><button type="button" class="button is-small is-link usePackageBtn" {% if pkg.remaining_sessions
+                      <=0 or not pkg.is_active %}disabled{% endif %}>Sử dụng</button></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
         {% endif %}
       </div>
@@ -198,7 +223,48 @@
             </tr>
           </thead>
           <tbody id="serviceTableBody">
-            <!-- Rows will be dynamically added by JS -->
+            {% if exam.services %}
+            {% for service in exam.services %}
+            <tr data-price="{{ (service.quantity|int * (service.price|default(0)|float)) }}"
+              data-service-id="{{ service.service_id or service.id or '' }}">
+              <td>{{ loop.index }}</td>
+              <td>
+                {{ service.name }}
+                <input type="hidden" name="service_name" value="{{ service.name }}">
+                <input type="hidden" name="service_id" value="{{ service.service_id or service.id or '' }}">
+              </td>
+              <td>
+                {{ service.department or service.service_department or '' }}
+                <input type="hidden" name="service_department"
+                  value="{{ service.department or service.service_department or '' }}">
+              </td>
+              <td>
+                {{ service.quantity }}
+                <input type="hidden" name="service_quantity" value="{{ service.quantity }}">
+              </td>
+              <td>
+                {{ service.note or service.service_note or '' }}
+                <input type="hidden" name="service_note" value="{{ service.note or service.service_note or '' }}">
+              </td>
+              <td class="has-text-right">
+                {{ "{:,.0f}".format(service.price|default(0)|float) }}
+                <input type="hidden" name="service_price" value="{{ service.price|default(0)|float }}">
+              </td>
+              <td class="has-text-right">
+                {{ "{:,.0f}".format((service.quantity|int * (service.price|default(0)|float))) }}
+                <input type="hidden" name="service_subtotal"
+                  value="{{ (service.quantity|int * (service.price|default(0)|float)) }}">
+              </td>
+              <td>
+                <button type="button" class="button is-small is-danger removeServiceRow">X</button>
+              </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="8" class="has-text-grey">Không có dịch vụ</td>
+            </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>
@@ -1072,95 +1138,292 @@
 
 <!-- Services management script -->
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const serviceSelect = document.getElementById("serviceSelect");
+  document.addEventListener("DOMContentLoaded", async () => {
+    const serviceInput = document.getElementById("serviceInput");
+    const serviceDropdown = document.getElementById("serviceDropdown");
+    const serviceQty = document.getElementById("serviceQty");
+    const serviceNote = document.getElementById("serviceNote");
     const addServiceBtn = document.getElementById("addServiceBtn");
     const serviceTableBody = document.getElementById("serviceTableBody");
 
-    addServiceBtn.addEventListener("click", () => {
-      const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
-      if (!selectedOption.value) {
-        alert("Vui lòng chọn dịch vụ");
+    let serviceList = [];
+    let currentSelectedService = null;
+    let activeServiceIndex = -1;
+
+    function appendHiddenInput(parent, inputName, inputValue) {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = inputName;
+      hidden.value = String(inputValue ?? "");
+      parent.appendChild(hidden);
+    }
+
+    function updateServiceRowNumbers() {
+      serviceTableBody.querySelectorAll("tr").forEach((row, idx) => {
+        const indexCell = row.querySelector("td");
+        if (indexCell) indexCell.textContent = idx + 1;
+      });
+    }
+
+    function renderDropdown() {
+      const value = (serviceInput.value || "").toLowerCase();
+      serviceDropdown.innerHTML = "";
+      if (!value) {
+        serviceDropdown.style.display = "none";
         return;
       }
 
-      const serviceId = selectedOption.value;
-      const serviceName = selectedOption.textContent;
-      const servicePrice = parseFloat(selectedOption.getAttribute("data-price")) || 0;
+      const grouped = {};
+      serviceList.forEach(s => {
+        if (s.name.toLowerCase().includes(value)) {
+          const dept = s.department || "Khác";
+          if (!grouped[dept]) grouped[dept] = [];
+          grouped[dept].push(s);
+        }
+      });
 
-      // remove "no service" placeholder if exists
-      const placeholder = serviceTableBody.querySelector("tr[colspan]");
-      if (placeholder) {
-        placeholder.remove();
-      }
+      let hasAny = false;
+      Object.keys(grouped).forEach(dept => {
+        const deptDiv = document.createElement("div");
+        deptDiv.textContent = dept;
+        deptDiv.style.fontWeight = "bold";
+        deptDiv.style.background = "#f5f5f5";
+        deptDiv.style.padding = "4px 8px";
+        serviceDropdown.appendChild(deptDiv);
 
-      // Create row
-      const row = document.createElement("tr");
-      row.dataset.price = servicePrice;
-      row.dataset.serviceId = serviceId;
+        grouped[dept].forEach(s => {
+          const option = document.createElement("div");
+          option.className = "dropdown-item service-item";
+          option.textContent = `${s.name} (${s.department || ''}) - ${s.price.toLocaleString()}đ`;
+          option.style.backgroundColor = "white";
+          option.style.color = "black";
+          option.onclick = () => {
+            serviceInput.value = s.name;
+            serviceInput.dataset.serviceId = s.id;
+            serviceInput.dataset.price = s.price;
+            serviceInput.dataset.department = s.department || "";
+            currentSelectedService = s;
+            serviceDropdown.style.display = "none";
+            serviceQty.focus();
+          };
+          serviceDropdown.appendChild(option);
+          hasAny = true;
+        });
+      });
+      serviceDropdown.style.display = hasAny ? "block" : "none";
+    }
 
-      const tdIdx = document.createElement("td");
-      tdIdx.textContent = String(serviceTableBody.querySelectorAll("tr").length + 1);
+    try {
+      const res = await fetch("/api/services");
+      serviceList = await res.json();
+      serviceList.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (err) {
+      console.error("Failed to load services", err);
+    }
 
-      const tdService = document.createElement("td");
-      tdService.textContent = serviceName;
-      const serviceNameInput = document.createElement("input");
-      serviceNameInput.type = "hidden";
-      serviceNameInput.name = "service_name";
-      serviceNameInput.value = serviceName;
-      const serviceIdInput = document.createElement("input");
-      serviceIdInput.type = "hidden";
-      serviceIdInput.name = "service_id";
-      serviceIdInput.value = serviceId;
-      tdService.appendChild(serviceNameInput);
-      tdService.appendChild(serviceIdInput);
-
-      const tdServicePrice = document.createElement("td");
-      tdServicePrice.className = "has-text-right";
-      tdServicePrice.textContent = servicePrice.toLocaleString();
-      const servicePriceInput = document.createElement("input");
-      servicePriceInput.type = "hidden";
-      servicePriceInput.name = "service_price";
-      servicePriceInput.value = String(servicePrice);
-      tdServicePrice.appendChild(servicePriceInput);
-
-      const tdRemove = document.createElement("td");
-      const removeServiceBtn = document.createElement("button");
-      removeServiceBtn.type = "button";
-      removeServiceBtn.className = "button is-small is-danger removeServiceRow";
-      removeServiceBtn.textContent = "X";
-      tdRemove.appendChild(removeServiceBtn);
-
-      row.appendChild(tdIdx);
-      row.appendChild(tdService);
-      row.appendChild(tdServicePrice);
-      row.appendChild(tdRemove);
-
-      serviceTableBody.appendChild(row);
-      serviceSelect.value = "";
-      calculateTotals();
+    serviceInput.addEventListener("input", () => {
+      activeServiceIndex = -1;
+      currentSelectedService = null;
+      renderDropdown();
     });
 
-    // Remove service row
+    serviceInput.addEventListener("keydown", (e) => {
+      const items = serviceDropdown.querySelectorAll(".service-item");
+      if (!items.length || serviceDropdown.style.display === "none") return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeServiceIndex = (activeServiceIndex + 1) % items.length;
+        items.forEach((item, i) => {
+          item.classList.toggle("has-background-primary", i === activeServiceIndex);
+          item.classList.toggle("has-text-white", i === activeServiceIndex);
+        });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeServiceIndex = (activeServiceIndex - 1 + items.length) % items.length;
+        items.forEach((item, i) => {
+          item.classList.toggle("has-background-primary", i === activeServiceIndex);
+          item.classList.toggle("has-text-white", i === activeServiceIndex);
+        });
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        if (activeServiceIndex >= 0 && activeServiceIndex < items.length) {
+          e.preventDefault();
+          items[activeServiceIndex].click();
+        }
+      }
+    });
+
+    addServiceBtn.addEventListener("click", () => {
+      const name = serviceInput.value.trim();
+      const qty = parseInt(serviceQty.value, 10) || 1;
+      const note = serviceNote.value.trim();
+      const s = currentSelectedService || serviceList.find(x => x.name === name);
+      if (!s) {
+        alert("Vui lòng chọn dịch vụ từ danh sách gợi ý.");
+        return;
+      }
+
+      const price = parseFloat(s.price) || 0;
+      const subtotal = qty * price;
+
+      const placeholder = serviceTableBody.querySelector("tr td[colspan]");
+      if (placeholder) {
+        placeholder.closest("tr").remove();
+      }
+
+      const row = document.createElement("tr");
+      row.dataset.price = subtotal;
+      row.dataset.serviceId = s.id;
+
+      const indexCell = document.createElement("td");
+      const nameCell = document.createElement("td");
+      const deptCell = document.createElement("td");
+      const qtyCell = document.createElement("td");
+      const noteCell = document.createElement("td");
+      const priceCell = document.createElement("td");
+      const subtotalCell = document.createElement("td");
+      const actionCell = document.createElement("td");
+      const removeBtn = document.createElement("button");
+
+      nameCell.textContent = s.name;
+      appendHiddenInput(nameCell, "service_name", s.name);
+      appendHiddenInput(nameCell, "service_id", s.id);
+
+      deptCell.textContent = s.department || "";
+      appendHiddenInput(deptCell, "service_department", s.department || "");
+
+      qtyCell.textContent = String(qty);
+      appendHiddenInput(qtyCell, "service_quantity", qty);
+
+      noteCell.textContent = note;
+      appendHiddenInput(noteCell, "service_note", note);
+
+      priceCell.className = "has-text-right";
+      priceCell.textContent = price.toLocaleString();
+      appendHiddenInput(priceCell, "service_price", price);
+
+      subtotalCell.className = "has-text-right";
+      subtotalCell.textContent = subtotal.toLocaleString();
+      appendHiddenInput(subtotalCell, "service_subtotal", subtotal);
+
+      removeBtn.type = "button";
+      removeBtn.className = "button is-small is-danger removeServiceRow";
+      removeBtn.textContent = "X";
+      actionCell.appendChild(removeBtn);
+
+      row.appendChild(indexCell);
+      row.appendChild(nameCell);
+      row.appendChild(deptCell);
+      row.appendChild(qtyCell);
+      row.appendChild(noteCell);
+      row.appendChild(priceCell);
+      row.appendChild(subtotalCell);
+      row.appendChild(actionCell);
+      serviceTableBody.appendChild(row);
+
+      updateServiceRowNumbers();
+      calculateTotals();
+
+      serviceInput.value = "";
+      serviceQty.value = "";
+      serviceNote.value = "";
+      currentSelectedService = null;
+      serviceDropdown.style.display = "none";
+    });
+
     document.addEventListener("click", (e) => {
       if (e.target.classList.contains("removeServiceRow")) {
         const row = e.target.closest("tr");
         row.remove();
-        // if no services left, show placeholder
-        if (serviceTableBody.querySelectorAll("tr").length === 0) {
+        if (!serviceTableBody.querySelector("tr")) {
           const placeholder = document.createElement("tr");
           const placeholderTd = document.createElement("td");
-          placeholderTd.colSpan = 4;
+          placeholderTd.colSpan = 8;
           placeholderTd.className = "has-text-grey";
           placeholderTd.textContent = "Không có dịch vụ";
           placeholder.appendChild(placeholderTd);
           serviceTableBody.appendChild(placeholder);
         }
+        updateServiceRowNumbers();
         calculateTotals();
       }
     });
 
-    // On override change
+    document.addEventListener("click", (e) => {
+      if (e.target.classList.contains("usePackageBtn")) {
+        const row = e.target.closest("tr");
+        const serviceId = row.dataset.serviceId;
+        const serviceName = row.dataset.serviceName;
+        const unitPrice = parseFloat(row.dataset.unitPrice) || 0;
+        const remaining = parseInt(row.dataset.remaining, 10) || 0;
+
+        if (remaining <= 0) {
+          alert("Gói này đã hết lượt sử dụng.");
+          return;
+        }
+
+        const qty = parseInt(prompt(`Nhập số lượng sử dụng (tối đa ${remaining}):`, "1"), 10);
+        if (!qty || qty <= 0 || qty > remaining) {
+          alert("Số lượng không hợp lệ.");
+          return;
+        }
+
+        const subtotal = qty * unitPrice;
+        const serviceRow = document.createElement("tr");
+        serviceRow.dataset.price = subtotal;
+        serviceRow.dataset.serviceId = serviceId;
+
+        const indexCell = document.createElement("td");
+        const nameCell = document.createElement("td");
+        const deptCell = document.createElement("td");
+        const qtyCell = document.createElement("td");
+        const noteCell = document.createElement("td");
+        const priceCell = document.createElement("td");
+        const subtotalCell = document.createElement("td");
+        const actionCell = document.createElement("td");
+        const removeBtn = document.createElement("button");
+
+        nameCell.textContent = serviceName;
+        appendHiddenInput(nameCell, "service_name", serviceName);
+        appendHiddenInput(nameCell, "service_id", serviceId);
+
+        deptCell.textContent = "Gói trả trước";
+        appendHiddenInput(deptCell, "service_department", "Gói trả trước");
+
+        qtyCell.textContent = String(qty);
+        appendHiddenInput(qtyCell, "service_quantity", qty);
+
+        noteCell.textContent = "Từ gói trả trước";
+        appendHiddenInput(noteCell, "service_note", "Từ gói trả trước");
+
+        priceCell.className = "has-text-right";
+        priceCell.textContent = unitPrice.toLocaleString();
+        appendHiddenInput(priceCell, "service_price", unitPrice);
+
+        subtotalCell.className = "has-text-right";
+        subtotalCell.textContent = subtotal.toLocaleString();
+        appendHiddenInput(subtotalCell, "service_subtotal", subtotal);
+
+        removeBtn.type = "button";
+        removeBtn.className = "button is-small is-danger removeServiceRow";
+        removeBtn.textContent = "X";
+        actionCell.appendChild(removeBtn);
+
+        serviceRow.appendChild(indexCell);
+        serviceRow.appendChild(nameCell);
+        serviceRow.appendChild(deptCell);
+        serviceRow.appendChild(qtyCell);
+        serviceRow.appendChild(noteCell);
+        serviceRow.appendChild(priceCell);
+        serviceRow.appendChild(subtotalCell);
+        serviceRow.appendChild(actionCell);
+        serviceTableBody.appendChild(serviceRow);
+
+        updateServiceRowNumbers();
+        calculateTotals();
+        serviceDropdown.style.display = "none";
+      }
+    });
+
     const overrideInput = document.getElementById("total_override");
     if (overrideInput) {
       overrideInput.addEventListener("input", calculateTotals);

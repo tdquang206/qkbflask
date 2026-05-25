@@ -41,18 +41,22 @@ def test_money_map_generation():
         {'exam_id': 'a', 'timestamp': '2026-02-01T00:00:00', 'amount': 200},
         {'exam_id': 'b', 'timestamp': '2026-01-15T00:00:00', 'amount': 300},
     ]
-    # monkeypatch the raw money_log_table.all() method
-    monkeypatch_module = route_all_exams_page
-
-    class DummyTable:
-        def all(self):
-            return logs
-    monkeypatch_module.money_log_table = DummyTable()
+    # Use MemoryStorage TinyDB table so both all() and insert() work perfectly
+    temp_db = TinyDB(storage=MemoryStorage)
+    temp_table = temp_db.table('money_received')
+    for log in logs:
+        temp_table.insert(log)
+        
+    route_all_exams_page.money_log_table = temp_table
+    import routes.reports as reports_module
+    reports_module.money_log_table = temp_table
 
     # call get_exam_list GET portion via test client to ensure money_map is
     # included in template context.  This is a light integration rather than
     # end-to-end render.
     from app import app
+    app.config['WTF_CSRF_ENABLED'] = False
+    app.config['TESTING'] = True
 
     with app.test_client() as client:
         # need to login first; create a dummy user and a dummy patient + exam
@@ -90,11 +94,11 @@ def test_money_map_generation():
         updated = patients_table.get(Query().id == 'pid1')
         assert updated['exams'][0]['paid_status'] is True
 
-        # ledger should contain a single record with correct amount
+        # ledger should contain 4 records (3 pre-seeded logs + 1 newly inserted log)
         logs = route_all_exams_page.money_log_table.all()
-        assert len(logs) == 1
-        assert logs[0]['amount'] == 1234
-        assert logs[0]['exam_id'] == 'e1'
+        assert len(logs) == 4
+        assert logs[3]['amount'] == 1234
+        assert logs[3]['exam_id'] == 'e1'
 
         # hit the money_flow report and ensure it includes total
         resp3 = client.get('/money_flow')

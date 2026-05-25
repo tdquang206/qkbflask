@@ -45,6 +45,10 @@
               tin</a>
             <a href="{{ url_for('patients.view_exams', patient_id=patient.id) }}" class="button is-info">Lịch sử khám
               bệnh</a>
+            <a href="{{ url_for('patients.manage_packages', patient_id=patient.id) }}" class="button is-success">Quản lý
+              gói</a>
+            <a href="{{ url_for('patients.view_package_usage', patient_id=patient.id) }}" class="button is-primary">Xem
+              sử dụng gói</a>
           </div>
         </td>
       </tr>

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Thống kê sử dụng gói - {{ patient.kid_name }}</h1>
+
+<div class="columns">
+	<div class="column is-half">
+		<h2 class="subtitle">Lịch sử mua gói</h2>
+		{% if package_history %}
+		<div class="table-container">
+			<table class="table is-fullwidth is-striped">
+				<thead>
+					<tr>
+						<th>Ngày mua</th>
+						<th>Dịch vụ</th>
+						<th>Tổng buổi</th>
+						<th>Đã dùng</th>
+						<th>Còn lại</th>
+						<th>Đơn giá</th>
+						<th>Trạng thái</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for pkg in package_history %}
+					<tr>
+						<td>{{ pkg.purchase_date }}</td>
+						<td>{{ pkg.service_name }}</td>
+						<td>{{ pkg.total_sessions }}</td>
+						<td>{{ pkg.used_sessions }}</td>
+						<td>{{ pkg.remaining_sessions }}</td>
+						<td>{{ "{:,.0f}".format(pkg.unit_price|float) }}đ</td>
+						<td>
+							<span class="tag {% if pkg.status == 'Active' %}is-success{% else %}is-warning{% endif %}">
+								{{ pkg.status }}
+							</span>
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% else %}
+		<p class="has-text-grey">Chưa có lịch sử mua gói</p>
+		{% endif %}
+	</div>
+
+	<div class="column is-half">
+		<h2 class="subtitle">Thống kê sử dụng dịch vụ</h2>
+		{% if service_usage %}
+		<div class="table-container">
+			<table class="table is-fullwidth is-striped">
+				<thead>
+					<tr>
+						<th>Dịch vụ</th>
+						<th>Tổng sử dụng</th>
+						<th>Đi gói</th>
+						<th>Đi lẻ</th>
+						<th>Tỷ lệ gói (%)</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for service_name, stats in service_usage.items() %}
+					<tr>
+						<td>{{ service_name }}</td>
+						<td>{{ stats.total_used }}</td>
+						<td>{{ stats.package_used }}</td>
+						<td>{{ stats.regular_used }}</td>
+						<td>
+							{% if stats.total_used > 0 %}
+							{{ "%.1f"|format((stats.package_used / stats.total_used) * 100) }}%
+							{% else %}
+							0%
+							{% endif %}
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% else %}
+		<p class="has-text-grey">Chưa có dữ liệu sử dụng</p>
+		{% endif %}
+	</div>
+</div>
+
+<div class="mt-5">
+	<a href="{{ url_for('patients.manage_packages', patient_id=patient.id) }}" class="button is-primary">Quản lý gói</a>
+	<a href="{{ url_for('patients.manage_patients') }}" class="button">Quay lại danh sách</a>
+</div>
+
+{% endblock %}

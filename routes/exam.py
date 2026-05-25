@@ -53,10 +53,42 @@ def _to_float(value, default=0.0):
     except Exception:
         return default
 
-def _collect_services_from_form(form, patient_packages):
+def _package_is_active(pkg, exam_date=None):
+    """Check if package is active (not expired)"""
+    expires_at = pkg.get('expires_at')
+    if not expires_at:
+        result = True
+    else:
+        if not exam_date:
+            result = True
+        else:
+            try:
+                expiry = datetime.strptime(expires_at, '%Y-%m-%d').date()
+                exam_dt = datetime.strptime(exam_date, '%Y-%m-%d').date() if isinstance(exam_date, str) else exam_date.date()
+                result = exam_dt <= expiry
+            except:
+                result = True
+    print(f"Processed package active check for service {pkg.get('service_id')}: {'active' if result else 'expired'}.")
+    return result
+
+def _package_display_status(pkg, exam_date=None):
+    """Get display status for package"""
+    remaining = pkg.get('remaining_sessions', 0)
+    if remaining <= 0:
+        status = 'Hết lượt'
+    elif not _package_is_active(pkg, exam_date):
+        status = 'Hết hạn'
+    else:
+        status = f'Còn {remaining} lượt'
+    print(f"Processed package display status for service {pkg.get('service_id')}: {status}.")
+    return status
+
+def _collect_services_from_form(form, patient_packages, exam_date=None):
     service_ids = form.getlist('service_id')
     service_names = form.getlist('service_name')
     service_prices = form.getlist('service_price')
+    service_quantities = form.getlist('service_quantity')
+    service_notes = form.getlist('service_note')
 
     services = []
     all_services = {str(s.get('id')): s for s in services_table.all() if s.get('id') is not None}
@@ -68,19 +100,34 @@ def _collect_services_from_form(form, patient_packages):
 
         raw_name = service_names[idx] if idx < len(service_names) else ''
         raw_price = service_prices[idx] if idx < len(service_prices) else ''
+        raw_quantity = service_quantities[idx] if idx < len(service_quantities) else '1'
+        raw_note = service_notes[idx] if idx < len(service_notes) else ''
 
         catalog = all_services.get(sid, {})
         name = (raw_name or catalog.get('name') or '').strip()
+        quantity = int(_to_float(raw_quantity, default=1.0))
         price_val = _to_float(raw_price, default=_to_float(catalog.get('price'), default=0.0))
 
+        prepaid_status = ''
         for pkg in patient_packages:
-            if pkg.get('service_id') == sid and pkg.get('remaining_sessions', 0) > 0:
+            if (pkg.get('service_id') == sid and 
+                _package_is_active(pkg, exam_date) and 
+                pkg.get('remaining_sessions', 0) >= quantity):
                 price_val = _to_float(pkg.get('unit_price'), default=price_val)
-                pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - 1
+                pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - quantity
+                prepaid_status = 'PAID PACKAGE'
                 break
 
-        services.append({'id': sid, 'name': name, 'price': price_val})
+        services.append({
+            'id': sid, 
+            'name': name, 
+            'price': price_val, 
+            'quantity': quantity, 
+            'note': raw_note,
+            'prepaid_status': prepaid_status
+        })
 
+    print(f"Processed services from form: {len(services)} services collected.")
     return services
 
 def send_discord_helper(patient, exam_data):
@@ -163,12 +210,19 @@ def edit_exam(exam_id):
         # load available services and patient prepaid packages
         all_services = services_table.all()
         patient_packages = patient_found.get('packages', [])
+        # Enrich packages with status
+        enriched_packages = []
+        for pkg in patient_packages:
+            enriched_pkg = pkg.copy()
+            enriched_pkg['status'] = _package_display_status(pkg, exam_editting.get('exam_date'))
+            enriched_pkg['is_active'] = _package_is_active(pkg, exam_editting.get('exam_date'))
+            enriched_packages.append(enriched_pkg)
         return render_template('edit_exam.html', 
             patient=patient_found, 
             exam=exam_editting, 
             departments=departments,
             services=all_services,
-            packages=patient_packages)
+            packages=enriched_packages)
 
     if request.method == 'POST':
         try:
@@ -196,7 +250,7 @@ def edit_exam(exam_id):
                     })
 
             patient_packages = patient_found.get('packages', [])
-            services = _collect_services_from_form(request.form, patient_packages)
+            services = _collect_services_from_form(request.form, patient_packages, exam_date)
             total_override = request.form.get('total_override')
 
             computed_total = 0
@@ -323,11 +377,18 @@ def new_exam(patient_id):
         departments = settings.get('departments', ["Nhi khoa", "Khám Da liễu"])
         all_services = services_table.all()
         patient_packages = patient.get('packages', [])
+        # Enrich packages with status
+        enriched_packages = []
+        for pkg in patient_packages:
+            enriched_pkg = pkg.copy()
+            enriched_pkg['status'] = _package_display_status(pkg, None)  # No exam_date yet
+            enriched_pkg['is_active'] = _package_is_active(pkg, None)
+            enriched_packages.append(enriched_pkg)
         return render_template('new_exam.html', 
                                patient=patient, 
                                departments=departments,
                                services=all_services,
-                               packages=patient_packages)
+                               packages=enriched_packages)
     
     if request.method == 'POST':
         try:
@@ -354,7 +415,7 @@ def new_exam(patient_id):
                     })
 
             patient_packages = patient.get('packages', [])
-            services = _collect_services_from_form(request.form, patient_packages)
+            services = _collect_services_from_form(request.form, patient_packages, exam_date)
             total_override = request.form.get('total_override')
 
             if request.form.get('department'):

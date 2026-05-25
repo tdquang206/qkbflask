@@ -62,7 +62,6 @@ def get_exam_list():
                         "history": exam.get("history", ""),
                         "drugs": exam.get("drugs", []),
                         "service_fee": exam.get("service_fee", "0"),
-                        "service_fee": exam.get("service_fee", "0"),
                         "total_money": service_fee + drug_total,
                         "address": patient.get("address", "unknown address"),
                         "department": exam.get("department", "PK Nhi"),
@@ -70,18 +69,21 @@ def get_exam_list():
                 }
                     
                 all_exams.append(exam_with_patient)
-        # all_exams = sorted(all_exams, key=lambda x: x.get('exam_date', ''), reverse=True)
 
-        # group all_exams to year-month, split paid/unpaid
-        # 1. convert exam_date to datetime
+        # Parse dates to datetime objects for accurate sorting and grouping
         for exam in all_exams:
             try:
                 exam["exam_dt"] = datetime.strptime(exam["exam_date"], "%Y-%m-%d")
             except Exception:
                 exam["exam_dt"] = datetime.min
-        # 2. group by year-month
-        grouped = defaultdict(lambda: {"paid": [], "unpaid": [], "subtotal_paid": 0, "subtotal_unpaid": 0})
 
+        # Filter all unpaid exams for the top-level scrollable panel
+        # Sort unpaid exams descending by date (newest first) by default
+        unpaid_exams = [e for e in all_exams if not e.get("paid_status", False)]
+        unpaid_exams = sorted(unpaid_exams, key=lambda x: x.get("exam_date", ""), reverse=True)
+
+        # Group all exams by year-month for the interactive month view
+        grouped = defaultdict(lambda: {"paid": [], "unpaid": [], "subtotal_paid": 0, "subtotal_unpaid": 0})
         for exam in all_exams:
             ym = exam["exam_dt"].strftime("%Y-%m")
             if exam["paid_status"]:
@@ -90,28 +92,22 @@ def get_exam_list():
             else:
                 grouped[ym]["unpaid"].append(exam)
                 grouped[ym]["subtotal_unpaid"] += exam["total_money"]
-        # 3. sort months Z - A
-        # After grouping
+
+        # Sort entries inside each month by exam date (newest first)
         for ym, data in grouped.items():
             data["paid"] = sorted(data["paid"], key=lambda x: x["exam_dt"], reverse=True)
             data["unpaid"] = sorted(data["unpaid"], key=lambda x: x["exam_dt"], reverse=True)
+
+        # Get list of all available months sorted descending (newest first)
         sorted_months = sorted(grouped.keys(), reverse=True)
-        # 4. Keep 3, the rest is paged
-        current_months = sorted_months[:3]
-        older_months = sorted_months[3:]
-        # paging
-        PAGE_SIZE = 1
-        page = int(request.args.get("page", 1))
-        start = (page - 1) * PAGE_SIZE
-        end = start + PAGE_SIZE
+        # Default active months are the last 3 months (or fewer if less than 3 exist)
+        default_selected_months = sorted_months[:3]
 
-        older_months_page = older_months[start:end]
-        total_pages = (len(older_months) + PAGE_SIZE - 1) // PAGE_SIZE
-        has_next = page < total_pages
-
-        return render_template('all_exams_page.html', grouped=grouped, exams = all_exams,
-                               current_months = current_months, older_months=older_months_page,
-                               page=page, total_pages=total_pages,has_next=has_next,
+        return render_template('all_exams_page.html', 
+                               grouped=grouped,
+                               sorted_months=sorted_months,
+                               default_selected_months=default_selected_months,
+                               unpaid_exams=unpaid_exams,
                                money_map=money_map)
 
 # mark paid status - toggle button

@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Quản lý gói dịch vụ - {{ patient.kid_name }}</h1>
+
+<div class="columns">
+	<div class="column is-half">
+		<h2 class="subtitle">Thêm gói mới</h2>
+		<form method="POST" action="{{ url_for('patients.manage_packages', patient_id=patient.id) }}">
+			<input type="hidden" name="action" value="create">
+
+			<div class="field">
+				<label class="label">Chọn dịch vụ</label>
+				<div class="control">
+					<div class="select">
+						<select name="service_id" id="serviceSelect" onchange="updateServiceDetails()">
+							<option value="">-- Chọn dịch vụ --</option>
+							{% for service in services %}
+							<option value="{{ service.id }}" data-name="{{ service.name }}"
+								data-price="{{ service.price }}">
+								{{ service.name }} - {{ "{:,.0f}".format(service.price|float) }}đ
+							</option>
+							{% endfor %}
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<div class="field">
+				<label class="label">Tên dịch vụ</label>
+				<div class="control">
+					<input class="input" type="text" name="service_name" id="serviceName" required>
+				</div>
+			</div>
+
+			<div class="field">
+				<label class="label">Đơn giá (VNĐ)</label>
+				<div class="control">
+					<input class="input" type="number" name="unit_price" id="unitPrice" required>
+				</div>
+			</div>
+
+			<div class="field">
+				<label class="label">Số buổi</label>
+				<div class="control">
+					<input class="input" type="number" name="total_sessions" value="1" min="1" required>
+				</div>
+			</div>
+
+			<div class="field">
+				<label class="label">Ngày hết hạn (tùy chọn)</label>
+				<div class="control">
+					<input class="input" type="date" name="expires_at">
+				</div>
+			</div>
+
+			<div class="field">
+				<div class="control">
+					<button type="submit" class="button is-primary">Thêm gói</button>
+				</div>
+			</div>
+		</form>
+	</div>
+
+	<div class="column is-half">
+		<h2 class="subtitle">Gói hiện tại</h2>
+		{% if packages %}
+		<div class="table-container">
+			<table class="table is-fullwidth is-striped">
+				<thead>
+					<tr>
+						<th>Dịch vụ</th>
+						<th>Số buổi</th>
+						<th>Còn lại</th>
+						<th>Đơn giá</th>
+						<th>Hết hạn</th>
+						<th>Thao tác</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for package in packages %}
+					<tr>
+						<td>{{ package.service_name }}</td>
+						<td>{{ package.total_sessions }}</td>
+						<td>{{ package.remaining_sessions }}</td>
+						<td>{{ "{:,.0f}".format(package.unit_price|float) }}đ</td>
+						<td>{{ package.expires_at or 'Không giới hạn' }}</td>
+						<td>
+							<button class="button is-small is-warning"
+								onclick="editPackage('{{ package.id }}')">Sửa</button>
+							<form method="POST"
+								action="{{ url_for('patients.manage_packages', patient_id=patient.id) }}"
+								style="display: inline;">
+								<input type="hidden" name="action" value="delete">
+								<input type="hidden" name="package_id" value="{{ package.id }}">
+								<button type="submit" class="button is-small is-danger"
+									onclick="return confirm('Xóa gói này?')">Xóa</button>
+							</form>
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% else %}
+		<p class="has-text-grey">Chưa có gói nào</p>
+		{% endif %}
+	</div>
+</div>
+
+<!-- Edit Package Modal -->
+<div class="modal" id="editModal">
+	<div class="modal-background"></div>
+	<div class="modal-card">
+		<header class="modal-card-head">
+			<p class="modal-card-title">Sửa gói</p>
+			<button class="delete" aria-label="close" onclick="closeEditModal()"></button>
+		</header>
+		<section class="modal-card-body">
+			<form method="POST" action="{{ url_for('patients.manage_packages', patient_id=patient.id) }}">
+				<input type="hidden" name="action" value="update">
+				<input type="hidden" name="package_id" id="editPackageId">
+
+				<div class="field">
+					<label class="label">Đơn giá (VNĐ)</label>
+					<div class="control">
+						<input class="input" type="number" name="unit_price" id="editUnitPrice" required>
+					</div>
+				</div>
+
+				<div class="field">
+					<label class="label">Số buổi còn lại</label>
+					<div class="control">
+						<input class="input" type="number" name="remaining_sessions" id="editRemainingSessions"
+							required>
+					</div>
+				</div>
+
+				<div class="field">
+					<label class="label">Ngày hết hạn (tùy chọn)</label>
+					<div class="control">
+						<input class="input" type="date" name="expires_at" id="editExpiresAt">
+					</div>
+				</div>
+
+				<div class="field">
+					<div class="control">
+						<button type="submit" class="button is-primary">Cập nhật</button>
+						<button type="button" class="button" onclick="closeEditModal()">Hủy</button>
+					</div>
+				</div>
+			</form>
+		</section>
+	</div>
+</div>
+
+<script>
+	function updateServiceDetails() {
+		const select = document.getElementById('serviceSelect');
+		const selectedOption = select.options[select.selectedIndex];
+		const nameInput = document.getElementById('serviceName');
+		const priceInput = document.getElementById('unitPrice');
+
+		if (selectedOption.value) {
+			nameInput.value = selectedOption.getAttribute('data-name') || '';
+			priceInput.value = selectedOption.getAttribute('data-price') || '';
+		}
+	}
+
+	function editPackage(packageId) {
+		// Find package data
+		const packages = {{ packages| tojson
+	}};
+	const package = packages.find(p => p.id === packageId);
+
+	if (package) {
+		document.getElementById('editPackageId').value = package.id;
+		document.getElementById('editUnitPrice').value = package.unit_price;
+		document.getElementById('editRemainingSessions').value = package.remaining_sessions;
+		document.getElementById('editExpiresAt').value = package.expires_at || '';
+
+		document.getElementById('editModal').classList.add('is-active');
+	}
+}
+
+	function closeEditModal() {
+		document.getElementById('editModal').classList.remove('is-active');
+	}
+</script>
+
+{% endblock %}

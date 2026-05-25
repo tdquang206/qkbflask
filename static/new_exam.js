@@ -1,9 +1,12 @@
 /* new_exam.js — exam form behaviour for new_exam.html */
 
 // Back button
-document.getElementById("backBtn").addEventListener("click", function () {
-  window.location.href = "/patients"
-});
+const backBtn = document.getElementById("backBtn");
+if (backBtn) {
+  backBtn.addEventListener("click", function () {
+    window.location.href = "/patients";
+  });
+}
 
 // Calculate drug + service totals
 function calculateTotals() {
@@ -592,6 +595,79 @@ document.addEventListener("DOMContentLoaded", async function () {
       serviceNote.value = "";
       currentSelectedService = null;
       serviceDropdown.style.display = "none";
+      console.log(`Added service: ${s.name} with quantity ${qty} and price ${price}.`);
+    });
+
+    // Package "Use" button handler
+    document.addEventListener("click", (e) => {
+      if (e.target.classList.contains("usePackageBtn")) {
+        const row = e.target.closest("tr");
+        const serviceId = row.dataset.serviceId;
+        const serviceName = row.dataset.serviceName;
+        const unitPrice = parseFloat(row.dataset.unitPrice);
+        const remaining = parseInt(row.dataset.remaining);
+        
+        if (remaining <= 0) {
+          alert("Gói này đã hết lượt sử dụng.");
+          return;
+        }
+        
+        const qty = parseInt(prompt(`Nhập số lượng sử dụng (tối đa ${remaining}):`, "1"));
+        if (!qty || qty <= 0 || qty > remaining) {
+          alert("Số lượng không hợp lệ.");
+          return;
+        }
+        
+        // Create service row from package
+        const subtotal = qty * unitPrice;
+        const serviceRow = document.createElement("tr");
+        serviceRow.dataset.price = subtotal;
+        serviceRow.dataset.serviceId = serviceId;
+
+        const indexCell = document.createElement("td");
+        const nameCell = document.createElement("td");
+        const deptCell = document.createElement("td");
+        const qtyCell = document.createElement("td");
+        const noteCell = document.createElement("td");
+        const priceCell = document.createElement("td");
+        const subtotalCell = document.createElement("td");
+        const actionCell = document.createElement("td");
+        const removeBtn = document.createElement("button");
+
+        nameCell.textContent = serviceName;
+        appendHiddenInput(nameCell, "service_name", serviceName);
+        appendHiddenInput(nameCell, "service_id", serviceId);
+        deptCell.textContent = "Gói trả trước";
+        appendHiddenInput(deptCell, "service_department", "Gói trả trước");
+        qtyCell.textContent = String(qty);
+        appendHiddenInput(qtyCell, "service_quantity", qty);
+        noteCell.textContent = "Từ gói trả trước";
+        appendHiddenInput(noteCell, "service_note", "Từ gói trả trước");
+        priceCell.className = "has-text-right";
+        priceCell.textContent = unitPrice.toLocaleString();
+        appendHiddenInput(priceCell, "service_price", unitPrice);
+        subtotalCell.className = "has-text-right";
+        subtotalCell.textContent = subtotal.toLocaleString();
+        appendHiddenInput(subtotalCell, "service_subtotal", subtotal);
+
+        removeBtn.type = "button";
+        removeBtn.className = "button is-small is-danger removeServiceRow";
+        removeBtn.textContent = "X";
+        actionCell.appendChild(removeBtn);
+
+        serviceRow.appendChild(indexCell);
+        serviceRow.appendChild(nameCell);
+        serviceRow.appendChild(deptCell);
+        serviceRow.appendChild(qtyCell);
+        serviceRow.appendChild(noteCell);
+        serviceRow.appendChild(priceCell);
+        serviceRow.appendChild(subtotalCell);
+        serviceRow.appendChild(actionCell);
+        serviceTableBody.appendChild(serviceRow);
+        updateServiceRowNumbers();
+        calculateTotals();
+        console.log(`Used package for service: ${serviceName} with quantity ${qty} at price ${unitPrice}.`);
+      }
     });
 
     serviceTableBody.addEventListener("click", (e) => {

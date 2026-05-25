@@ -4,9 +4,10 @@ from werkzeug.utils import secure_filename
 import os
 import re
 import shutil
+import uuid
 from datetime import datetime
 
-from shared_db import patients_table as patients
+from shared_db import patients_table as patients, services_table as services
 from utils.error_logger import append_error_log
 from utils.pdf_generator import generate_exam_file_name
 from utils.db_logger import weekly_backup_all, log_action
@@ -386,7 +387,7 @@ def manage_patients():
             phone = _normalize_phone_input(request.form.get('phone', ''))
             address = request.form.get('address', '')
 
-            import uuid
+
             patients.insert({
                 'id': str(uuid.uuid4()),
                 'kid_name': kid_name,
@@ -520,7 +521,6 @@ def add_patient():
             phone = _normalize_phone_input(request.form.get('phone', ''))
             address = request.form.get('address', '')
 
-            import uuid
             patients.insert({
                 'id': str(uuid.uuid4()),
                 'kid_name': kid_name,
@@ -566,3 +566,173 @@ def view_exams(patient_id):
 
     # Render the renamed template
     return render_template('previous_exams.html', patient=patient, exams=patient_exams)
+
+
+def _safe_int(value, default=0):
+    """Safely convert value to int, supporting float strings (like '300000.0') and fallback defaults."""
+    if value is None:
+        return default
+    try:
+        # Convert to string, strip whitespace, cast to float first to handle string decimals like '300000.0'
+        return int(float(str(value).strip()))
+    except (ValueError, TypeError):
+        return default
+
+
+@patients_bp.route('/patient/<patient_id>/packages', methods=['GET', 'POST'])
+def manage_packages(patient_id):
+    results = patients.search(Query().id == patient_id)
+    if not results:
+        return "Patient not found", 404
+    patient = results[0]
+
+    if request.method == 'POST':
+        try:
+            action = request.form.get('action')
+            
+            if action == 'create':
+                service_id = request.form.get('service_id')
+                service_name = request.form.get('service_name')
+                unit_price = _safe_int(request.form.get('unit_price', 0))
+                total_sessions = _safe_int(request.form.get('total_sessions', 1))
+                expires_at = request.form.get('expires_at', '')
+                
+                # Get service details if service_id provided
+                if service_id:
+                    service_results = services.search(Query().id == service_id)
+                    if service_results:
+                        service = service_results[0]
+                        service_name = service.get('name', service_name)
+                        if not unit_price:
+                            unit_price = service.get('price', 0)
+                
+                new_package = {
+                    'id': str(uuid.uuid4()),
+                    'service_id': service_id,
+                    'service_name': service_name,
+                    'unit_price': unit_price,
+                    'total_sessions': total_sessions,
+                    'remaining_sessions': total_sessions,
+                    'expires_at': expires_at if expires_at else None,
+                    'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'purchase_date': datetime.now().strftime('%Y-%m-%d')
+                }
+                
+                patient_packages = patient.get('packages', [])
+                patient_packages.append(new_package)
+                patients.update({'packages': patient_packages}, Query().id == patient_id)
+                
+                log_action('package_created', f"Package created for patient {patient.get('kid_name')}", {
+                    'patient_id': patient_id,
+                    'package': new_package
+                })
+                
+            elif action == 'update':
+                package_id = request.form.get('package_id')
+                unit_price = _safe_int(request.form.get('unit_price', 0))
+                remaining_sessions = _safe_int(request.form.get('remaining_sessions', 0))
+                expires_at = request.form.get('expires_at', '')
+                
+                patient_packages = patient.get('packages', [])
+                for pkg in patient_packages:
+                    if pkg.get('id') == package_id:
+                        pkg['unit_price'] = unit_price
+                        pkg['remaining_sessions'] = remaining_sessions
+                        pkg['expires_at'] = expires_at if expires_at else None
+                        break
+                
+                patients.update({'packages': patient_packages}, Query().id == patient_id)
+                
+                log_action('package_updated', f"Package updated for patient {patient.get('kid_name')}", {
+                    'patient_id': patient_id,
+                    'package_id': package_id
+                })
+                
+            elif action == 'delete':
+                package_id = request.form.get('package_id')
+                patient_packages = patient.get('packages', [])
+                patient_packages = [pkg for pkg in patient_packages if pkg.get('id') != package_id]
+                patients.update({'packages': patient_packages}, Query().id == patient_id)
+                
+                log_action('package_deleted', f"Package deleted for patient {patient.get('kid_name')}", {
+                    'patient_id': patient_id,
+                    'package_id': package_id
+                })
+            
+            return redirect(url_for('patients.manage_packages', patient_id=patient_id))
+            
+        except Exception as e:
+            append_error_log(
+                'Package management failed',
+                str(e),
+                {
+                    'route': '/patient/<patient_id>/packages',
+                    'action': request.form.get('action'),
+                    'patient_id': patient_id
+                }
+            )
+            return 'Error while managing packages', 500
+
+    # GET request - show package management page
+    all_services = services.all()
+    patient_packages = patient.get('packages', [])
+    
+    return render_template('manage_packages.html', 
+                         patient=patient, 
+                         packages=patient_packages,
+                         services=all_services)
+
+
+@patients_bp.route('/patient/<patient_id>/package-usage')
+def view_package_usage(patient_id):
+    results = patients.search(Query().id == patient_id)
+    if not results:
+        return "Patient not found", 404
+    patient = results[0]
+
+    # Get all exams for usage analysis
+    patient_exams = patient.get("exams", [])
+    patient_packages = patient.get('packages', [])
+    
+    # Analyze package usage
+    usage_stats = {}
+    service_usage = {}
+    
+    for exam in patient_exams:
+        exam_date = exam.get('exam_date', '')
+        services_used = exam.get('services', [])
+        
+        for service in services_used:
+            service_name = service.get('name', '')
+            quantity = service.get('quantity', 1)
+            prepaid_status = service.get('prepaid_status', '')
+            
+            # Track service usage
+            if service_name not in service_usage:
+                service_usage[service_name] = {'total_used': 0, 'package_used': 0, 'regular_used': 0}
+            
+            service_usage[service_name]['total_used'] += quantity
+            if prepaid_status and 'PACKAGE' in prepaid_status.upper():
+                service_usage[service_name]['package_used'] += quantity
+            else:
+                service_usage[service_name]['regular_used'] += quantity
+    
+    # Package purchase history
+    package_history = []
+    for pkg in patient_packages:
+        package_history.append({
+            'service_name': pkg.get('service_name', ''),
+            'purchase_date': pkg.get('purchase_date', ''),
+            'total_sessions': pkg.get('total_sessions', 0),
+            'remaining_sessions': pkg.get('remaining_sessions', 0),
+            'used_sessions': pkg.get('total_sessions', 0) - pkg.get('remaining_sessions', 0),
+            'unit_price': pkg.get('unit_price', 0),
+            'expires_at': pkg.get('expires_at', ''),
+            'status': 'Active' if pkg.get('remaining_sessions', 0) > 0 else 'Used'
+        })
+    
+    return render_template('package_usage.html', 
+                         patient=patient,
+                         usage_stats=usage_stats,
+                         service_usage=service_usage,
+                         package_history=package_history)

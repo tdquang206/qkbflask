@@ -25,7 +25,7 @@
 
             {% if unpaid_exams %}
             <!-- Scrollable list wrapper -->
-            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <div class="table-container" style="max-height: 500px; overflow-y: auto;">
                 <table class="table is-striped is-hoverable is-fullwidth">
                     <thead>
                         <tr>
@@ -41,7 +41,7 @@
                         {% for exam in unpaid_exams %}
                         <tr data-date="{{ exam.exam_date }}">
                             <td>{{ loop.index }}</td>
-                            <td class="has-text-grey-dark">{{ exam.exam_date }}</td>
+                            <td>{{ exam.exam_date }}</td>
                             <td>
                                 <div>
                                     <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
@@ -69,8 +69,8 @@
                                         href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
                                         Edit
                                     </a>
-                                    <a class="button is-warning is-small money_received_btn" data-exam-id="{{ exam.exam_id }}"
-                                        data-patient-id="{{ exam.patient_id }}">
+                                    <a class="button is-warning is-small money_received_btn"
+                                        data-exam-id="{{ exam.exam_id }}" data-patient-id="{{ exam.patient_id }}">
                                         Chưa kiểm tra tiền
                                     </a>
                                 </div>
@@ -140,11 +140,11 @@
     <!-- 4. Bottom Section: Detailed Exam Lists by Month -->
     <section class="section pt-0">
         {% for month in sorted_months %}
-        <div class="month-section box mb-5" data-month="{{ month }}" 
-             data-total-records="{{ grouped[month].paid|length + grouped[month].unpaid|length }}"
-             data-subtotal-paid="{{ grouped[month].subtotal_paid }}"
-             data-subtotal-unpaid="{{ grouped[month].subtotal_unpaid }}">
-             
+        <div class="month-section box mb-5" data-month="{{ month }}"
+            data-total-records="{{ grouped[month].paid|length + grouped[month].unpaid|length }}"
+            data-subtotal-paid="{{ grouped[month].subtotal_paid }}"
+            data-subtotal-unpaid="{{ grouped[month].subtotal_unpaid }}">
+
             <h2 class="title is-4 has-text-link mb-4">Chi tiết Tháng {{ month }}</h2>
 
             <!-- Unpaid list for this month -->
@@ -166,7 +166,7 @@
                         {% for exam in grouped[month].unpaid %}
                         <tr>
                             <td>{{ loop.index }}</td>
-                            <td class="has-text-grey-dark">{{ exam.exam_date }}</td>
+                            <td>{{ exam.exam_date }}</td>
                             <td>
                                 <div>
                                     <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
@@ -194,8 +194,8 @@
                                         href="{{ url_for('exam.edit_exam', exam_id=exam.exam_id) }}">
                                         Edit
                                     </a>
-                                    <a class="button is-warning is-small money_received_btn" data-exam-id="{{ exam.exam_id }}"
-                                        data-patient-id="{{ exam.patient_id }}">
+                                    <a class="button is-warning is-small money_received_btn"
+                                        data-exam-id="{{ exam.exam_id }}" data-patient-id="{{ exam.patient_id }}">
                                         Chưa kiểm tra tiền
                                     </a>
                                 </div>
@@ -226,7 +226,7 @@
                         {% for exam in grouped[month].paid %}
                         <tr>
                             <td>{{ loop.index }}</td>
-                            <td class="has-text-grey-dark">{{ exam.exam_date }}</td>
+                            <td>{{ exam.exam_date }}</td>
                             <td>
                                 <div>
                                     <strong>Bé {{ exam.kid_name if exam.kid_name else "Chưa có tên" }}</strong>
@@ -245,7 +245,8 @@
                                 {{ "{:,}".format(exam.total_money) }}
                             </td>
                             <td class="has-text-weight-semibold">
-                                {{ "{:,}".format(money_map[exam.exam_id].amount) if money_map.get(exam.exam_id) else "-" }}
+                                {{ "{:,}".format(money_map[exam.exam_id].amount) if money_map.get(exam.exam_id) else "-"
+                                }}
                             </td>
                             <td>
                                 <div class="buttons">

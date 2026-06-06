@@ -3,9 +3,11 @@ from datetime import datetime
 from tinydb import TinyDB, Query
 import uuid
 
-mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
-mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
 from utils.storage import EncryptedJSONStorage
+from utils.drug_notifications import build_price_notifications
+
+mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
+mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
 db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
 purchases_table = db.table('purchases')
 
@@ -44,7 +46,8 @@ def mua_thuoc():
         }
 
         purchases_table.insert(purchase_data)
-        return jsonify({'status': 'success', 'data': purchase_data})
+        notifications = build_price_notifications(drugs)
+        return jsonify({'status': 'success', 'data': purchase_data, 'notifications': notifications})
 
     # GET request → show history
     purchases = purchases_table.all()
@@ -76,7 +79,7 @@ def mua_thuoc_delete(purchase_uuid):
 
 
 # Update, Edit
-@mua_thuoc_bp.route('/mua_thuoc/edit/<purchase_uuid>', methods=['GET', 'POST'])
+@mua_thuoc_bp.route('/mua_thuoc/edit/<purchase_uuid>', methods=['GET', 'POST', 'PUT'])
 def mua_thuoc_edit(purchase_uuid):
     Purchase = Query()
     purchase = purchases_table.get(Purchase.uuid == purchase_uuid)
@@ -135,7 +138,8 @@ def mua_thuoc_edit(purchase_uuid):
         }
 
         purchases_table.update(updated_data, Purchase.uuid == purchase_uuid)
-        return jsonify({"status": "success", "uuid": purchase_uuid})
+        notifications = build_price_notifications(drugs)
+        return jsonify({"status": "success", "uuid": purchase_uuid, "notifications": notifications})
         # return redirect(url_for('mua_thuoc.mua_thuoc'))
 
     # GET: render the edit page with current purchase data

@@ -1,4 +1,25 @@
-# Version 15.260525 (2026-05-25)
+# Version 0.16.260620 (2026-06-20)
+==================================================
+
+## Project Analysis & Summary
+- Added a mobile-first quick subtotal calculator to the drugs export HTML, enabling rapid cost estimation from natural text or voice input.
+- Added fallback product search and touch-optimized controls for phone users.
+
+## New Features
+
+- **Quick Subtotal Calculator (Drugs Export HTML)**:
+  - Added an input panel above the drug list that accepts phrases like `5 product A, 7 product B, 1 product C` in English or Vietnamese.
+  - Added optional voice input support using the browser SpeechRecognition API when available.
+  - Displays a responsive subtotal grid with product name, unit price, quantity, line subtotal, and total sum.
+  - Includes fallback searchable product selection for cases where natural text parsing cannot resolve the product.
+
+## Technical Improvements
+
+- **Mobile Optimization**:
+  - Updated styles to improve spacing, larger touch targets, and single-column fallback controls on small screens.
+  - Preserved the previous HTML layout as a backup comment in `routes/drugs.py` for easier review and rollback.
+
+# Version 0.15.260525 (2026-05-25)
 ==================================================
 
 ## Project Analysis & Summary

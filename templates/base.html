@@ -176,9 +176,77 @@
 </script>
 
 <!-- toggle noti -->
-<script src="{{ url_for('static', filename='notifications.js') }}"></script>
-
 <script>
+  const toggleBtn = document.getElementById("toggleNotifications");
+  const panel = document.getElementById("notificationPanel");
+
+  let panelOpen = false;
+
+  toggleBtn.addEventListener("click", () => {
+    panelOpen = !panelOpen;
+    panel.style.right = panelOpen ? "0" : "-350px";
+  });
+
+  // Global helper to show JSON in the panel
+  const errorLog = []; // keep last 20 errors
+
+  // Global helper to show JSON in the panel
+  function showNotification(data) {
+    // only log errors
+    if (!data || data.status !== "error") return;
+
+    // push to error log
+    errorLog.unshift(data);
+    if (errorLog.length > 20) {
+      errorLog.pop(); // keep only last 20
+    }
+
+    // render panel
+    const content = document.getElementById("notificationContent");
+    content.innerHTML = ""; // clear old
+
+    errorLog.forEach(err => {
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(err, null, 2);
+      const divider = document.createElement("hr");
+      content.appendChild(pre);
+      content.appendChild(divider);
+    });
+
+    // auto-open when new error arrives
+    panel.style.right = "0";
+    panelOpen = true;
+  }
+
+  // Intercept fetch responses globally
+  (function () {
+    const origFetch = window.fetch;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    window.fetch = function (url, opts) {
+      opts = opts || {};
+      const method = (opts.method || 'GET').toUpperCase();
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        opts.headers = opts.headers || {};
+        // Support both Headers object and plain object
+        if (opts.headers instanceof Headers) {
+          if (!opts.headers.has('X-CSRFToken')) opts.headers.set('X-CSRFToken', csrfToken);
+        } else {
+          if (!opts.headers['X-CSRFToken']) opts.headers['X-CSRFToken'] = csrfToken;
+        }
+      }
+      return origFetch.apply(this, [url, opts]).then(async res => {
+        try {
+          const clone = res.clone();
+          const data = await clone.json();
+          showNotification(data);
+        } catch (e) {
+          // not JSON, ignore
+        }
+        return res;
+      });
+    };
+  })();
+
   // Auto-inject CSRF token into all forms
   document.addEventListener('DOMContentLoaded', () => {
     const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');

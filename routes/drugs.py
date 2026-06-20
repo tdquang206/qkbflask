@@ -357,7 +357,7 @@ tbody tr:hover{{background:rgba(255,255,255,.04)}}
         if (!qty || qty < 1) continue;
         var product = matchProduct(name);
         if (product) {{
-          items.push({ name: product.name, price: product.price, qty: qty });
+          items.push({{ name: product.name, price: product.price, qty: qty }});
           found = true;
           break;
         }}
@@ -411,7 +411,7 @@ tbody tr:hover{{background:rgba(255,255,255,.04)}}
         button.className = 'match-button';
         button.textContent = item.name + ' – ' + item.price.toLocaleString();
         button.addEventListener('click', function() {{
-          renderResults([{ name: item.name, price: item.price, qty: parseInt(qtyInput.value, 10) || 1 }]);
+          renderResults([{{ name: item.name, price: item.price, qty: parseInt(qtyInput.value, 10) || 1 }}]);
         }});
         matches.appendChild(button);
       }});
@@ -424,7 +424,7 @@ tbody tr:hover{{background:rgba(255,255,255,.04)}}
         matches.innerHTML = '<p style="margin:0;color:#f5f5f5">Không tìm thấy sản phẩm.</p>';
         return;
       }}
-      renderResults([{ name: product.name, price: product.price, qty: parseInt(qtyInput.value, 10) || 1 }]);
+      renderResults([{{ name: product.name, price: product.price, qty: parseInt(qtyInput.value, 10) || 1 }}]);
     }});
   }}
 

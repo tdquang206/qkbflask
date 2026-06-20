@@ -338,7 +338,7 @@ tbody tr:hover{{background:rgba(255,255,255,.04)}}
   }}
 
   function parseInput(text) {{
-    var segments = text.split(/[,;\n]+/).map(function(s) {{ return s.trim(); }}).filter(Boolean);
+    var segments = text.split(/[,;\\n]+/).map(function(s) {{ return s.trim(); }}).filter(Boolean);
     var items = [];
     var unmatched = [];
     var patterns = [
@@ -403,9 +403,9 @@ tbody tr:hover{{background:rgba(255,255,255,.04)}}
 
     function renderMatches() {{
       matches.innerHTML = '';
-      var query = normalize(searchInput.value);
+      var query = norm(searchInput.value);
       if (!query) return;
-      productCatalog.filter(function(item) {{ return normalize(item.name).includes(query); }}).slice(0, 10).forEach(function(item) {{
+      productCatalog.filter(function(item) {{ return norm(item.name).includes(query); }}).slice(0, 10).forEach(function(item) {{
         var button = document.createElement('button');
         button.type = 'button';
         button.className = 'match-button';

@@ -200,6 +200,46 @@
     margin: 0;
     box-sizing: border-box;
   }
+
+  .drug-error-row {
+    background-color: rgba(255, 75, 75, 0.12) !important;
+  }
+
+  .drug-error-row td {
+    border-color: rgba(255, 75, 75, 0.35) !important;
+  }
+
+  #drugErrorNotification {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: auto;
+    max-width: 320px;
+    background: rgba(11, 36, 67, 0.95);
+    color: #f5f5f5;
+    border: 1px solid rgba(108, 146, 255, 0.45);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+    font-size: 0.95rem;
+    z-index: 50;
+    display: none;
+  }
+
+  #drugErrorNotification strong {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 1rem;
+  }
+
+  #drugErrorNotification small {
+    color: #b8d4ff;
+  }
+
+  #drugErrorNotification a {
+    color: #8cc1ff;
+    text-decoration: underline;
+  }
 </style>
 
 <div class="controls-container">
@@ -276,6 +316,14 @@
         <button class="button is-primary" type="submit" form="drug-form">Create Drug</button>
       </footer>
     </div>
+  </div>
+</div>
+
+<div id="drugErrorNotification" role="status" aria-live="polite">
+  <strong>Some drugs need attention</strong>
+  <span id="drugErrorMessage">Some drugs have incorrect cost or sell price values.</span>
+  <div style="margin-top:0.75rem;font-size:0.85rem;">
+    <small>Click "Edit" on a highlighted row to fix cost or sell price.</small>
   </div>
 </div>
 
@@ -469,6 +517,43 @@
         skuInput.value = `${prefix}-${uuidPart}`;
       }
     });
+
+    function highlightDrugErrors() {
+      const table = document.getElementById('drugTable');
+      if (!table) return;
+      const rows = Array.from(table.querySelectorAll('tbody > tr'));
+      const notification = document.getElementById('drugErrorNotification');
+      const message = document.getElementById('drugErrorMessage');
+      let errorCount = 0;
+
+      rows.forEach(row => {
+        const sellCell = row.cells[2];
+        const costCell = row.cells[3];
+        if (!sellCell || !costCell) return;
+
+        const sellText = sellCell.textContent.trim().replace(/,/g, '');
+        const costText = costCell.textContent.trim().replace(/,/g, '');
+        const sellValue = parseFloat(sellText) || 0;
+        const costValue = parseFloat(costText) || 0;
+
+        const hasError = sellValue === 0 || costValue === 0 || costValue > sellValue * 0.8;
+        if (hasError) {
+          row.classList.add('drug-error-row');
+          errorCount += 1;
+        }
+      });
+
+      if (notification) {
+        if (errorCount > 0) {
+          notification.style.display = 'block';
+          message.textContent = `${errorCount} drug${errorCount > 1 ? 's' : ''} have missing or suspicious cost/sell values.`;
+        } else {
+          notification.style.display = 'none';
+        }
+      }
+    }
+
+    highlightDrugErrors();
   });
 </script>
 {% endblock %}

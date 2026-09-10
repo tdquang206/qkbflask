@@ -1,3 +1,11 @@
+# Unreleased (2026-09-09)
+
+- Fixed drug creation and editing silently clearing decimal prices, including unchanged prices such as `7850.0`. Invalid input now shows an error without saving any changes; populated numeric fields cannot be silently cleared.
+- Added purchase unit prices and a **Use as cost** button to Edit Drug. Uses recorded PPU, falling back to total purchase price divided by quantity; selecting a price fills the cost field and requires Update to save.
+- Added all-time recorded purchases, prescribed quantities, and calculated inventory (bought minus prescribed) to Edit Drug. Includes unpaid and undated exams; preserves existing manual inventory and quantity fields. Opening stock, returns, and adjustments are excluded.
+- Purchase history now sorts by date and matches normalized exact drug names, preventing similarly named strengths from being mixed. Name changes can disconnect old history.
+- Stock totals scan purchases and nested patient exams once per edit-page load; no persisted stock cache or database migration is needed.
+
 # Version 0.16.260620 (2026-06-20)
 ==================================================
 

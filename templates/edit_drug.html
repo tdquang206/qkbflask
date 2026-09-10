@@ -2,21 +2,30 @@
 {% block content %}
 <h1 class="title">Edit Drug: {{ drug.name }}</h1>
 
+{% if errors %}
+<div class="notification is-danger" role="alert">
+  <strong>Drug was not updated.</strong>
+  <ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
 <div class="box">
   <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="id" value="{{ drug.doc_id }}">
 
     <div class="field">
       <label class="label">SKU</label>
       <div class="control">
-        <input class="input" type="text" name="sku" value="{{ drug.sku }}">
+        <input class="input" type="text" name="sku" value="{{ form_values.get('sku', '') }}">
       </div>
     </div>
 
     <div class="field">
       <label class="label">Name</label>
       <div class="control">
-        <input class="input" type="text" name="name" value="{{ drug.name }}">
+        <input class="input" type="text" name="name" value="{{ form_values.get('name', '') }}" required>
+        <p class="help">Purchase and sales history matches the drug name. Renaming may disconnect older records.</p>
       </div>
     </div>
 
@@ -25,15 +34,16 @@
         <div class="field">
           <label class="label">Sell Price</label>
           <div class="control">
-            <input class="input" type="number" step="0.01" name="sell_price" value="{{ drug.sell_price }}">
+            <input class="input" type="number" step="0.01" min="0" name="sell_price" value="{{ form_values.get('sell_price', '') }}">
           </div>
         </div>
       </div>
       <div class="column">
         <div class="field">
-          <label class="label">Buy Price</label>
+          <label class="label" for="buy_price">Cost (Buy Price per Unit)</label>
           <div class="control">
-            <input class="input" type="number" step="0.01" name="buy_price" value="{{ drug.buy_price }}">
+            <input class="input" type="number" step="0.01" min="0" name="buy_price" id="buy_price" value="{{ form_values.get('buy_price', '') }}">
+            <p class="help" id="costSelectionStatus" role="status" aria-live="polite"></p>
 
           </div>
         </div>
@@ -45,15 +55,16 @@
         <div class="field">
           <label class="label">Quantity</label>
           <div class="control">
-            <input class="input" type="number" name="quantity" value="{{ drug.quantity }}">
+            <input class="input" type="number" min="0" name="quantity" value="{{ form_values.get('quantity', '') }}">
           </div>
         </div>
       </div>
       <div class="column">
         <div class="field">
-          <label class="label">Inventory</label>
+          <label class="label">Recorded Inventory (Manual)</label>
           <div class="control">
-            <input class="input" type="number" name="inventory" value="{{ drug.inventory }}">
+            <input class="input" type="number" min="0" name="inventory" value="{{ form_values.get('inventory', '') }}">
+            <p class="help">Kept separately from the calculated stock below.</p>
           </div>
         </div>
       </div>
@@ -66,36 +77,60 @@
         </button>
       </div>
       <div class="control">
-        <a href=javascript:history.back() class="button is-light">Cancel</a>
+        <a href="{{ url_for('drugs.manage_drugs') }}" class="button is-light">Cancel</a>
       </div>
     </div>
   </form>
 </div>
 
+<div class="box" id="stockSummary">
+  <h2 class="subtitle">All-time Recorded Stock</h2>
+  <div class="columns is-mobile is-multiline">
+    <div class="column"><p>Total Bought</p><strong>{{ '{:,}'.format(stock.bought) }}</strong></div>
+    <div class="column"><p>Total Sold / Prescribed</p><strong>{{ '{:,}'.format(stock.sold) }}</strong></div>
+    <div class="column"><p>Calculated Inventory</p><strong>{{ '{:,}'.format(stock.inventory) }}</strong></div>
+  </div>
+  <p class="help">Calculated inventory = all recorded purchases minus all quantities prescribed in exams, including unpaid exams. All dates are included. Opening stock, returns, and stock adjustments are not included. Quantity and manual inventory above are not added.</p>
+  {% if stock.inventory < 0 %}<p class="help has-text-warning">Recorded sales exceed purchases. Check opening stock and missing purchase records.</p>{% endif %}
+  {% if stock.skipped %}<p class="help has-text-warning">{{ stock.skipped }} matching record(s) have invalid quantities and were excluded from totals.</p>{% endif %}
+</div>
+
 {% if purchase_history %}
 <div class="box">
   <h2 class="subtitle">Purchase History</h2>
+  <div class="table-container">
   <table class="table is-striped is-fullwidth">
     <thead>
       <tr>
         <th>Date</th>
         <th>Quantity</th>
-        <th>Buy Price</th>
+        <th>Total Buy Price</th>
+        <th>Buy Price per Unit</th>
         <th>Note</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody>
-      {% for p in purchase_history | reverse %}
+      {% for p in purchase_history %}
       <tr>
         <td>{{ p.date_buy }}</td>
         <td>{{ p.quantity }}</td>
         <td>{{ "{:,.0f}".format(p.buy_price|float) }}</td>
+        <td>{{ "{:,.2f}".format(p.ppu) if p.ppu is not none else '—' }}</td>
         <td>{{ p.note }}</td>
+        <td>
+          {% if p.ppu is not none %}
+          <button type="button" class="button is-small is-info use-purchase-cost" data-cost="{{ '%.2f'|format(p.ppu) }}" data-date="{{ p.date_buy }}">Use as cost</button>
+          {% else %}<span class="has-text-grey">Unavailable</span>{% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  <p class="help">Unit price uses the recorded PPU, or total buy price ÷ quantity when PPU is missing. “Use as cost” fills the cost field to two decimal places; click Update to save.</p>
 </div>
 {% endif %}
 
+<script src="{{ url_for('static', filename='edit_drug.js') }}" defer></script>
 {% endblock %}

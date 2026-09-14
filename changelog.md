@@ -1,3 +1,18 @@
+# Unreleased (2026-09-12)
+
+- Polished the desktop image-comparison workspace with three left tabs: image adjustment, grading, and save to exam history. Image controls remain below each photograph; grading keeps photographs visible and makes the score baseline/status explicit.
+- Images now open fitted to the whole viewport. Added Fit reset, persistent reference-patch overlays, an overlay visibility toggle, and optional numbered patch suggestions that require user selection.
+- Made **Đóng** red and added save-and-close, discard, and continue choices. Failed saves preserve the draft; appending notes still requires preview.
+- Added geometry, patch-candidate, and UI-controller regression coverage. Browser layout acceptance remains pending a connected browser.
+
+# Unreleased (2026-09-10)
+
+- Expanded patient-history **So sánh** into a local image comparison workspace: independent lighting reference and baseline visit, original/adjusted toggle, brightness/contrast controls, reference-patch normalization, crop, zoom, and pan.
+- Added modular clinician-entered **mMASI v1** with regional area/darkness inputs, server-validated scoring, incomplete-state handling, confirmation, and changes from baseline. POSAS remains a paper attachment workflow.
+- Added comparison save/reopen, optional numbered `_edited_01` JPEG copies, labelled comparison sheets, and previewed summaries appended to a selected exam note. Originals are preserved.
+- Added stable image references, safe unique upload names, protections for referenced images/exams, and comparison ZIP exports containing metadata and attachments. Existing exam records remain supported.
+- See [image comparison documentation](docs/image-comparison.md) for workflow, grading references, storage/backup details, and browser acceptance checks.
+
 # Unreleased (2026-09-09)
 
 - Fixed drug creation and editing silently clearing decimal prices, including unchanged prices such as `7850.0`. Invalid input now shows an error without saving any changes; populated numeric fields cannot be silently cleared.

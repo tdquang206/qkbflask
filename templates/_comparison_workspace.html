@@ -1,0 +1,70 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='comparison.css') }}">
+<div id="compareModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="comparisonTitle">
+  <div class="modal-background"></div>
+  <div class="modal-content comparison-workspace">
+    <header class="comparison-header">
+      <div><h2 id="comparisonTitle" class="title is-4">So sánh hình ảnh</h2><span id="comparisonSaveState" class="help">Chưa có thay đổi</span></div>
+      <button type="button" class="button is-danger" id="closeComparison">Đóng</button>
+    </header>
+    <p id="comparisonStatus" role="status" aria-live="polite"></p>
+    <div class="comparison-layout" id="comparisonLayout" data-view="adjust">
+      <nav class="comparison-nav" role="tablist" aria-label="Công cụ so sánh" aria-orientation="vertical">
+        <button type="button" id="comparisonTabAdjust" role="tab" aria-selected="true" aria-controls="comparisonImageStage" data-comparison-view="adjust"><span class="step-number">01</span><span>Chỉnh ảnh<small>Ánh sáng &amp; vùng chọn</small></span></button>
+        <button type="button" id="comparisonTabGrade" role="tab" aria-selected="false" aria-controls="comparisonGradeSection" tabindex="-1" data-comparison-view="grade"><span class="step-number">02</span><span>Chấm điểm<small id="gradingTabStatus">Chưa chấm</small></span></button>
+        <button type="button" id="comparisonTabSave" role="tab" aria-selected="false" aria-controls="comparisonSaveSection" tabindex="-1" data-comparison-view="save"><span class="step-number">03</span><span>Lưu vào lịch sử<small>Ảnh, đánh giá &amp; ghi chú</small></span></button>
+        <p class="help">Ảnh gốc được giữ lại.<br>Chấm điểm là tùy chọn.</p>
+      </nav>
+      <div class="comparison-content">
+      <section id="comparisonImageStage" role="tabpanel" aria-labelledby="comparisonTabAdjust">
+      <div id="comparisonAdjustToolbar">
+    <div class="comparison-toolbar">
+      <label class="reference-control">Ảnh dùng làm chuẩn sáng <select id="referenceImage" class="input"></select></label>
+      <button type="button" id="normalizeImages" class="button is-info">Gợi ý cân sáng</button>
+    </div>
+    <p class="help">Để gợi ý cân sáng: chọn một vùng tham chiếu tương ứng trên mỗi ảnh (ưu tiên vùng trung tính, tránh tổn thương, bóng đổ, phản sáng). Sau đó kiểm tra và chỉnh thủ công.</p>
+    </div>
+    <div class="comparison-view-options">
+      <label><input type="checkbox" id="showOriginal"> Xem ảnh gốc</label>
+      <label><input type="checkbox" id="showReferencePatches" checked> Hiện vùng tham chiếu</label>
+      <span class="help">Kéo để di chuyển khi phóng to · Tối đa 8 ảnh</span>
+    </div>
+    <div id="compareGrid" class="comparison-grid"></div>
+    </section>
+    <section class="comparison-section" id="comparisonGradeSection" role="tabpanel" aria-labelledby="comparisonTabGrade" hidden>
+      <h3 class="subtitle">Chấm điểm theo lần khám</h3>
+      <label><input type="checkbox" id="enableGrading"> Bật chấm điểm</label>
+      <label class="block-label">Phương pháp <select id="gradingMethod" class="input"></select></label>
+      <label class="block-label">Mốc so sánh điểm <select id="baselineExam" class="input"></select></label>
+      <p class="help" id="gradingBaselineStatus" role="status">Chọn mốc để so sánh điểm. Không thay đổi ánh sáng của ảnh.</p>
+      <div id="gradingPanel" hidden></div>
+    </section>
+    <section class="comparison-section" id="comparisonSaveSection" role="tabpanel" aria-labelledby="comparisonTabSave" hidden>
+      <h3 class="subtitle">Lưu vào lịch sử khám</h3>
+      <label class="block-label">Lần khám nhận bản so sánh <select id="targetExam" class="input"></select></label>
+      <label class="block-label">Nhận xét <textarea id="comparisonComment" class="textarea" maxlength="4000" rows="3"></textarea></label>
+      <div class="comparison-save-options">
+        <label><input id="saveEditedCopies" type="checkbox"> Lưu ảnh hiệu chỉnh (_edited_01…)</label>
+        <label><input id="saveComparisonSheet" type="checkbox"> Lưu ảnh ghép so sánh</label>
+        <label><input id="appendComparisonNote" type="checkbox"> Thêm tóm tắt vào ghi chú khám</label>
+      </div>
+      <button type="button" class="button" id="previewComparisonNote">Xem trước tóm tắt</button>
+      <pre id="comparisonNotePreview" hidden></pre>
+      <button type="button" class="button is-primary" id="saveComparison">Lưu và đóng</button>
+      <p class="help">Luôn lưu thông số chỉnh ảnh và đánh giá để mở lại. Bản lưu mới không thay thế bản trước.</p>
+    </section>
+    </div>
+    </div>
+    <dialog id="comparisonClosePrompt" aria-labelledby="comparisonCloseTitle">
+      <h3 id="comparisonCloseTitle" class="subtitle">Lưu bản so sánh trước khi đóng?</h3>
+      <p id="comparisonCloseMessage"></p>
+      <p class="help">Lưu sử dụng lần khám và các tùy chọn trong “Lưu vào lịch sử”.</p>
+      <div class="buttons">
+        <button type="button" id="comparisonContinue" class="button" autofocus>Tiếp tục chỉnh</button>
+        <button type="button" id="comparisonDiscard" class="button is-danger is-outlined">Bỏ thay đổi và đóng</button>
+        <button type="button" id="comparisonSaveAndClose" class="button is-primary">Lưu và đóng</button>
+      </div>
+    </dialog>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='comparison_core.js') }}" defer></script>
+<script src="{{ url_for('static', filename='comparison.js') }}" defer></script>

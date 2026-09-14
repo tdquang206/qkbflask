@@ -49,6 +49,9 @@ app.register_blueprint(drugs_bp)
 from routes.patients import patients_bp
 app.register_blueprint(patients_bp)
 
+from routes.comparisons import comparisons_bp
+app.register_blueprint(comparisons_bp)
+
 from routes.reports import reports_bp
 app.register_blueprint(reports_bp)
 

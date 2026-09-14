@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash, current_app
 from flask_login import current_user
 from datetime import datetime
 from tinydb import Query
@@ -308,7 +308,7 @@ def edit_exam(exam_id):
                 folder = _safe_patient_image_folder(patient_found.get('phone'))
                 patient_token = _safe_filename_token(patient_found.get('phone'), fallback='patient')
                 date_token = _safe_filename_token(exam_date, fallback='date')
-                filename = f"{patient_token}_{date_token}_image_1{ext}"
+                filename = f"{patient_token}_{date_token}_{uuid.uuid4().hex}_image_1{ext}"
                 image_path = os.path.join(folder, filename)
 
                 # Save processed/validated image to disk
@@ -468,7 +468,7 @@ def new_exam(patient_id):
                         if not _is_allowed_image_ext(ext):
                             return jsonify({"status": "error", "message": "Định dạng ảnh không hợp lệ"}), 400
 
-                        new_name = f"{patient_token}_{date_token}_image_{idx}{ext}"
+                        new_name = f"{patient_token}_{date_token}_{uuid.uuid4().hex}_image_{idx}{ext}"
                         image_path = os.path.join(folder, new_name)
 
                         img = Image.open(image_file)
@@ -485,6 +485,7 @@ def new_exam(patient_id):
                             f.write(buffer.getvalue())
 
                         image_list.append({
+                            "id": str(uuid.uuid4()),
                             "filename": new_name,
                             "path": image_path
                         })
@@ -679,6 +680,10 @@ def delete_exam(exam_id):
                 "message": "exam id not found"
             }), 404
                 
+        from utils.image_comparison import image_index, image_is_referenced
+        for owner, image_record in image_index(patient_found).values():
+            if owner['id'] == exam_id and image_is_referenced(patient_found, owner, image_record):
+                return jsonify(status='error', message='Ảnh đang được dùng trong so sánh hoặc bản hiệu chỉnh. Xóa bản liên quan trước.'), 409
         delete_exam_files(patient_phone, exam_date, short_exam_id)
         updated_exams = [e for e in patient_found.get('exams', []) if e['id'] != exam_id]
         Patients_db.update({'exams': updated_exams}, doc_ids=[patient_doc_id])
@@ -737,7 +742,7 @@ def upload_images(patient_id, exam_id):
                 if not _is_allowed_image_ext(ext):
                     return jsonify({"status": "error", "message": "Định dạng ảnh không hợp lệ"}), 400
 
-                new_name = f"{patient_token}_{date_token}_image_{idx}{ext}"
+                new_name = f"{patient_token}_{date_token}_{uuid.uuid4().hex}_image_{idx}{ext}"
                 image_path = os.path.join(folder, new_name)
 
                 img = Image.open(image)
@@ -753,6 +758,7 @@ def upload_images(patient_id, exam_id):
                     f.write(buffer.getvalue())
 
                 image_list.append({
+                    "id": str(uuid.uuid4()),
                     "filename": new_name,
                     "path": image_path
                 })
@@ -808,16 +814,16 @@ def delete_exam_image(patient_id, exam_id, filename):
         
         if not image_to_remove:
             return jsonify({"status": "error", "message": "Image not found in exam"}), 404
+
+        from utils.image_comparison import image_is_referenced, safe_image_path
+        if image_is_referenced(patient, exams[exam_index], image_to_remove):
+            return jsonify(status='error', message='Ảnh đang được dùng trong so sánh hoặc bản hiệu chỉnh. Xóa bản liên quan trước.'), 409
         
         new_images = [img for img in current_images if img.get('filename') != safe_route_filename]
         exams[exam_index]['images'] = new_images
         
         try:
-            patient_folder = _safe_patient_image_folder(patient.get('phone'))
-            candidate_path = os.path.abspath(os.path.join(patient_folder, safe_route_filename))
-            patient_folder_abs = os.path.abspath(patient_folder)
-            if not (candidate_path == patient_folder_abs or candidate_path.startswith(patient_folder_abs + os.sep)):
-                return jsonify({"status": "error", "message": "Invalid file path"}), 400
+            candidate_path = str(safe_image_path(current_app.root_path, image_to_remove))
 
             if os.path.exists(candidate_path):
                 os.remove(candidate_path)

@@ -196,6 +196,8 @@ def _build_phone_rename_plan(patient_doc, old_phone, new_phone):
             for img_idx, img in enumerate(images):
                 if not isinstance(img, dict):
                     continue
+                if img.get('kind') in ('adjusted', 'comparison_sheet'):
+                    continue
 
                 old_filename = str(img.get('filename') or '').strip()
                 old_rel_path = str(img.get('path') or '').strip()
@@ -284,6 +286,10 @@ def _build_phone_rename_plan(patient_doc, old_phone, new_phone):
 
 
 def _rename_patient_assets(patient_doc, old_phone, new_phone):
+    # Assign source IDs before their filenames change. Derived files live in a
+    # patient-ID folder and retain the original filename from the time of saving.
+    from utils.image_comparison import image_index
+    image_index(patient_doc, assign=True)
     exams = patient_doc.get('exams', [])
     if not isinstance(exams, list):
         return
@@ -565,7 +571,9 @@ def view_exams(patient_id):
     patient_exams = sorted(patient_exams, key=exam_sort_key, reverse=True)
 
     # Render the renamed template
-    return render_template('previous_exams.html', patient=patient, exams=patient_exams)
+    from utils.image_comparison import image_id, gallery_images
+    return render_template('previous_exams.html', patient=patient, exams=patient_exams,
+                           comparison_image_id=image_id, comparison_gallery=gallery_images)
 
 
 def _safe_int(value, default=0):

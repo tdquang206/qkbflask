@@ -1,0 +1,48 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='image_grid.css') }}">
+<dialog id="imageGridDialog" class="image-grid-dialog" aria-labelledby="imageGridTitle">
+  <header class="image-grid-header">
+    <div><h2 id="imageGridTitle" class="title is-4">Tạo lưới ảnh</h2><p class="help">Chọn ô để chỉnh ảnh. Kéo ảnh để căn vị trí; kéo chữ để đặt chú thích.</p></div>
+    <button type="button" id="closeImageGrid" class="button is-danger">Đóng</button>
+  </header>
+  <p id="imageGridStatus" role="status" aria-live="polite"></p>
+  <div class="image-grid-layout">
+    <aside id="imageGridControls" class="image-grid-controls" aria-label="Chỉnh lưới ảnh">
+      <fieldset><legend>Bố cục</legend>
+        <div class="image-grid-pair">
+          <label>Hàng <input id="gridRows" class="input" type="number" min="1" max="6" value="1"></label>
+          <label>Cột <input id="gridColumns" class="input" type="number" min="1" max="6" value="2"></label>
+        </div>
+        <label>Tỉ lệ ô <select id="gridAspect" class="input"><option value="square">Vuông (1:1)</option><option value="landscape">Ngang (4:3)</option><option value="portrait">Dọc (3:4)</option></select></label>
+        <label>Khoảng cách <input id="gridGap" type="range" min="0" max="40" value="8"></label>
+        <label>Màu nền <input id="gridBackground" type="color" value="#ffffff"></label>
+      </fieldset>
+      <fieldset><legend>Ảnh trong ô</legend>
+        <label>Chọn ô <select id="gridCell" class="input"></select></label>
+        <label>Đổi chỗ với ô <select id="gridSwapTarget" class="input"></select></label>
+        <button type="button" id="gridSwap" class="button is-info is-small">Đổi chỗ</button>
+        <label>Cách vừa ô <select id="gridFitMode" class="input"><option value="contain">Hiện toàn bộ ảnh</option><option value="cover">Lấp đầy ô</option></select></label>
+        <label>Phóng ảnh <output id="gridImageZoomValue">100%</output><input id="gridImageZoom" type="range" min="10" max="400" step="5" value="100"></label>
+        <div class="buttons are-small"><button type="button" id="gridImageZoomOut" class="button" aria-label="Thu nhỏ ảnh">−</button><button type="button" id="gridImageZoomIn" class="button" aria-label="Phóng to ảnh">+</button><button type="button" id="gridResetImage" class="button">Đặt lại ảnh</button></div>
+      </fieldset>
+      <fieldset><legend>Chữ tùy chỉnh</legend>
+        <label>Chú thích <select id="gridTextSelection" class="input"></select></label>
+        <label>Nội dung <textarea id="gridText" class="textarea" rows="2" maxlength="500" placeholder="Nhập chú thích…"></textarea></label>
+        <div class="image-grid-pair"><label>Cỡ chữ <input id="gridTextSize" class="input" type="number" min="12" max="100" value="28"></label><label>Màu chữ <input id="gridTextColor" type="color" value="#111111"></label></div>
+        <div class="buttons are-small"><button type="button" id="gridAddText" class="button is-info">Thêm chữ</button><button type="button" id="gridDeleteText" class="button is-danger is-outlined">Xóa chữ</button></div>
+      </fieldset>
+    </aside>
+    <section class="image-grid-preview" aria-label="Xem trước lưới">
+      <div class="image-grid-preview-toolbar">
+        <label>Phóng bản xem <select id="gridViewZoom" class="input"><option value="fit">Vừa màn hình</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.5">150%</option></select></label>
+        <span id="gridDimensions" class="help"></span>
+        <button type="button" id="gridDownload" class="button is-primary">Tải PNG</button>
+      </div>
+      <div id="gridViewport" class="image-grid-viewport"><div id="gridCanvas" role="img" aria-label="Lưới ảnh; dùng các điều khiển Chọn ô và Chú thích để chỉnh"></div></div>
+      <p class="help">PNG gồm ảnh và chữ. Bản lưới chỉ được tải về máy; không tự lưu vào hồ sơ.</p>
+    </section>
+  </div>
+</dialog>
+<script src="{{ url_for('static', filename='vendor/konva/konva.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='image_grid_core.js') }}" defer></script>
+<script src="{{ url_for('static', filename='image_tools.js') }}" defer></script>
+<script src="{{ url_for('static', filename='image_grid.js') }}" defer></script>

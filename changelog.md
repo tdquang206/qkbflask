@@ -1,3 +1,10 @@
+# Unreleased (2026-10-02)
+
+- Replaced the selected-image **So sánh** shortcut with a **Tools** button containing **So sánh** and **Tạo lưới ảnh**.
+- Added a local Konva-based grid editor: 1–6 rows/columns, square/landscape/portrait cells, spacing/background, independent image zoom/pan, fit/fill, cell swaps, movable custom text, and PNG download. Layouts preserve every selected image; the grid supports up to 36 originals.
+- Bundled Konva 10.7.0 with its MIT license for offline use. Grid exports run in the browser and do not alter originals or automatically save into exam history.
+- See [image grid documentation](docs/image-grid.md) for usage and validation.
+
 # Unreleased (2026-09-12)
 
 - Polished the desktop image-comparison workspace with three left tabs: image adjustment, grading, and save to exam history. Image controls remain below each photograph; grading keeps photographs visible and makes the score baseline/status explicit.

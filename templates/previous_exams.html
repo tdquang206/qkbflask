@@ -228,19 +228,26 @@
   </div>
   </div>
 
-  <!-- Compare Controls -->
-  <div id="compareControls" style="display:none; position: fixed; bottom: 20px; right: 80px; z-index: 2000; gap: 10px;">
-    <button id="clearSelectionBtn" class="button is-danger is-light is-rounded is-medium shadow-lg mr-2">
+  <!-- Selected image tools -->
+  <div id="compareControls" class="image-tools-controls" style="display:none;">
+    <button type="button" id="clearSelectionBtn" class="button is-danger is-light is-rounded is-medium shadow-lg">
       <span class="icon">✕</span>
       <span>Xóa chọn</span>
     </button>
-    <button id="compareBtn" class="button is-warning is-rounded is-medium shadow-lg">
-      <span class="icon">🔍</span>
-      <span>So sánh (<span id="compareCount">0</span>)</span>
-    </button>
+    <div class="image-tools-dropdown">
+      <button type="button" id="imageToolsBtn" class="button is-warning is-rounded is-medium shadow-lg"
+        aria-expanded="false" aria-controls="imageToolsMenu">
+        <span>Tools (<span id="compareCount">0</span>) ▴</span>
+      </button>
+      <div id="imageToolsMenu" class="image-tools-menu" hidden aria-label="Công cụ ảnh">
+        <button type="button" id="compareBtn">🔍 So sánh</button>
+        <button type="button" id="imageGridBtn">▦ Tạo lưới ảnh</button>
+      </div>
+    </div>
   </div>
 
   {% include '_comparison_workspace.html' %}
+  {% include '_image_grid_workspace.html' %}
 </section>
 <div id="toast" class="notification is-success"
   style="position: fixed; bottom: 1rem; right: 1rem; display: none; z-index: 1000;">

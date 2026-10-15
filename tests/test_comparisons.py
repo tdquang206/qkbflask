@@ -130,6 +130,9 @@ def test_catalog_does_not_mutate_legacy_images_and_history_renders(comparison_ap
     text = page.get_data(as_text=True)
     assert 'data-image-id=' in text and 'comparison.js' in text
     assert 'Chọn ảnh' in text and 'Ch?n ?nh' not in text
+    assert 'id="imageToolsBtn"' in text and 'id="imageToolsMenu"' in text
+    assert 'id="compareBtn"' in text and 'id="imageGridBtn"' in text
+    assert 'id="imageGridDialog"' in text and 'vendor/konva/konva.min.js' in text
 
 
 def test_save_versions_reopen_notes_archive_and_original_integrity(comparison_app):

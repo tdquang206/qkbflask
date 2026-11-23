@@ -181,8 +181,10 @@
 				<strong id="restoreTime"></strong>
 			</p>
 			<div class="field mt-4">
+				<label class="label" for="restoreAdminPassword">Mật khẩu quản trị viên hiện tại</label>
+				<input class="input" id="restoreAdminPassword" type="password" autocomplete="current-password">
 				<label class="checkbox">
-					<input type="checkbox" id="restoreConfirmCheck" onchange="toggleRestoreBtn()">
+                    <input type="checkbox" id="restoreConfirmCheck" onchange="toggleRestoreBtn()">
 					I understand this will <strong>overwrite the current database</strong> and cannot be undone (except
 					via safety backup).
 				</label>
@@ -598,7 +600,7 @@
 					body: JSON.stringify({
 						source: _currentDiffSource,
 						group_key: _currentDiffGroup,
-						confirm: true,
+						confirm: true, admin_password: document.getElementById('restoreAdminPassword').value,
 					}),
 				});
 				const data = await resp.json();

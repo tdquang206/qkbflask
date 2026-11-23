@@ -11,13 +11,14 @@ from shared_db import patients_table as patients, services_table as services
 from utils.error_logger import append_error_log
 from utils.pdf_generator import generate_exam_file_name
 from utils.db_logger import weekly_backup_all, log_action
+from utils.coordination import capture_file
 
 patients_bp = Blueprint('patients', __name__)
 
 # Patients
 Patients = Query()
 
-_APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_APP_ROOT = os.path.abspath(os.getcwd())
 _PATIENT_IMAGE_ROOT = os.path.abspath(os.path.join(_APP_ROOT, 'uploads', 'patient_image'))
 _PDF_ROOT = os.path.abspath(os.path.join(_APP_ROOT, 'files', 'pdf'))
 _JPEG_ROOT = os.path.abspath(os.path.join(_APP_ROOT, 'files', 'jpeg'))
@@ -88,7 +89,10 @@ def _rename_path_safe(old_abs, new_abs, allowed_root):
         return False
 
     os.makedirs(os.path.dirname(new_abs), exist_ok=True)
-    os.replace(old_abs, new_abs)
+    capture_file(old_abs)
+    capture_file(new_abs)
+    # Retain the previous path for historical attachment versions.
+    shutil.copy2(old_abs, new_abs)
     return True
 
 
@@ -499,6 +503,8 @@ def edit_patient(patient_id):
                     'exams': next_exams
                 }, Query().id == patient_id)
             elif action == 'delete':
+                if patient.get('exams'):
+                    return jsonify(status='error', message='Không được xóa bệnh nhân có lịch sử khám. Hồ sơ và lịch sử chỉnh sửa phải được giữ lại.'), 409
                 patients.remove(Query().id == patient_id)
             return redirect(url_for('patients.manage_patients'))
         except Exception as e:
@@ -561,7 +567,7 @@ def view_exams(patient_id):
     patient = results[0]
 
     # Get all exams for this patient
-    patient_exams = patient.get("exams", [])
+    patient_exams = [e for e in patient.get('exams', []) if not e.get('deleted_at')]
 
     def exam_sort_key(e):
         return (

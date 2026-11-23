@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Lịch sử chỉnh sửa lần khám</h1>
+<p>{{ patient.kid_name or patient.name }} · {{ exam.exam_date }} · {{ exam.created_by_name }}</p>
+{% if exam.deleted_at %}<p class="notification is-warning">Lần khám đã được đánh dấu xóa. Lịch sử được giữ lại.</p>{% endif %}
+{% for entry in exam.get('edit_history', []) | reverse %}
+<details class="box">
+  <summary>Phiên bản {{ entry.revision }} · {{ entry.actor_name }} · {{ entry.at | clinic_time }} · {{ entry.fields | join(', ') }}</summary>
+  <div class="columns">
+    <div class="column"><h2 class="subtitle">Trước chỉnh sửa</h2><pre style="white-space:pre-wrap">{{ entry.before | tojson(indent=2) }}</pre></div>
+    <div class="column"><h2 class="subtitle">Sau chỉnh sửa</h2><pre style="white-space:pre-wrap">{{ entry.after | tojson(indent=2) }}</pre></div>
+  </div>
+</details>
+{% else %}<p class="notification">Chưa có chỉnh sửa được ghi nhận. Hồ sơ cũ không có lịch sử trước khi bật tính năng này.</p>{% endfor %}
+<a class="button" href="/patient/{{ patient.id }}/exams">Lịch sử khám</a>
+{% endblock %}

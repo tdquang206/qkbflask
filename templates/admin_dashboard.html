@@ -30,7 +30,7 @@
                             <div class="control">
                                 <div class="select is-fullwidth">
                                     <select name="role">
-                                        <option value="user">User</option>
+                                        <option value="receptionist">Receptionist</option><option value="cashier">Cashier</option><option value="pharmacist">Pharmacist</option><option value="user">User</option>
                                         <option value="doctor">Doctor</option>
                                         <option value="admin">Admin</option>
                                     </select>
@@ -70,7 +70,7 @@
                             <tr>
                                 <th>Username</th>
                                 <th>Display Name</th>
-                                <th>Dept</th>
+                                <th>Dept</th><th>Reset password</th>
                                 <th>Role</th>
                                 <th>Action</th>
                             </tr>
@@ -78,9 +78,9 @@
                         <tbody>
                             {% for user in users %}
                             <tr>
-                                <td>{{ user.username }}</td>
+                                <td>{{ user.username }} {% if user.disabled %}<span class="tag is-warning">Disabled</span>{% endif %}</td>
                                 <td>{{ user.get('display_name', '') }}</td>
-                                <td>{{ user.get('department', '') }}</td>
+                                <td>{{ user.get('department', '') }}</td><td><details><summary>Reset password</summary><form method="post" action="/admin/users/reset/{{ user.username }}"><input class="input" type="password" name="admin_password" autocomplete="current-password" placeholder="Admin password" required><input class="input" type="password" name="new_password" minlength="12" autocomplete="new-password" placeholder="Temporary password (12+)" required><button class="button">Reset</button></form></details></td>
                                 <td>
                                     <span class="tag {{ 'is-danger' if user.role == 'admin' else 'is-info' }}">
                                         {{ user.role }}
@@ -94,7 +94,7 @@
                                         <form action="{{ url_for('admin.delete_user', username=user.username) }}"
                                             method="POST" onsubmit="return confirm('Are you sure?');"
                                             style="display:inline;">
-                                            <button class="button is-danger">Delete</button>
+                                            <button class="button is-danger">Deactivate</button>
                                         </form>
                                     </div>
                                     {% endif %}
@@ -137,17 +137,18 @@
             </div>
         </div>
 
+        <a class="button is-primary" href="/admin/backups">Sao lưu đầy đủ</a>
         <!-- Exam Management Section -->
         <div class="columns mt-5">
             <div class="column">
                 <div class="box">
                     <h2 class="subtitle">Quản lý thông tin toa thuốc</h2>
-                    <p class="mb-4">Tìm kiếm và chỉnh sửa thông tin bác sĩ và khoa cho toa thuốc.</p>
+                    <p class="mb-4">Tra cứu thông tin. Chỉ bác sĩ tạo hồ sơ được sửa nội dung; tác giả được giữ nguyên.</p>
                     <a href="{{ url_for('admin.edit_exam_info') }}" class="button is-primary is-fullwidth">
                         <span class="icon">
                             <i class="fas fa-edit"></i>
                         </span>
-                        <span>Đổi thông tin toa thuốc</span>
+                        <span>Xem thông tin toa thuốc</span>
                     </a>
                 </div>
             </div>
@@ -182,7 +183,7 @@
                     <div class="control">
                         <div class="select is-fullwidth">
                             <select name="role" id="edit_role">
-                                <option value="user">User</option>
+                                <option value="receptionist">Receptionist</option><option value="cashier">Cashier</option><option value="pharmacist">Pharmacist</option><option value="user">User</option>
                                 <option value="doctor">Doctor</option>
                                 <option value="admin">Admin</option>
                             </select>

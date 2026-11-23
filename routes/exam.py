@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash, current_app
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort, flash, current_app, g
 from flask_login import current_user
 from datetime import datetime
 from tinydb import Query
@@ -8,6 +8,10 @@ import os, io, json
 from routes.settings import load_settings
 from PIL import Image
 import requests
+import copy
+import hashlib
+from utils.exam_access import can_edit_exam, require_owner, finish_exam_change
+from utils.coordination import capture_file
 
 from utils.template_renderer import render_exam_markdown
 from utils.pdf_generator import build_exam_html, generate_pdf_and_jpeg, delete_exam_files, generate_exam_file_name
@@ -21,6 +25,44 @@ MAX_SIZE = (2000, 2000)
 MAX_FILE_SIZE = 1 * 1024 * 1024
 SETTINGS_FILE = 'user_settings.json'
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+
+
+@exam_bp.before_request
+def check_clinical_write():
+    if not current_user.is_authenticated:
+        abort(401)
+    if getattr(current_user, 'role', None) not in ('doctor', 'admin'):
+        abort(403)
+    if request.method in ('GET', 'HEAD'):
+        return
+    if request.endpoint == 'exam.api_send_discord' and not current_app.config.get('DISCORD_ENABLED', False):
+        abort(403, description='Gửi dữ liệu bệnh nhân ra Discord đang tắt.')
+    exam_id = (request.view_args or {}).get('exam_id')
+    if not exam_id:
+        return
+    for patient in Patients_db.all():
+        exam = next((e for e in patient.get('exams', []) if e.get('id') == exam_id), None)
+        if exam:
+            require_owner(exam)
+            g.exam_before = copy.deepcopy(exam)
+            g.exam_patient_id = patient['id']
+            return
+    abort(404)
+
+
+@exam_bp.after_request
+def finish_clinical_write(response):
+    return finish_exam_change(Patients_db, getattr(g, 'exam_before', None),
+                              getattr(g, 'exam_patient_id', None), response)
+
+
+@exam_bp.route('/exam/<exam_id>/history')
+def exam_history(exam_id):
+    for patient in Patients_db.all():
+        exam = next((e for e in patient.get('exams', []) if e.get('id') == exam_id), None)
+        if exam:
+            return render_template('exam_history.html', patient=patient, exam=exam)
+    abort(404)
 
 
 def _json_server_error(message='Đã có lỗi hệ thống, vui lòng thử lại sau.'):
@@ -41,6 +83,23 @@ def _is_allowed_image_ext(ext):
 def _safe_filename_token(value, fallback='x'):
     token = secure_filename(str(value or '')).strip('._')
     return token or fallback
+
+
+def _submission_fingerprint():
+    values = {key: value for key, value in request.form.to_dict(flat=False).items()
+              if key not in ('csrf_token', 'submission_id')}
+    digest = hashlib.sha256(json.dumps(values, sort_keys=True).encode('utf-8'))
+    for image in request.files.getlist('lab_image'):
+        position = image.stream.tell()
+        try:
+            while True:
+                chunk = image.stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+        finally:
+            image.stream.seek(position)
+    return digest.hexdigest()
 
 def _to_float(value, default=0.0):
     try:
@@ -83,7 +142,7 @@ def _package_display_status(pkg, exam_date=None):
     print(f"Processed package display status for service {pkg.get('service_id')}: {status}.")
     return status
 
-def _collect_services_from_form(form, patient_packages, exam_date=None):
+def _collect_services_from_form(form, patient_packages, exam_date=None, previous_services=None):
     service_ids = form.getlist('service_id')
     service_names = form.getlist('service_name')
     service_prices = form.getlist('service_price')
@@ -106,16 +165,24 @@ def _collect_services_from_form(form, patient_packages, exam_date=None):
         catalog = all_services.get(sid, {})
         name = (raw_name or catalog.get('name') or '').strip()
         quantity = int(_to_float(raw_quantity, default=1.0))
+        if quantity <= 0 or _to_float(raw_quantity, default=1.0) != quantity:
+            raise ValueError('Service quantity must be a positive integer')
         price_val = _to_float(raw_price, default=_to_float(catalog.get('price'), default=0.0))
 
         prepaid_status = ''
-        for pkg in patient_packages:
+        package_id = None
+        if previous_services is not None:
+            previous = previous_services[len(services)]
+            prepaid_status = previous.get('prepaid_status', '')
+            package_id = previous.get('package_id')
+        for pkg in ([] if previous_services is not None else patient_packages):
             if (pkg.get('service_id') == sid and 
                 _package_is_active(pkg, exam_date) and 
                 pkg.get('remaining_sessions', 0) >= quantity):
                 price_val = _to_float(pkg.get('unit_price'), default=price_val)
                 pkg['remaining_sessions'] = pkg.get('remaining_sessions', 0) - quantity
                 prepaid_status = 'PAID PACKAGE'
+                package_id = pkg.get('id')
                 break
 
         services.append({
@@ -126,11 +193,15 @@ def _collect_services_from_form(form, patient_packages, exam_date=None):
             'note': raw_note,
             'prepaid_status': prepaid_status
         })
+        if package_id:
+            services[-1]['package_id'] = package_id
 
     print(f"Processed services from form: {len(services)} services collected.")
     return services
 
 def send_discord_helper(patient, exam_data):
+    if not current_app.config.get('DISCORD_ENABLED', False):
+        return
     # Load settings
     if not os.path.exists(SETTINGS_FILE):
         return
@@ -166,7 +237,7 @@ def send_discord_helper(patient, exam_data):
         filename = generate_exam_file_name(phone, exam_date, short_id)
         
         base_dir = os.path.dirname(os.path.abspath(__file__)) # routes/
-        app_root = os.path.dirname(base_dir)
+        app_root = os.path.abspath(os.getcwd())
         jpeg_path = os.path.join(app_root, "files", "jpeg", f"{filename}.jpg")
         
         if os.path.exists(jpeg_path):
@@ -176,10 +247,10 @@ def send_discord_helper(patient, exam_data):
 
     try:
         if files:
-            requests.post(webhook_url, data=payload, files=files)
+            requests.post(webhook_url, data=payload, files=files, timeout=15)
             files["file"][1].close()
         else:
-            requests.post(webhook_url, json=payload)
+            requests.post(webhook_url, json=payload, timeout=15)
     except Exception as e:
         print(f"Error sending to Discord: {e}")
 
@@ -222,7 +293,7 @@ def edit_exam(exam_id):
             exam=exam_editting, 
             departments=departments,
             services=all_services,
-            packages=enriched_packages)
+            packages=enriched_packages, can_edit=can_edit_exam(exam_editting))
 
     if request.method == 'POST':
         try:
@@ -249,8 +320,26 @@ def edit_exam(exam_id):
                         'price': price
                     })
 
-            patient_packages = patient_found.get('packages', [])
-            services = _collect_services_from_form(request.form, patient_packages, exam_date)
+            patient_packages = copy.deepcopy(patient_found.get('packages', []))
+            previous_services = exam_editting.get('services', [])
+            incoming_ids = request.form.getlist('service_id')
+            incoming_quantities = request.form.getlist('service_quantity')
+            incoming_pairs = [(sid.strip(), int(_to_float(incoming_quantities[idx] if idx < len(incoming_quantities) else '1', 1)))
+                              for idx, sid in enumerate(incoming_ids) if sid.strip()]
+            same_allocations = incoming_pairs == [(s.get('id'), int(s.get('quantity', 1))) for s in previous_services]
+            # Unchanged allocations are retained, even if a package has since
+            # expired or another package for the same service has been purchased.
+            for old_service in ([] if same_allocations else previous_services):
+                if old_service.get('prepaid_status') == 'PAID PACKAGE':
+                    candidates = [p for p in patient_packages if
+                                  (p.get('id') == old_service['package_id'] if old_service.get('package_id')
+                                   else p.get('service_id') == old_service.get('id'))]
+                    if len(candidates) != 1:
+                        return jsonify(status='error', message='Không xác định được gói đã dùng trong hồ sơ cũ. Giữ nguyên số lượng dịch vụ hoặc đối chiếu gói trước khi sửa.'), 409
+                    package = candidates[0]
+                    package['remaining_sessions'] = package.get('remaining_sessions', 0) + int(old_service.get('quantity', 0))
+            services = _collect_services_from_form(request.form, patient_packages, exam_date,
+                                                   previous_services if same_allocations else None)
             total_override = request.form.get('total_override')
 
             computed_total = 0
@@ -274,10 +363,10 @@ def edit_exam(exam_id):
                 'expected_date': expected_date,
                 'drugs': drugs,
                 'services': services,
-                'paid_status' : False,
+                'paid_status': exam_editting.get('paid_status', False),
                 'total_money': final_total,
                 'total_override': total_override,
-                'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
+                'submit_time': exam_editting.get('submit_time'),
                 'id': exam_id,
                 'department': exam_editting.get('department', 'Nhi khoa'),
                 'created_by_id': exam_editting.get('created_by_id'),
@@ -314,8 +403,10 @@ def edit_exam(exam_id):
                 # Save processed/validated image to disk
                 save_format = pil_image.format or None
                 if save_format is not None:
+                    capture_file(image_path)
                     pil_image.save(image_path, format=save_format)
                 else:
+                    capture_file(image_path)
                     pil_image.save(image_path)
                 exam_data['image_path'] = image_path
 
@@ -325,8 +416,7 @@ def edit_exam(exam_id):
                 if exam.get('id') == exam_id:
                     old_date = exam.get('exam_date')
                     short_id = str(exam_id)[:8].replace('-','')
-                    if old_date:
-                        delete_exam_files(patient_found.get('phone'), old_date, short_id)
+                    # Prior attachments/artifacts are retained for edit history.
                     exams[i].update(exam_data)
                     updated = True
                     break
@@ -388,10 +478,24 @@ def new_exam(patient_id):
                                patient=patient, 
                                departments=departments,
                                services=all_services,
-                               packages=enriched_packages)
+                               packages=enriched_packages, submission_id=str(uuid.uuid4()))
     
     if request.method == 'POST':
         try:
+            submission_id = request.form.get('submission_id', '')
+            try:
+                uuid.UUID(submission_id)
+            except (ValueError, TypeError):
+                return jsonify(status='error', message='Thiếu mã tạo hồ sơ. Mở lại trang tạo lần khám.'), 400
+            existing = next((e for e in patient.get('exams', []) if e.get('submission_id') == submission_id), None)
+            fingerprint = _submission_fingerprint()
+            if existing:
+                if not can_edit_exam(existing):
+                    return jsonify(status='error', message='Mã tạo hồ sơ đã được sử dụng.'), 409
+                if existing.get('submission_fingerprint') != fingerprint:
+                    return jsonify(status='error', message='Lần khám này đã được tạo với nội dung khác. Mở hồ sơ đã tạo để đối chiếu trước khi sửa.'), 409
+                return jsonify(status='success', exam_id=existing['id'], patient_id=patient_id,
+                               redirect_url=url_for('exam.edit_exam', exam_id=existing['id']))
             exam_date = request.form.get('exam_date')
             weight = request.form.get('weight')
             height = request.form.get('height')
@@ -449,6 +553,9 @@ def new_exam(patient_id):
                 'total_override': total_override,
                 'submit_time' : datetime.now().strftime('%y%m%d%H%M%S'),
                 'id': str(uuid.uuid4()),
+                'submission_id': submission_id,
+                'submission_fingerprint': fingerprint,
+                'revision': 1,
                 'department': selected_department,
                 'created_by_id': current_user.id if current_user.is_authenticated else None,
                 'created_by_name': current_user.display_name if current_user.is_authenticated else 'Admin'
@@ -481,6 +588,7 @@ def new_exam(patient_id):
                             buffer = io.BytesIO()
                             img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
 
+                        capture_file(image_path)
                         with open(image_path, "wb") as f:
                             f.write(buffer.getvalue())
 
@@ -684,8 +792,11 @@ def delete_exam(exam_id):
         for owner, image_record in image_index(patient_found).values():
             if owner['id'] == exam_id and image_is_referenced(patient_found, owner, image_record):
                 return jsonify(status='error', message='Ảnh đang được dùng trong so sánh hoặc bản hiệu chỉnh. Xóa bản liên quan trước.'), 409
-        delete_exam_files(patient_phone, exam_date, short_exam_id)
-        updated_exams = [e for e in patient_found.get('exams', []) if e['id'] != exam_id]
+        updated_exams = patient_found.get('exams', [])
+        for entry in updated_exams:
+            if entry['id'] == exam_id:
+                entry['deleted_at'] = datetime.now().isoformat()
+        # Retain the record and attachments; this is an attributed soft deletion.
         Patients_db.update({'exams': updated_exams}, doc_ids=[patient_doc_id])
 
         return jsonify({
@@ -754,6 +865,7 @@ def upload_images(patient_id, exam_id):
                     buffer = io.BytesIO()
                     img.save(buffer, format=img.format or "JPEG", optimize=True, quality=70)
 
+                capture_file(image_path)
                 with open(image_path, "wb") as f:
                     f.write(buffer.getvalue())
 
@@ -825,10 +937,7 @@ def delete_exam_image(patient_id, exam_id, filename):
         try:
             candidate_path = str(safe_image_path(current_app.root_path, image_to_remove))
 
-            if os.path.exists(candidate_path):
-                os.remove(candidate_path)
-            else:
-                 print(f"File not found on disk: {candidate_path}")
+            # Retain bytes: encrypted edit history references this old version.
         except Exception as e:
             print(f"Error deleting file: {e}")
         

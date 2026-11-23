@@ -1,5 +1,10 @@
 from tinydb import TinyDB
 from utils.storage import EncryptedJSONStorage
+import os
+from utils.coordination import ensure_single_instance, recover_pending
+
+ensure_single_instance(os.getcwd())
+recover_pending(os.getcwd())
 
 # Initialize the primary application database with encrypted storage
 # this file contains patients, exams, drugs, users, etc.
@@ -30,3 +35,7 @@ money_log_table = ledger_db.table('money_received')
 
 # Define table for services
 services_table = services_db.table('services')
+
+purchases_db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
+purchases_table = purchases_db.table('purchases')
+DATABASES = (db, ledger_db, services_db, purchases_db)

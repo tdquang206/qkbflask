@@ -74,6 +74,10 @@
           {% if exam.created_by_name %}
           <span class="tag is-success is-light ml-2">{{ exam.created_by_name }}</span>
           {% endif %}
+          {% if exam.edited_at %}
+          <span class="tag is-warning">Edited · Đã chỉnh sửa</span>
+          <a href="/exam/{{ exam.id }}/history">Lịch sử chỉnh sửa</a>
+          {% endif %}
 
           <span class="ml-4 is-4">Phí khám: {{ exam.service_fee|string }}
           </span>
@@ -87,18 +91,21 @@
             <a href="{{ url_for('exam.edit_exam', exam_id=exam.id) }}" style="display:inline;">
               <!-- <input type="hidden" name="exam_id" value="{{ exam.id }}"> -->
               <button type="submit" class="button is-link">
-                <span>Sửa</span>
+                <span>Xem{% if can_edit_exam is defined and can_edit_exam(exam) %} / Sửa{% endif %}</span>
               </button>
             </a>
 
             <!-- Delete button -->
+            {% if can_edit_exam is defined and can_edit_exam(exam) %}
             <form method="post" action="{{ url_for('exam.delete_exam', exam_id=exam.id) }}" style="display:inline;"
               onsubmit="return confirm('Bạn có chắc muốn xóa lần khám này?');">
               <input type="hidden" name="exam_id" value="{{ exam.id }}">
+              <input type="hidden" name="exam_revision" value="{{ exam.get('revision', 1) }}">
               <button type="submit" class="button is-danger delete-exam-btn">
                 <span>Xóa</span>
               </button>
             </form>
+            {% endif %}
 
           </div>
         </div>

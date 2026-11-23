@@ -1,6 +1,6 @@
 # QKBFlask LAN trial plan
 
-Revised: 15 October 2026, incorporating the owner's feedback. Planning document only; application code and production data are unchanged.
+Revised: 15 October 2026, incorporating the owner's feedback. This is the agreed design; implementation details and outstanding deployment acceptance are recorded in [LAN trial setup](lan-trial-setup.md). Development tests use synthetic data; production records have not been modified.
 
 ## 1. Agreed scope
 
@@ -95,7 +95,7 @@ Flask documents Waitress as a multi-threaded server, so one process alone is not
 
 ## 5. Safe file-based trial
 
-TinyDB does not supply general concurrent access or ACID transaction guarantees; the trial needs application-level protections. See [TinyDB limitations](https://tinydb.readthedocs.io/en/latest/intro.html). These measures are planned work, not capabilities already present.
+TinyDB does not supply general concurrent access or ACID transaction guarantees; the trial needs application-level protections. See [TinyDB limitations](https://tinydb.readthedocs.io/en/latest/intro.html). The following is the design target; [the setup guide](lan-trial-setup.md) distinguishes the implemented conservative request gate/journal from later optimizations and physical acceptance.
 
 1. Centralize database access, including the separately opened purchases databases in drug/search routes. Use shared instances and defined cache invalidation/reload behavior; forbid external writers, parallel app instances and unsupervised migration scripts.
 2. Use one common reentrant coordination mechanism for database reads and complete read-modify-write operations across all routes, authentication loading, background jobs, phone/file renames, backup and restore. A lock around only the final `write()` call cannot prevent stale decisions. Replace isolated feature locks with a consistent lock order to prevent deadlocks.
@@ -179,4 +179,4 @@ Use synthetic/de-identified data for automated/load/crash tests. Existing data m
 - Database migration: evaluate only after trial results or demonstrated operational need; retain an access layer to make it feasible.
 - Confirm actual departments/support users, payment responsibilities, server/UPS/backup hardware, backup operator/deputy, tolerated downtime/data loss and clinic retention/sharing policy as deployment details become available.
 
-Next implementation slice: complete recovery coverage and fix secret logging/bootstrap, then protect file access and implement exam ownership/history. This revision changes the plan only.
+Implementation is available for a controlled trial: coordinated file access/recovery, exam ownership/history, security controls and encrypted backup/restore. Follow [the setup guide](lan-trial-setup.md) before deployment. Receptionist/transfer features and database-server migration remain deferred.

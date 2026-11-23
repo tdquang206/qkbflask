@@ -1,6 +1,7 @@
 """Drug routes with real templates/CSRF and entirely in-memory databases."""
 
 import importlib.util
+import json
 import sys
 import types
 from html.parser import HTMLParser
@@ -38,6 +39,7 @@ def drug_app(monkeypatch):
     database = TinyDB(storage=MemoryStorage)
     shared = types.ModuleType('shared_db')
     shared.drugs_table = database.table('drugs')
+    shared.purchases_db = database
     shared.patients_table = database.table('patients')
     purchase_module = types.ModuleType('routes.mua_thuoc')
     purchase_module.purchases_table = database.table('purchases')
@@ -130,6 +132,43 @@ def test_create_decimal_prices_and_invalid_create(drug_app):
     assert 'Drug was not created.' in response.get_data(as_text=True)
     assert 'modal is-active' in response.get_data(as_text=True)
     assert len(db.table('drugs')) == 2
+
+
+def test_export_encrypted_catalog_download(drug_app):
+    client, _database, _drug_id = drug_app
+    html_response = client.get('/drugs/catalog/calculator')
+    assert html_response.status_code == 200
+    assert 'text/html' in html_response.headers['Content-Type']
+    assert 'QKB Drug Calculator' in html_response.get_data(as_text=True)
+
+    page = client.get('/drugs')
+    assert page.status_code == 200
+    fields = FormParser(page.get_data(as_text=True)).fields
+    response = client.post('/drugs/catalog/export', data={
+        'csrf_token': fields['csrf_token'],
+        'catalog_password': 'test catalog passphrase',
+        'catalog_password_confirm': 'test catalog passphrase',
+    })
+
+    content = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert 'attachment; filename="drug_catalog.enc.json"' in response.headers['Content-Disposition']
+    assert 'Thuốc 10mg' not in content
+    assert json.loads(content)['format'] == 'qkb-drug-catalog-encrypted'
+
+
+def test_export_encrypted_catalog_rejects_mismatched_passwords(drug_app):
+    client, _database, _drug_id = drug_app
+    page = client.get('/drugs')
+    fields = FormParser(page.get_data(as_text=True)).fields
+    response = client.post('/drugs/catalog/export', data={
+        'csrf_token': fields['csrf_token'],
+        'catalog_password': 'first catalog password',
+        'catalog_password_confirm': 'second catalog password',
+    })
+
+    assert response.status_code == 400
+    assert 'passwords do not match' in response.get_data(as_text=True)
 
 
 def test_csrf_and_missing_record(drug_app):

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="title">Sao lưu đầy đủ</h1>
+<p>Bao gồm cơ sở dữ liệu, ảnh, PDF, cấu hình và lịch sử chỉnh sửa. Cần giữ khóa mã hóa riêng để khôi phục.</p>
+{% if status.get('error') %}<p class="notification is-danger">{{ status.error }}</p>{% endif %}
+{% if status.get('stale') %}<p class="notification is-warning">Chưa xác nhận bản tự động trong 20 phút gần đây. Kiểm tra dịch vụ và nơi lưu bản sao.</p>{% endif %}
+<p>Lần tự động thành công: {{ status.get('last_success', 'Chưa có bằng chứng tự động sao lưu') }}</p>
+<form method="post"><button class="button is-primary">Tạo và kiểm tra bản sao lưu</button></form>
+{% for filename in files %}
+<details class="box"><summary>{{ filename }}</summary>
+  <a class="button" href="{{ url_for('admin.download_full_backup', filename=filename) }}">Tải bản mã hóa</a>
+  <form method="post" action="{{ url_for('admin.restore_full_backup', filename=filename) }}">
+    <p class="notification is-warning">Khôi phục sẽ thay thế dữ liệu bằng thời điểm đã chọn và đăng xuất mọi người. Hệ thống tạo bản an toàn trước khi thay thế. Chỉ thực hiện khi đã ngừng tiếp nhận thay đổi.</p>
+    <label class="label">Nhập RESTORE</label><input class="input" name="confirmation" required autocomplete="off">
+    <label class="label">Mật khẩu quản trị viên hiện tại</label><input class="input" type="password" name="admin_password" required autocomplete="current-password">
+    <button class="button is-danger">Khôi phục bản này</button>
+  </form>
+</details>
+{% else %}<p class="notification is-warning">Chưa có bản sao lưu đầy đủ.</p>{% endfor %}
+{% endblock %}

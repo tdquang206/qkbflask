@@ -67,7 +67,7 @@ def comparison_app(monkeypatch, tmp_path):
         image.putdata([(x * 7, y * 10, 75 + i * 20) for y in range(16) for x in range(32)])
         image.save(path)
         patient['exams'].append({'id': f'exam-{i}', 'exam_date': f'2026-0{i+1}-01',
-                                 'history': 'Existing clinical note', 'drugs': [],
+                                 'created_by_id': 'test-user', 'history': 'Existing clinical note', 'drugs': [],
                                  'images': [{'filename': path.name, 'path': path.relative_to(tmp_path).as_posix()}]})
     table.insert(patient)
     table.insert({'id': 'another-patient', 'exams': []})
@@ -227,7 +227,7 @@ def test_source_ids_survive_rename_and_deletion_references(comparison_app):
     assert image_id(exam, image) == source_id
     catalog = client.get('/patient/patient-one/comparisons').json
     assert any(i['id'] == source_id and i['filename'] == 'renamed.jpg' for i in catalog['images'])
-    assert client.post(f"/patient/patient-one/comparisons/{saved['id']}/delete", json={}, headers=headers).status_code == 200
+    assert client.post(f"/patient/patient-one/comparisons/{saved['id']}/delete", json={'revision': catalog['revision']}, headers=headers).status_code == 200
     patient = table.all()[0]
     assert patient['exams'][1]['comparisons'] == []
     assert image_is_referenced(patient, exam, image)  # Edited copies still need their original.

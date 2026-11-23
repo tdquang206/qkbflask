@@ -61,12 +61,12 @@
         <div class="navbar-item has-dropdown is-hoverable">
           <a class="navbar-link">⚙️ Admin</a>
           <div class="navbar-dropdown">
-            <a class="navbar-item" href="{{ url_for('admin.index') }}">👥 Quản lý Users</a>
+            <a class="navbar-item" href="/admin/backups">Sao lưu đầy đủ</a><a class="navbar-item" href="{{ url_for('admin.index') }}">👥 Quản lý Users</a>
             <a class="navbar-item" href="{{ url_for('admin.decrypt_database_page') }}">💾 Xuất Database</a>
             <a class="navbar-item" href="{{ url_for('admin.import_database_page') }}">📥 Nhập Database</a>
             <a class="navbar-item" href="{{ url_for('admin.edit_exam_info') }}">✏️ Đổi Thông Tin Toa Thuốc</a>
             <hr class="navbar-divider">
-            <a class="navbar-item" href="{{ url_for('auth.logout') }}">🚪 Logout</a>
+            <form class="navbar-item" method="post" action="{{ url_for('auth.logout') }}"><button class="button is-light">Logout</button></form>
           </div>
         </div>
         {% endif %}
@@ -81,7 +81,7 @@
                 👤 {{ current_user.username }}
               </a>
               <div class="navbar-dropdown is-right">
-                <a class="navbar-item" href="{{ url_for('auth.logout') }}">Logout</a>
+                <a class="navbar-item" href="/account/password">Đổi mật khẩu</a><form class="navbar-item" method="post" action="{{ url_for('auth.logout') }}"><button class="button is-light">Logout</button></form>
               </div>
             </div>
             {% else %}
@@ -236,6 +236,13 @@
       }
       return origFetch.apply(this, [url, opts]).then(async res => {
         try {
+          const newRevision = res.headers.get('X-Exam-Revision');
+          const revisionField = document.querySelector('input[name="exam_revision"]');
+          if (res.ok && newRevision && revisionField) {
+            revisionField.value = newRevision;
+            const label = document.getElementById('examEditedLabel');
+            if (label && Number(newRevision) > 1) label.hidden = false;
+          }
           const clone = res.clone();
           const data = await clone.json();
           showNotification(data);

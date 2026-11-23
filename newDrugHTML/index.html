@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>QKB Drug Calculator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #171a1d;
+      color: #f3f5f7;
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    body { max-width: 860px; margin: 0 auto; padding: 18px; }
+    h1 { margin: 0 0 5px; color: #53dfbd; font-size: 1.5rem; }
+    h2 { margin: 0 0 9px; font-size: 1.1rem; }
+    p { line-height: 1.5; }
+    .muted { color: #aab2b8; font-size: .9rem; }
+    .card { margin: 14px 0; padding: 16px; border: 1px solid #343a40; border-radius: 14px; background: #22272b; }
+    .field { display: grid; gap: 7px; margin: 12px 0; }
+    input, textarea, button { width: 100%; min-height: 46px; border: 1px solid #444d54; border-radius: 10px; padding: 11px 13px; font: inherit; }
+    input, textarea { background: #171a1d; color: #f3f5f7; }
+    textarea { min-height: 105px; resize: vertical; }
+    button { border: 0; background: #53dfbd; color: #09221b; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #3a4248; color: #f3f5f7; }
+    button:disabled { cursor: wait; opacity: .65; }
+    .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .status { min-height: 24px; margin: 8px 0; color: #f4c86a; overflow-wrap: anywhere; }
+    .error { color: #ff8e9b; }
+    .success { color: #73e0a4; }
+    .results { overflow-x: auto; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #343a40; text-align: left; }
+    th { color: #aab2b8; font-size: .82rem; }
+    td.price, td.number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .match-list { display: grid; gap: 7px; margin: 9px 0; }
+    .match-list button { background: #30373c; color: #f3f5f7; text-align: left; }
+    .search-row, .qty-row { display: grid; grid-template-columns: 1fr 115px; gap: 9px; }
+    .footer { margin: 18px 0 8px; text-align: center; color: #7f898f; font-size: .8rem; }
+    @media (max-width: 560px) {
+      body { padding: 12px; }
+      .actions, .search-row, .qty-row { grid-template-columns: 1fr; }
+      .card { padding: 13px; }
+      th, td { padding: 9px 6px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Danh sách thuốc</h1>
+    <div class="muted">QKB drug list and quick subtotal</div>
+    <div id="catalogMeta" class="muted">Catalog not loaded.</div>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="loadTitle">
+      <h2 id="loadTitle">Load latest catalog</h2>
+      <p class="muted">Enter the shared catalog password. Decryption happens in this browser; the password is not sent to Cloudflare.</p>
+      <form id="loadForm">
+        <label class="field" for="catalogPassword">
+          <span>Catalog password</span>
+          <input id="catalogPassword" type="password" autocomplete="current-password" required>
+        </label>
+        <button id="loadButton" type="submit">Load latest prices</button>
+      </form>
+      <div id="loadStatus" class="status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card" aria-labelledby="calcTitle">
+      <h2 id="calcTitle">Quick subtotal</h2>
+      <p class="muted">Examples: <em>5 product A, 7 product B</em> or one item per line. Matching uses the drug name and sell price.</p>
+      <label class="field" for="subtotalInput">
+        <span>Items and quantities</span>
+        <textarea id="subtotalInput" placeholder="5 product A&#10;7 product B" disabled></textarea>
+      </label>
+      <div class="actions">
+        <button id="calculateButton" type="button" disabled>Calculate</button>
+        <button id="voiceButton" class="secondary" type="button" disabled>Voice input</button>
+      </div>
+      <div id="calcStatus" class="status" role="status" aria-live="polite"></div>
+      <div id="subtotalResult" class="results"></div>
+
+      <div class="field">
+        <label for="fallbackSearch">Find a drug to add</label>
+        <input id="fallbackSearch" type="search" placeholder="Search drug name..." autocomplete="off" disabled>
+      </div>
+      <div id="matchList" class="match-list"></div>
+      <div class="qty-row">
+        <label class="field" for="fallbackQty">
+          <span>Quantity</span>
+          <input id="fallbackQty" type="number" min="1" step="1" value="1" disabled>
+        </label>
+        <button id="addDrugButton" type="button" class="secondary" disabled>Add drug</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="listTitle">
+      <h2 id="listTitle">Drug list</h2>
+      <label class="field" for="listSearch">
+        <span>Filter by name</span>
+        <input id="listSearch" type="search" placeholder="Search..." autocomplete="off" disabled>
+      </label>
+      <div class="results">
+        <table>
+          <thead><tr><th>Name</th><th class="price">Sell</th><th class="price">Cost</th></tr></thead>
+          <tbody id="drugRows"></tbody>
+        </table>
+      </div>
+      <div id="emptyList" class="muted">Load the catalog to view drugs.</div>
+    </section>
+  </main>
+  <div class="footer">QKB Drug Calculator</div>
+
+  <script>
+    // Replace this placeholder with the Cloudflare Worker URL before sharing the HTML.
+    const CATALOG_URL = 'https://YOUR-WORKER.workers.dev/';
+    const FORMAT = 'qkb-drug-catalog-encrypted';
+    const KDF_ITERATIONS = 600000;
+    const AAD = new TextEncoder().encode('qkb-drug-catalog:v1');
+    let catalogItems = [];
+
+    const byId = id => document.getElementById(id);
+    const money = new Intl.NumberFormat('vi-VN', {maximumFractionDigits: 2});
+
+    function setStatus(element, message, kind) {
+      element.textContent = message;
+      element.className = 'status' + (kind ? ' ' + kind : '');
+    }
+
+    function decodeBase64(value) {
+      const binary = atob(value);
+      return Uint8Array.from(binary, character => character.charCodeAt(0));
+    }
+
+    function validateCatalog(catalog) {
+      if (!catalog || catalog.schema_version !== 1 || !Array.isArray(catalog.items) ||
+          catalog.items.length > 20000 || typeof catalog.updated_at !== 'string') {
+        throw new Error('Catalog format is invalid.');
+      }
+      return catalog.items.map(item => {
+        if (!item || typeof item.name !== 'string' || !item.name.trim() ||
+            !Number.isFinite(item.sell) || item.sell < 0 ||
+            !Number.isFinite(item.cost) || item.cost < 0) {
+          throw new Error('Catalog contains an invalid drug or price.');
+        }
+        return {name: item.name, sell: item.sell, cost: item.cost};
+      });
+    }
+
+    async function decryptCatalog(envelope, password) {
+      if (!envelope || envelope.format !== FORMAT || envelope.version !== 1 ||
+          envelope.kdf !== 'PBKDF2-HMAC-SHA256' || envelope.cipher !== 'AES-256-GCM' ||
+          envelope.iterations !== KDF_ITERATIONS) {
+        throw new Error('Unsupported encrypted catalog format.');
+      }
+      const salt = decodeBase64(envelope.salt);
+      const nonce = decodeBase64(envelope.nonce);
+      const ciphertext = decodeBase64(envelope.ciphertext);
+      if (salt.length !== 16 || nonce.length !== 12 || ciphertext.length < 17 ||
+          ciphertext.length > 5 * 1024 * 1024) {
+        throw new Error('Encrypted catalog has an invalid size or format.');
+      }
+
+      const passwordKey = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+      const key = await crypto.subtle.deriveKey(
+        {name: 'PBKDF2', salt, iterations: KDF_ITERATIONS, hash: 'SHA-256'},
+        passwordKey, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+      let plaintext;
+      try {
+        plaintext = await crypto.subtle.decrypt(
+          {name: 'AES-GCM', iv: nonce, additionalData: AAD, tagLength: 128},
+          key, ciphertext);
+      } catch (_error) {
+        throw new Error('Password is incorrect or catalog is damaged.');
+      }
+      return JSON.parse(new TextDecoder().decode(plaintext));
+    }
+
+    function normalize(value) {
+      return value.toLocaleLowerCase('vi')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .trim();
+    }
+
+    function makeCell(text, className) {
+      const cell = document.createElement('td');
+      cell.textContent = text;
+      if (className) cell.className = className;
+      return cell;
+    }
+
+    function renderDrugList(query) {
+      const tbody = byId('drugRows');
+      tbody.replaceChildren();
+      const normalizedQuery = normalize(query || '');
+      const shown = catalogItems.filter(item => normalize(item.name).includes(normalizedQuery));
+      shown.forEach(item => {
+        const row = document.createElement('tr');
+        row.append(makeCell(item.name), makeCell(money.format(item.sell), 'price'),
+          makeCell(money.format(item.cost), 'price'));
+        tbody.appendChild(row);
+      });
+      byId('emptyList').textContent = shown.length ? '' : 'No matching drugs.';
+      byId('emptyList').hidden = shown.length > 0;
+    }
+
+    function matchDrug(query) {
+      const target = normalize(query);
+      if (!target) return null;
+      const exact = catalogItems.find(item => normalize(item.name) === target);
+      if (exact) return exact;
+      const contained = catalogItems.find(item => normalize(item.name).includes(target));
+      if (contained) return contained;
+      const tokens = target.split(/\s+/).filter(Boolean);
+      let best = null;
+      let score = 0;
+      catalogItems.forEach(item => {
+        const name = normalize(item.name);
+        const candidateScore = tokens.filter(token => name.includes(token)).length;
+        if (candidateScore > score) {
+          score = candidateScore;
+          best = item;
+        }
+      });
+      return score ? best : null;
+    }
+
+    function appendResultRow(target, name, sell, quantity, subtotal) {
+      const row = document.createElement('tr');
+      row.append(makeCell(name), makeCell(money.format(sell), 'price'),
+        makeCell(String(quantity), 'number'), makeCell(money.format(subtotal), 'price'));
+      target.appendChild(row);
+    }
+
+    function renderResults(items, unmatched) {
+      const target = byId('subtotalResult');
+      target.replaceChildren();
+      if (!items.length) {
+        setStatus(byId('calcStatus'), 'No matching products found. Search for a drug below.', 'error');
+        return;
+      }
+      setStatus(byId('calcStatus'), '', '');
+      const table = document.createElement('table');
+      const head = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      ['Drug', 'Sell', 'Qty', 'Subtotal'].forEach(label => {
+        const cell = document.createElement('th');
+        cell.textContent = label;
+        headerRow.appendChild(cell);
+      });
+      head.appendChild(headerRow);
+      table.appendChild(head);
+      const body = document.createElement('tbody');
+      let total = 0;
+      items.forEach(item => {
+        const subtotal = item.sell * item.quantity;
+        total += subtotal;
+        appendResultRow(body, item.name, item.sell, item.quantity, subtotal);
+      });
+      const totalRow = document.createElement('tr');
+      const totalLabel = document.createElement('th');
+      totalLabel.colSpan = 3;
+      totalLabel.textContent = 'Total';
+      totalRow.append(totalLabel, makeCell(money.format(total), 'price'));
+      body.appendChild(totalRow);
+      table.append(body);
+      target.appendChild(table);
+      if (unmatched.length) {
+        const note = document.createElement('p');
+        note.className = 'muted';
+        note.textContent = 'Not matched: ' + unmatched.join('; ');
+        target.appendChild(note);
+      }
+    }
+
+    function calculate() {
+      const segments = byId('subtotalInput').value.split(/[,;\n]+/).map(value => value.trim()).filter(Boolean);
+      const items = [];
+      const unmatched = [];
+      const patterns = [
+        /^(\d+)\s*(?:x|×|sp|sản phẩm|san pham|product|viên|hộp|chai|pack|pcs)?\s+(.+)$/i,
+        /^(.+?)\s*(?:x|×|:|–|-)\s*(\d+)$/i
+      ];
+      segments.forEach(segment => {
+        let matched = false;
+        for (let index = 0; index < patterns.length; index += 1) {
+          const parts = segment.match(patterns[index]);
+          if (!parts) continue;
+          const quantity = Number(index === 0 ? parts[1] : parts[2]);
+          const name = (index === 0 ? parts[2] : parts[1]).trim();
+          const drug = matchDrug(name);
+          if (drug && Number.isSafeInteger(quantity) && quantity > 0) {
+            items.push({name: drug.name, sell: drug.sell, quantity});
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) unmatched.push(segment);
+      });
+      renderResults(items, unmatched);
+    }
+
+    function renderMatches() {
+      const list = byId('matchList');
+      list.replaceChildren();
+      const query = normalize(byId('fallbackSearch').value);
+      if (!query) return;
+      catalogItems.filter(item => normalize(item.name).includes(query)).slice(0, 10).forEach(item => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = item.name + ' — ' + money.format(item.sell);
+        button.addEventListener('click', () => {
+          byId('fallbackSearch').value = item.name;
+          list.replaceChildren();
+        });
+        list.appendChild(button);
+      });
+    }
+
+    async function loadCatalog(password) {
+      if (CATALOG_URL.includes('YOUR-WORKER')) {
+        throw new Error('Set CATALOG_URL to your Cloudflare Worker URL before sharing this HTML.');
+      }
+      if (!window.crypto || !crypto.subtle) {
+        throw new Error('This browser does not support secure catalog decryption. Open the HTML in an up-to-date browser.');
+      }
+      const response = await fetch(CATALOG_URL, {cache: 'no-store'});
+      if (!response.ok) {
+        throw new Error(response.status === 404
+          ? 'No catalog has been uploaded to Cloudflare yet.'
+          : 'Could not download the catalog (HTTP ' + response.status + ').');
+      }
+      const contentLength = Number(response.headers.get('Content-Length') || 0);
+      if (contentLength > 7 * 1024 * 1024) throw new Error('Catalog file is too large.');
+      const responseText = await response.text();
+      if (responseText.length > 7 * 1024 * 1024) throw new Error('Catalog file is too large.');
+      const envelope = JSON.parse(responseText);
+      const catalog = await decryptCatalog(envelope, password);
+      const items = validateCatalog(catalog);
+      if (!items.length) throw new Error('The published catalog is empty.');
+      catalogItems = items;
+      return catalog.updated_at;
+    }
+
+    byId('loadForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = byId('loadButton');
+      const passwordInput = byId('catalogPassword');
+      const password = passwordInput.value;
+      passwordInput.value = '';
+      button.disabled = true;
+      setStatus(byId('loadStatus'), 'Downloading and decrypting catalog...', '');
+      try {
+        const updatedAt = await loadCatalog(password);
+        byId('catalogMeta').textContent = 'Updated: ' + updatedAt + ' · ' + catalogItems.length + ' drugs';
+        ['subtotalInput', 'calculateButton', 'voiceButton', 'fallbackSearch', 'fallbackQty',
+          'addDrugButton', 'listSearch'].forEach(id => { byId(id).disabled = false; });
+        byId('emptyList').hidden = true;
+        renderDrugList('');
+        setStatus(byId('loadStatus'), 'Catalog loaded.', 'success');
+      } catch (error) {
+        catalogItems = [];
+        renderDrugList('');
+        byId('catalogMeta').textContent = 'Catalog not loaded.';
+        ['subtotalInput', 'calculateButton', 'voiceButton', 'fallbackSearch', 'fallbackQty',
+          'addDrugButton', 'listSearch'].forEach(id => { byId(id).disabled = true; });
+        setStatus(byId('loadStatus'), error.message || 'Catalog could not be loaded.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    byId('calculateButton').addEventListener('click', calculate);
+    byId('fallbackSearch').addEventListener('input', renderMatches);
+    byId('listSearch').addEventListener('input', event => renderDrugList(event.target.value));
+    byId('addDrugButton').addEventListener('click', () => {
+      const drug = matchDrug(byId('fallbackSearch').value);
+      const quantity = Number(byId('fallbackQty').value);
+      if (!drug || !Number.isSafeInteger(quantity) || quantity < 1) {
+        setStatus(byId('calcStatus'), 'Select a drug and enter a whole-number quantity.', 'error');
+        return;
+      }
+      renderResults([{name: drug.name, sell: drug.sell, quantity}], []);
+    });
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'vi-VN';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.addEventListener('result', event => {
+        byId('subtotalInput').value = event.results[0][0].transcript;
+        calculate();
+      });
+      recognition.addEventListener('error', () => {
+        setStatus(byId('calcStatus'), 'Voice input is unavailable; enter quantities as text.', 'error');
+      });
+      byId('voiceButton').addEventListener('click', () => recognition.start());
+    } else {
+      byId('voiceButton').hidden = true;
+    }
+  </script>
+</body>
+</html>

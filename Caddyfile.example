@@ -1,0 +1,7 @@
+# Resolve this name to the server's reserved LAN IP on staff devices.
+# Install this Caddy instance's local CA certificate as trusted on staff devices.
+# Run Caddy as a supervised service and restrict port 443 to the staff subnet.
+qkb.clinic.internal {
+    tls internal
+    reverse_proxy 127.0.0.1:5000
+}

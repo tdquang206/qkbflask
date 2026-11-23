@@ -28,6 +28,11 @@
 <section class="section">
   <form id="examForm" action="{{ url_for('exam.edit_exam', exam_id=exam.id) }}" method="POST"
     onsubmit="calculateTotals()">
+    <input type="hidden" name="exam_revision" value="{{ exam.get('revision', 1) }}">
+    {% if not can_edit %}<p class="notification is-info">Chỉ đọc. Chỉ bác sĩ tạo lần khám được chỉnh sửa hồ sơ này.</p>{% endif %}
+    <p id="examEditedLabel" {% if not exam.edited_at %}hidden{% endif %}> <span class="tag is-warning">Edited · Đã chỉnh sửa</span>
+      {{ exam.edited_by_name }} {{ exam.edited_at | clinic_time }} <a href="/exam/{{ exam.id }}/history">Lịch sử chỉnh sửa</a></p>
+    <fieldset {% if not can_edit %}disabled{% endif %} style="border:0;padding:0;margin:0">
     <div class="container">
 
       <!-- Patient Info -->
@@ -425,14 +430,14 @@
     <div class="is-flex is-align-content-from-start is-flex-wrap-wrap"
       style="justify-content: space-between; align-items: center;">
       <div>
-        <p id="paid_status_text">Tình trạng thanh toán:
+        <p id="paid_status_text" data-paid="{{ 'true' if exam.paid_status else 'false' }}">Tình trạng thanh toán:
           {% if exam.paid_status == True %} Đã thanh toán
           {% elif exam.paid_status == False %} Chưa thanh toán
           {% else %} Chưa biết
           {% endif %}
         </p>
       </div>
-      <div><button type="button" class="button is-info" id="paid_status_toggle_btn">Thay đổi</button>
+      <div><button type="button" class="button is-info" id="paid_status_toggle_btn" {% if current_user.role not in ('admin', 'cashier') %}disabled title="Thu ngân hoặc quản trị viên cập nhật thanh toán"{% endif %}>Thay đổi</button>
       </div>
     </div>
 
@@ -473,6 +478,7 @@
     </div>
 
     </div>
+    </fieldset>
   </form>
 </section>
 
@@ -599,7 +605,7 @@
           },
           body: JSON.stringify({
             patient_id: patientId,
-            exam_id: examId
+            exam_id: examId, desired_status: paid_status_textEl.dataset.paid !== 'true'
           })
         });
         const data = await response.json();
@@ -609,7 +615,8 @@
         }
 
         if (data.success) {
-          paid_status_text.value = "Đã nhận tiền"
+          paid_status_textEl.dataset.paid = String(data.paid_status);
+          paid_status_textEl.textContent = data.paid_status ? 'Đã nhận tiền' : 'Chưa nhận tiền';
           showToast("✅ Đã lưu thành công!", "is-success");
 
         } else {

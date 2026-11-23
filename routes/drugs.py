@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, abort
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, abort, current_app, Response, send_file
 from tinydb import Query, TinyDB
 from shared_db import drugs_table as drugs, patients_table as patients
 from utils.drug_values import parse_drug_form, drug_stock_details
@@ -7,6 +7,7 @@ import json
 import os
 import html as _html
 import requests as _requests
+from pathlib import Path
 from datetime import datetime
 from unicodedata import normalize
 from collections import defaultdict
@@ -33,7 +34,7 @@ def manage_drugs():
     
     # Load purchases - using encrypted storage
     from utils.storage import EncryptedJSONStorage
-    purchases_db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
+    from shared_db import purchases_db
     purchases_table = purchases_db.table('purchases')
     all_purchases = purchases_table.all()
 
@@ -445,8 +446,54 @@ tbody tr:hover{{background:rgba(255,255,255,.04)}}
 </html>'''
 
 
+@drugs_bp.route('/drugs/catalog/calculator')
+def download_drug_catalog_calculator():
+    """Download the standalone calculator HTML distributed to colleagues."""
+    calculator_path = Path(__file__).resolve().parents[1] / 'newDrugHTML' / 'index.html'
+    if not calculator_path.is_file():
+        abort(404, description='Drug catalog calculator file is missing.')
+    return send_file(
+        str(calculator_path),
+        mimetype='text/html',
+        as_attachment=True,
+        download_name='QKB_Drug_Calculator.html',
+    )
+
+
+@drugs_bp.route('/drugs/catalog/export', methods=['POST'])
+def export_encrypted_drug_catalog():
+    """Create an encrypted name/sell/cost catalog for manual R2 upload."""
+    password = request.form.get('catalog_password', '')
+    confirmation = request.form.get('catalog_password_confirm', '')
+    if len(password) < 12:
+        abort(400, description='Use a catalog password of at least 12 characters.')
+    if password != confirmation:
+        abort(400, description='The catalog passwords do not match.')
+
+    from shared_db import purchases_db
+    from utils.drug_catalog import build_drug_catalog, encrypted_catalog_json
+
+    try:
+        catalog = build_drug_catalog(
+            drugs.all(),
+            purchases_db.table('purchases').all(),
+        )
+        if not catalog['items']:
+            abort(400, description='No named drugs are available to export.')
+        file_content = encrypted_catalog_json(catalog, password)
+    except ValueError as error:
+        abort(400, description=str(error))
+
+    response = Response(file_content, mimetype='application/json')
+    response.headers['Content-Disposition'] = 'attachment; filename="drug_catalog.enc.json"'
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @drugs_bp.route('/api/drugs/send_discord', methods=['POST'])
 def api_send_drugs_discord():
+    if not current_app.config.get('DISCORD_ENABLED', False):
+        abort(403)
     SETTINGS_FILE = 'user_settings.json'
     if not os.path.exists(SETTINGS_FILE):
         return jsonify({'error': 'Settings file not found'}), 400
@@ -466,7 +513,7 @@ def api_send_drugs_discord():
 
     # Build latest-cost map from purchase history
     from utils.storage import EncryptedJSONStorage
-    purchases_db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
+    from shared_db import purchases_db
     all_purchases = sorted(
         purchases_db.table('purchases').all(),
         key=lambda p: p.get('date_buy', ''),

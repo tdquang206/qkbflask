@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     }
 
-                    const payload = { patient_id: patientId, exam_id: examId };
+                    const payload = { patient_id: patientId, exam_id: examId, desired_status: true };
                     if (realAmount !== null) {
                         payload.real_amount = realAmount;
                     }

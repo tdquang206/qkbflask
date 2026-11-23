@@ -257,6 +257,41 @@
       <input class="input" type="text" placeholder="Search by name or SKU..." id="searchInput" onkeyup="filterTable()">
     </div>
   </div>
+</div>
+
+{% if current_user.is_authenticated and current_user.role|default('') in ['admin', 'pharmacist'] %}
+<section class="box" style="background:#242424;color:#f5f5f5;border:1px solid #333;">
+    <h2 class="title is-6" style="color:#f5f5f5 !important;">Drug calculator sharing</h2>
+    <p class="mb-3">
+      Download the standalone HTML once and send it to colleagues. To publish updated prices,
+      encrypt a fresh catalog and manually replace <code>drug_catalog.enc.json</code> in your Cloudflare R2 bucket.
+    </p>
+    <div class="buttons">
+      <a class="button is-info" href="{{ url_for('drugs.download_drug_catalog_calculator') }}">
+        Download calculator HTML
+      </a>
+    </div>
+    <form method="POST" action="{{ url_for('drugs.export_encrypted_drug_catalog') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="columns">
+        <div class="column">
+          <label class="label" for="catalog_password">Catalog password</label>
+          <input class="input" id="catalog_password" name="catalog_password" type="password"
+            minlength="12" autocomplete="off" required>
+        </div>
+        <div class="column">
+          <label class="label" for="catalog_password_confirm">Confirm password</label>
+          <input class="input" id="catalog_password_confirm" name="catalog_password_confirm" type="password"
+            minlength="12" autocomplete="new-password" required>
+        </div>
+      </div>
+      <button class="button is-primary" type="submit">Download encrypted catalog</button>
+      <p class="help has-text-grey-light">
+        QKB does not store the password. Share it with colleagues separately from the HTML and catalog file.
+      </p>
+    </form>
+  </section>
+{% endif %}
 
   <!-- add drug modal -->
   <div class="modal{% if errors %} is-active{% endif %}" id="addDrugModal">

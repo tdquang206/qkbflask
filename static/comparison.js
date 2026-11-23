@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     button.addEventListener('click', async () => {
       if (!confirm('Xóa bản so sánh này? Ảnh đính kèm và ghi chú sẽ được giữ lại.')) return;
       button.disabled = true;
-      try { await request(`${api}/${encodeURIComponent(button.dataset.comparisonId)}/delete`, {}); location.reload(); }
+      try { const latest = await request(api); await request(`${api}/${encodeURIComponent(button.dataset.comparisonId)}/delete`, {revision: latest.revision}); location.reload(); }
       catch (error) { alert(error.message); button.disabled = false; }
     });
   });
@@ -127,7 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
       session = {images, visits, assessments: structuredClone(record?.assessments || {})};
       options($('referenceImage'), images.map(i => [i.id, `${i.date} · ${i.filename}`]), record?.reference_image_id || images[0].id);
       options($('baselineExam'), visits.map(e => [e.id, `${e.date} · ${e.id.slice(0, 8)}`]), record?.baseline_exam_id || visits[0].id);
-      options($('targetExam'), catalog.exams.map(e => [e.id, `${e.date} · ${e.id.slice(0, 8)}`]), record?.target_exam_id || visits.at(-1).id);
+      const destinations = catalog.exams.filter(e => e.can_edit !== false);
+      const preferred = destinations.find(e => e.id === record?.target_exam_id) || destinations.at(-1);
+      options($('targetExam'), destinations.map(e => [e.id, `${e.date} · ${e.id.slice(0, 8)}`]), preferred?.id);
       options($('gradingMethod'), catalog.methods.map(m => [m.id, `${m.label} v${m.version}`]));
       $('enableGrading').checked = Object.keys(session.assessments).length > 0;
       $('comparisonComment').value = record?.comment || '';
@@ -140,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
       images.forEach(buildCard); buildGrading();
       ready = true;
       status(record ? 'Đã mở bản lưu. Thay đổi sẽ được lưu thành phiên bản mới.' : 'Chọn ảnh chuẩn, kiểm tra vùng so sánh và điều chỉnh nếu cần.');
-      $('saveComparison').disabled = false;
+      $('saveComparison').disabled = destinations.length === 0;
     } catch (error) { status(error.message); }
     finally { busy = false; $('comparisonLayout').inert = false; }
   }

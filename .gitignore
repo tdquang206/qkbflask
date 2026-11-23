@@ -5,6 +5,11 @@ __pycache__/
 db.json
 db*.json
 *.json
+.qkb-instance.lock
+.qkb-journal/
+*.qkb
+decrypted_exports/
+.test-tmp*/
 .history/
 # C extensions
 *.so

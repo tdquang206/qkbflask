@@ -1,6 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, abort
 from flask_login import login_required, current_user
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
+import uuid
+from tinydb import Query
 from shared_db import users_table
 from routes.auth import User
 from routes.settings import load_settings
@@ -20,7 +22,12 @@ admin_bp = Blueprint('admin', __name__)
 def require_admin():
     if current_user.role != 'admin':
         flash('Access denied. Admin role required.', 'error')
-        return redirect(url_for('index'))
+        abort(403)
+    if request.endpoint == 'admin.edit_exam_info' and request.method == 'POST' and request.form.get('action') == 'save':
+        # Legacy tool can rewrite authorship and bypass owner-only clinical edits.
+        abort(403, description='Không được thay đổi bác sĩ tạo hồ sơ. Sửa nội dung trong lần khám của chính bác sĩ.')
+    if request.endpoint in ('admin.export_databases', 'admin.download_decrypted_file') and os.getenv('QKB_ALLOW_PLAINTEXT_EXPORTS') != '1':
+        abort(403, description='Xuất dữ liệu giải mã đang tắt. Dùng bản sao lưu mã hóa trong mục Sao lưu đầy đủ.')
 
 @admin_bp.route('/admin')
 def index():
@@ -40,8 +47,10 @@ def add_user():
     role = request.form.get('role', 'user')
     department = request.form.get('department', 'Chưa có PK')
     display_name = request.form.get('display_name', username)
+    if role not in ('admin', 'doctor', 'receptionist', 'cashier', 'pharmacist', 'user') or len(password) < 12:
+        abort(400, description='Vai trò không hợp lệ hoặc mật khẩu ngắn hơn 12 ký tự.')
     
-    if User.get_by_username(username):
+    if users_table.get(Query().username == username):
         flash('Username already exists.', 'error')
     else:
         users_table.insert({
@@ -49,7 +58,8 @@ def add_user():
             'password_hash': generate_password_hash(password),
             'role': role,
             'department': department,
-            'display_name': display_name
+            'display_name': display_name,
+            'must_change_password': True,
         })
         flash('User added successfully.', 'success')
         
@@ -67,8 +77,8 @@ def delete_user(username):
 
     from tinydb import Query
     UserQuery = Query()
-    users_table.remove(UserQuery.username == username)
-    flash(f'User {username} deleted.', 'success')
+    users_table.update({'disabled': True, 'auth_version': uuid.uuid4().hex}, UserQuery.username == username)
+    flash(f'User {username} disabled. Exam ownership is preserved.', 'success')
     return redirect(url_for('admin.index'))
 
 @admin_bp.route('/admin/users/edit/<username>', methods=['POST'])
@@ -76,6 +86,10 @@ def edit_user(username):
     role = request.form.get('role')
     department = request.form.get('department')
     display_name = request.form.get('display_name')
+    if role not in ('admin', 'doctor', 'receptionist', 'cashier', 'pharmacist', 'user'):
+        abort(400)
+    if username == current_user.username and role != 'admin':
+        abort(400, description='Không được tự bỏ quyền quản trị viên.')
     
     if not role or not department or not display_name:
         flash('Missing required fields.', 'error')
@@ -88,10 +102,26 @@ def edit_user(username):
     users_table.update({
         'role': role,
         'department': department,
-        'display_name': display_name
+        'display_name': display_name,
+        'auth_version': uuid.uuid4().hex
     }, UserQuery.username == username)
     
     flash(f'User {username} updated.', 'success')
+    return redirect(url_for('admin.index'))
+
+
+@admin_bp.route('/admin/users/reset/<username>', methods=['POST'])
+def reset_user_password(username):
+    from tinydb import Query
+    if not check_password_hash(current_user.password_hash, request.form.get('admin_password', '')):
+        abort(403, description='Cần xác nhận mật khẩu quản trị viên.')
+    password = request.form.get('new_password', '')
+    if len(password) < 12:
+        abort(400, description='Mật khẩu tạm cần ít nhất 12 ký tự.')
+    if not users_table.get(Query().username == username):
+        abort(404)
+    users_table.update({'password_hash': generate_password_hash(password), 'must_change_password': True,
+                        'auth_version': uuid.uuid4().hex}, Query().username == username)
     return redirect(url_for('admin.index'))
 
 @admin_bp.route('/admin/database/decrypt')
@@ -208,11 +238,9 @@ def edit_exam_info():
     
     if request.method == 'POST':
         action = request.form.get('action')
-        print(f"[DEBUG] Action: {action}")
         
         if action == 'search':
             search_exam_id = request.form.get('exam_id', '').strip()
-            print(f"[DEBUG] Searching for exam_id: {search_exam_id}")
             
             # Search for exam in all patients
             for patient in Patients_db.all():
@@ -220,14 +248,12 @@ def edit_exam_info():
                     if exam.get('id') == search_exam_id:
                         exam_found = exam
                         patient_found = patient
-                        print(f"[DEBUG] Found exam: {exam_found}")
                         break
                 if exam_found:
                     break
             
             if not exam_found:
                 flash(f'Exam ID "{search_exam_id}" not found', 'error')
-                print(f"[DEBUG] Exam not found for ID: {search_exam_id}")
         
         elif action == 'save':
             # Get the exam_id from the form
@@ -235,7 +261,6 @@ def edit_exam_info():
             new_doctor = request.form.get('doctor_name', '').strip()
             new_department = request.form.get('department', '').strip()
             
-            print(f"[DEBUG] Save action: exam_id={exam_id}, doctor={new_doctor}, dept={new_department}")
             
             # Validate inputs
             if not new_doctor:
@@ -258,7 +283,6 @@ def edit_exam_info():
             
             if not exam_found or not patient_found:
                 flash(f'Exam ID "{exam_id}" not found in database', 'error')
-                print(f"[DEBUG] Could not re-find exam for save: {exam_id}")
                 return redirect(url_for('admin.edit_exam_info'))
             
             # Update the exam in the patient record
@@ -266,32 +290,26 @@ def edit_exam_info():
             updated = False
             for i, exam in enumerate(exams):
                 if exam.get('id') == exam_id:
-                    print(f"[DEBUG] Found exam at index {i}, updating...")
                     # Update only doctor and department
                     exams[i]['created_by_name'] = new_doctor
                     exams[i]['department'] = new_department
                     updated = True
-                    print(f"[DEBUG] Updated exam data: {exams[i]}")
                     break
             
             if updated:
                 # Save back to database
                 try:
-                    print(f"[DEBUG] Saving to database with doc_id: {patient_found.doc_id}")
                     Patients_db.update({'exams': exams}, doc_ids=[patient_found.doc_id])
-                    print(f"[DEBUG] Successfully saved!")
                     flash(f'✅ Toa thuốc {exam_id} đã cập nhật thành công!', 'success')
                     # Redirect to clear the form and show success message
                     return redirect(url_for('admin.edit_exam_info'))
                 except Exception as e:
-                    print(f"[DEBUG] Error saving: {str(e)}")
                     import traceback
                     traceback.print_exc()
                     flash(f'❌ Lỗi khi lưu: {str(e)}', 'error')
                     return redirect(url_for('admin.edit_exam_info'))
             else:
                 flash('❌ Không tìm thấy toa thuốc để cập nhật', 'error')
-                print(f"[DEBUG] Exam ID mismatch")
                 return redirect(url_for('admin.edit_exam_info'))
     
     return render_template('edit_exam_info.html', 
@@ -305,7 +323,7 @@ def edit_exam_info():
 # Checkpoint Restore
 # ─────────────────────────────────────────────────────────────────────────────
 
-_ADM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ADM_ROOT = os.path.abspath(os.getcwd())
 _ADM_CP_DIR = os.path.abspath(os.path.join(_ADM_ROOT, 'backups', 'checkpoints'))
 _ADM_BACKUP_DIR = os.path.abspath(os.path.join(_ADM_ROOT, 'backups'))
 _ADM_DB_FILES = ['db.json', 'db_services.json', 'money_log.json', 'db_mua_thuoc.json']
@@ -615,6 +633,11 @@ def restore_checkpoint():
     if not confirmed:
         return jsonify({'error': 'Must confirm restore'}), 400
 
+    if not check_password_hash(current_user.password_hash, body.get('admin_password', '')):
+        abort(403, description='Cần xác nhận mật khẩu quản trị viên trước khi khôi phục.')
+    # Authenticate and parse the entire set before touching any live file.
+    prepared = [(db_file, _read_db_snapshot(cp_path)) for db_file, cp_path in snapshot_files]
+
     now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     safety_dir = os.path.abspath(os.path.join(_ADM_ROOT, 'backups', 'pre_restore_safety'))
     os.makedirs(safety_dir, exist_ok=True)
@@ -625,10 +648,9 @@ def restore_checkpoint():
 
     restored = []
     errors = []
-    for db_file, cp_path in snapshot_files:
+    for db_file, snapshot_data in prepared:
         live_path = os.path.join(_ADM_ROOT, db_file)
         try:
-            snapshot_data = _read_db_snapshot(cp_path)
             _write_live_db_snapshot(live_path, snapshot_data)
             restored.append(db_file)
         except Exception as exc:
@@ -636,6 +658,10 @@ def restore_checkpoint():
 
     if errors:
         return jsonify({'success': False, 'errors': errors, 'restored': restored}), 500
+
+    users_table.clear_cache()
+    for user in users_table.all():
+        users_table.update({'auth_version': uuid.uuid4().hex}, doc_ids=[user.doc_id])
 
     from utils.db_logger import log_action
     log_action('db_restore', {
@@ -646,3 +672,69 @@ def restore_checkpoint():
         'restored_by': current_user.username,
     })
     return jsonify({'success': True, 'restored': restored, 'safety_backup_ts': now_ts})
+
+
+def _full_backup_directory():
+    from pathlib import Path
+    return Path(os.getenv('QKB_BACKUP_DIR') or os.path.join(_ADM_ROOT, 'backups', 'full')).resolve()
+
+
+@admin_bp.route('/admin/backups', methods=['GET', 'POST'])
+def full_backups():
+    from utils.full_backup import create_backup
+    if request.method == 'POST':
+        create_backup(_ADM_ROOT, _full_backup_directory())
+        return redirect(url_for('admin.full_backups'))
+    directory = _full_backup_directory()
+    files = sorted((p.name for p in directory.glob('qkb_*.qkb') if p.is_file()), reverse=True)
+    status_path = os.path.join(_ADM_ROOT, 'backups', 'status.json')
+    status = {}
+    if os.path.exists(status_path):
+        with open(status_path, encoding='utf-8') as stream:
+            status = json.load(stream)
+    from datetime import timezone
+    last = status.get('last_success')
+    status['stale'] = not last or (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() > 1200
+    return render_template('full_backups.html', files=files, status=status)
+
+
+@admin_bp.route('/admin/backups/<filename>')
+def download_full_backup(filename):
+    if not re.fullmatch(r'qkb_[0-9TZ]+_[a-f0-9]{8}\.qkb', filename):
+        abort(404)
+    from utils.full_backup import portable_backup
+    from flask import send_file
+    path = _full_backup_directory() / filename
+    if not path.is_file():
+        abort(404)
+    stream = portable_backup(path)
+    response = send_file(stream, mimetype='application/zip', as_attachment=True, download_name=filename)
+    response.call_on_close(stream.close)
+    return response
+
+
+@admin_bp.route('/admin/backups/<filename>/restore', methods=['POST'])
+def restore_full_backup(filename):
+    from utils.full_backup import create_backup, restore_backup
+    from flask import session
+    if not re.fullmatch(r'qkb_[0-9TZ]+_[a-f0-9]{8}\.qkb', filename):
+        abort(404)
+    if request.form.get('confirmation') != 'RESTORE' or not check_password_hash(current_user.password_hash, request.form.get('admin_password', '')):
+        abort(403, description='Nhập RESTORE và mật khẩu quản trị viên để khôi phục.')
+    path = _full_backup_directory() / filename
+    if not path.is_file():
+        abort(404)
+    # The global gate blocks all requests until restore and cache refresh finish.
+    from utils.full_backup import inspect_backup
+    inspect_backup(path)
+    create_backup(_ADM_ROOT, _full_backup_directory())
+    restore_backup(_ADM_ROOT, path)
+    from shared_db import DATABASES
+    for database in DATABASES:
+        for table in database.tables():
+            database.table(table).clear_cache()
+            database.table(table)._next_id = None
+    for user in users_table.all():
+        users_table.update({'auth_version': uuid.uuid4().hex}, doc_ids=[user.doc_id])
+    session.clear()
+    return redirect(url_for('auth.login'))

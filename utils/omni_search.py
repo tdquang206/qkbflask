@@ -33,8 +33,8 @@ from utils.storage import EncryptedJSONStorage
 
 def _get_purchases_table():
     """Return the purchases TinyDB table (encrypted)."""
-    db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
-    return db.table('purchases')
+    from shared_db import purchases_table
+    return purchases_table
 
 
 def normalize_text(value):

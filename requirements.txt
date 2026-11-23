@@ -11,3 +11,6 @@ Werkzeug
 mypy
 pystray
 waitress
+pdfkit
+pdf2image
+Markdown

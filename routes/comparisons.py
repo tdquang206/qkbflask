@@ -3,16 +3,17 @@
 import copy
 import io
 import json
-import threading
 import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file, g, abort
 from flask_login import current_user, login_required
 from PIL import Image, ImageDraw, ImageOps
 from tinydb import Query
+from utils.coordination import DATA_LOCK
+from utils.exam_access import can_edit_exam, require_owner, finish_exam_change
 
 from shared_db import patients_table
 from utils.grading import GRADING_METHODS, assess
@@ -21,7 +22,37 @@ from utils.image_comparison import (MAX_IMAGES, TRANSFORM_VERSION, image_index,
                                     transform_image, validate_transform)
 
 comparisons_bp = Blueprint('comparisons', __name__)
-_save_lock = threading.RLock()
+_save_lock = DATA_LOCK
+
+
+@comparisons_bp.before_request
+def check_comparison_write():
+    if request.method != 'POST' or request.endpoint == 'comparisons.preview_summary':
+        return
+    if not current_user.is_authenticated:
+        abort(401)
+    patient = get_patient(request.view_args['patient_id'])
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        abort(400)
+    target_id = body.get('target_exam_id')
+    if request.endpoint == 'comparisons.delete_comparison':
+        target_id = next((e['id'] for e in patient.get('exams', [])
+                          if any(c.get('id') == request.view_args['comparison_id'] for c in e.get('comparisons', []))), None)
+    target = next((e for e in patient.get('exams', []) if e.get('id') == target_id), None)
+    if target is None:
+        abort(400, description='Chọn lần khám lưu hợp lệ.')
+    require_owner(target, check_revision=False)
+    if body.get('revision') != revision(patient):
+        abort(409, description='Lịch sử đã thay đổi. Mở lại trang trước khi lưu.')
+    g.comparison_exam_before = copy.deepcopy(target)
+    g.comparison_patient_id = patient['id']
+
+
+@comparisons_bp.after_request
+def finish_comparison_write(response):
+    return finish_exam_change(patients_table, getattr(g, 'comparison_exam_before', None),
+                              getattr(g, 'comparison_patient_id', None), response)
 
 
 def get_patient(patient_id):
@@ -48,7 +79,7 @@ def catalog(patient_id):
               for key, (exam, image) in index.items()
               if _exists(image)]
     return jsonify(revision=revision(patient), images=images,
-                   exams=[{'id': e['id'], 'date': e.get('exam_date', '')} for e in patient.get('exams', [])],
+                   exams=[{'id': e['id'], 'date': e.get('exam_date', ''), 'can_edit': can_edit_exam(e)} for e in patient.get('exams', []) if not e.get('deleted_at')],
                    records=[c for e in patient.get('exams', []) for c in e.get('comparisons', [])],
                    methods=[method[0] for method in GRADING_METHODS.values()])
 

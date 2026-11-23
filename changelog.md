@@ -1,3 +1,18 @@
+# Unreleased (2026-11-18)
+
+- Added an app-side export for a password-encrypted drug catalog containing only drug name, sell price, and cost price.
+- Added a standalone mobile quick-subtotal HTML calculator and a read-only Cloudflare Worker for serving the manually published encrypted catalog from private R2 storage.
+- The calculator decrypts the latest catalog locally in the browser; it does not send the password to Cloudflare or persist the plaintext catalog.
+
+# Unreleased (2026-10-15)
+
+- Added the file-based LAN trial: one coordinated app instance, stale-exam revision checks, encrypted atomic writes and a recovery journal for failed/interrupted operations.
+- Doctors retain shared reading and can change only their own exams, images and comparison destinations. Saved changes display **Edited** with encrypted before/after history. Removed records/attachments remain available for history; separate same-day department exams remain independent.
+- Preserved payment status and package allocations on note edits; payment retries set an explicit state and do not duplicate receipts.
+- Added secure account bootstrap/password change/reset, deactivation/session revocation, login rate limits, role checks, CSRF-protected logout and sanitized audit logging. Discord and plaintext exports are disabled by default.
+- Added verified encrypted backups including the ledger, patient files and settings; scheduled points reuse encrypted blobs, with portable downloads, retention and coordinated/offline restore. Keys are kept separately.
+- Added a headless loopback server and HTTPS proxy example. See [LAN trial setup](docs/lan-trial-setup.md) for configuration and acceptance boundaries. Browser/LAN/device/timed recovery acceptance remains pending.
+
 # Unreleased (2026-10-02)
 
 - Replaced the selected-image **So sánh** shortcut with a **Tools** button containing **So sánh** and **Tạo lưới ảnh**.

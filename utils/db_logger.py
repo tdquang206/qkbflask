@@ -1,4 +1,5 @@
 import os, json, datetime, shutil, glob
+from utils.coordination import DATA_LOCK
 
 LOG_DIR = "logs"
 BACKUP_DIR = "backups"
@@ -11,19 +12,20 @@ def log_action(action, payload, db_name="db.json"):
     month_file = os.path.join(LOG_DIR, f"db_{now.strftime('%Y_%m')}.log")
     
     # Redact sensitive info
-    safe_payload = payload.copy() if isinstance(payload, dict) else payload
-    if isinstance(safe_payload, dict):
-        for key in ['password', 'confirm_password', 'secret', 'token']:
-            if key in safe_payload:
-                safe_payload[key] = '[REDACTED]'
+    allowed = {'endpoint', 'method', 'actor_id', 'status_code', 'patient_id', 'exam_id',
+               'revision', 'comparison_id', 'asset_ref', 'restore_source', 'restore_group_key', 'restored_files',
+               'safety_backup_ts', 'restored_by', 'checkpoint_files'}
+    safe_payload = {key: value for key, value in payload.items() if key in allowed} if isinstance(payload, dict) else {}
 
     entry = {
         "action": action,
         "timestamp": now.isoformat(),
         "payload": safe_payload
     }
-    with open(month_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    with DATA_LOCK:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        with open(month_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 def weekly_backup_all():
     """Backup all db*.json files once per week."""
@@ -31,7 +33,7 @@ def weekly_backup_all():
     week_id = now.strftime("%Y_%W")
     os.makedirs(BACKUP_DIR, exist_ok=True)
 
-    for db_path in glob.glob("db*.json"):
+    for db_path in [p for p in ('db.json', 'db_services.json', 'money_log.json', 'db_mua_thuoc.json') if os.path.isfile(p)]:
         base = os.path.basename(db_path).replace(".json", "")
         backup_file = os.path.join(BACKUP_DIR, f"{base}_backup_{week_id}.json")
         if not os.path.exists(backup_file):

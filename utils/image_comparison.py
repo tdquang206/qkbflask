@@ -124,6 +124,9 @@ def save_version(image, folder, stem, suffix):
     folder.mkdir(parents=True, exist_ok=True)
     for number in range(1, 10000):
         path = folder / f'{stem}_{suffix}_{number:02d}.jpg'
+        from utils.coordination import capture_file
+        if not path.exists():
+            capture_file(path)
         try:
             stream = path.open('xb')
         except FileExistsError:

@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
+from utils.coordination import atomic_write, capture_file
 
 TEMPLATE_FILE = 'exam_template.json'
 
@@ -72,8 +73,8 @@ def save_exam_template(template_data, department=None):
             # Save default template
             data['default'] = template_data['template']
 
-        with open(TEMPLATE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        capture_file(TEMPLATE_FILE)
+        atomic_write(TEMPLATE_FILE, json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8'))
         return True
     except Exception as e:
         print(f"Error saving template: {e}")

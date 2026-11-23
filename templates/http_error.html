@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="notification is-warning"><strong>{{ error.code }}</strong> {{ error.description }}</div>
+<a class="button" href="/patients">Danh sách bệnh nhân</a>
+{% endblock %}

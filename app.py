@@ -1,12 +1,30 @@
 from flask import Flask
 from flask_wtf.csrf import CSRFProtect
 import os
+from datetime import timedelta
+from utils.coordination import init_coordination
 
 from dotenv import load_dotenv
 load_dotenv()
 
-app = Flask(__name__)
+_SOURCE_ROOT = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, root_path=os.path.abspath(os.getcwd()),
+            template_folder=os.path.join(_SOURCE_ROOT, 'templates'),
+            static_folder=os.path.join(_SOURCE_ROOT, 'static'))
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['DATA_ROOT'] = os.path.abspath(os.getcwd())
+app.config.update(
+    LAN_MODE=os.getenv('QKB_LAN_MODE', '0') == '1',
+    MAX_CONTENT_LENGTH=24 * 1024 * 1024,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.getenv('QKB_LAN_MODE', '0') == '1',
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+    DISCORD_ENABLED=os.getenv('QKB_ALLOW_DISCORD', '0') == '1',
+)
+if app.config['LAN_MODE']:
+    app.config['TRUSTED_HOSTS'] = os.getenv('QKB_TRUSTED_HOSTS', 'qkb.clinic.internal,localhost,127.0.0.1').split(',')
+init_coordination(app)
 
 # Determine debug mode once and reuse it for configuration decisions.
 is_debug = os.getenv('FLASK_DEBUG', '0') == '1'
@@ -70,10 +88,6 @@ login_manager.login_view = 'auth.login'
 def load_user(user_id):
     return User.get(user_id)
 
-import threading
-import webbrowser
-from pystray import Icon, Menu, MenuItem
-from PIL import Image
 import waitress
 
 # Setup default admin on startup
@@ -84,6 +98,8 @@ setup_default_admin()
 #     app.run(debug=True)
 
 def run_server():
+    from utils.full_backup import start_backup_scheduler
+    start_backup_scheduler(app.config['DATA_ROOT'], os.getenv('QKB_BACKUP_DIR'))
     # Run the Flask app with Waitress on localhost:5000
     waitress.serve(app, host='127.0.0.1', port=5000)
 
@@ -95,6 +111,10 @@ def exit_app(icon, item):
     # Stop the server thread if needed (Waitress handles shutdown on exit)
 
 if __name__ == '__main__':
+    import threading
+    import webbrowser
+    from pystray import Icon, Menu, MenuItem
+    from PIL import Image
     # Start the server in a background thread
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()

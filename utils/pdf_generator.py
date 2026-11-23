@@ -2,6 +2,7 @@ from utils.template_renderer import render_exam_html
 from utils.error_logger import append_error_log
 import os
 import re
+from utils.coordination import capture_file
 
 
 def _safe_path_segment(value, fallback="x"):
@@ -59,10 +60,11 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
 
         filename = generate_exam_file_name(phone, exam_date, short_exam_id)
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        base_dir = os.path.abspath(os.getcwd())
+        tool_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         # for bin inside flask app
-        wkhtml_path = os.path.join(base_dir, "wkhtmltopdf_bin", "wkhtmltopdf.exe")
-        poppler_path = os.path.join(base_dir, "poppler_bin", "bin")
+        wkhtml_path = os.path.join(tool_dir, "wkhtmltopdf_bin", "wkhtmltopdf.exe")
+        poppler_path = os.path.join(tool_dir, "poppler_bin", "bin")
 
         pdf_dir = os.path.join(base_dir, "files", "pdf")
         jpeg_dir = os.path.join(base_dir, "files", "jpeg")
@@ -71,6 +73,8 @@ def generate_pdf_and_jpeg(html_content, phone, exam_date, short_exam_id):
 
         pdf_path = _safe_join_under(pdf_dir, f"{filename}.pdf", ".pdf")
         jpeg_path = _safe_join_under(jpeg_dir, f"{filename}.jpg", ".jpg")
+        capture_file(pdf_path)
+        capture_file(jpeg_path)
 
         # HTML to PDF
         options = {

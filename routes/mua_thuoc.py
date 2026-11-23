@@ -5,9 +5,7 @@ import uuid
 
 mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
 mua_thuoc_bp = Blueprint('mua_thuoc', __name__)
-from utils.storage import EncryptedJSONStorage
-db = TinyDB('db_mua_thuoc.json', storage=EncryptedJSONStorage)
-purchases_table = db.table('purchases')
+from shared_db import purchases_db as db, purchases_table
 
 Drug = Query()
 
@@ -140,7 +138,3 @@ def mua_thuoc_edit(purchase_uuid):
 
     # GET: render the edit page with current purchase data
     return render_template('edit_mua_thuoc.html', purchase=purchase)
-
-    
-    
-    

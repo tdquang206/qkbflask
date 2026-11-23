@@ -5,6 +5,7 @@ import uuid
 from tinydb import Query
 from flask_login import login_required, current_user
 from utils.template_renderer import load_exam_template, save_exam_template, get_default_template
+from utils.coordination import atomic_write, capture_file
 
 _DISCORD_WEBHOOK_PREFIXES = (
     'https://discord.com/api/webhooks/',
@@ -36,8 +37,8 @@ def load_settings():
 
 def save_settings(settings):
     try:
-        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
+        capture_file(SETTINGS_FILE)
+        atomic_write(SETTINGS_FILE, json.dumps(settings, indent=2, ensure_ascii=False).encode('utf-8'))
         return True
     except Exception as e:
         print(f"Error saving settings: {e}")

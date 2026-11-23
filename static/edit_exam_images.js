@@ -137,6 +137,7 @@
 
     const formData = new FormData();
     Array.from(pendingDT.files).forEach(function (f) { formData.append('lab_image', f); });
+    formData.append('exam_revision', document.querySelector('[name=exam_revision]').value);
 
     const progressBar = document.getElementById('uploadProgress');
     progressBar.style.display = 'block';
@@ -178,7 +179,7 @@
     try {
       const response = await fetch(
         '/exam/' + patient_id + '/' + exam_id + '/delete_image/' + encodeURIComponent(filename),
-        { method: 'DELETE' }
+        { method: 'DELETE', headers: { 'X-Exam-Revision': document.querySelector('[name=exam_revision]').value } }
       );
       const data = await response.json();
       if (data.status === 'success') {

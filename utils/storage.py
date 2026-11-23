@@ -4,20 +4,25 @@ import base64
 from tinydb.storages import Storage
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
+from utils.coordination import DATA_LOCK, atomic_write, capture_file, synchronized, ensure_single_instance
 
 class EncryptedJSONStorage(Storage):
     def __init__(self, filename, **kwargs):
-        self.filename = filename
+        self.filename = os.path.abspath(filename)
+        ensure_single_instance(os.path.dirname(self.filename))
         
         key_b64 = os.getenv('DB_ENCRYPTION_KEY')
         if not key_b64:
              raise ValueError("DB_ENCRYPTION_KEY environment variable is not set.")
         
         try:
-            self.key = base64.b64decode(key_b64)
+            self.key = base64.b64decode(key_b64, validate=True)
+            if len(self.key) not in (16, 24, 32):
+                raise ValueError('AES key must be 16, 24 or 32 bytes')
         except Exception as e:
             raise ValueError(f"Invalid DB_ENCRYPTION_KEY: {e}")
 
+    @synchronized
     def read(self):
         if not os.path.exists(self.filename):
             return None
@@ -26,7 +31,7 @@ class EncryptedJSONStorage(Storage):
             data = f.read()
 
         if not data:
-            return None
+            raise ValueError('Existing database is empty; restore a verified backup')
             
         try:
             # Structure: Nonce (16) + Tag (16) + Ciphertext
@@ -61,8 +66,9 @@ class EncryptedJSONStorage(Storage):
         
         ciphertext, tag = cipher.encrypt_and_digest(json_data)
         
-        with open(self.filename, 'wb') as f:
-            f.write(cipher.nonce + tag + ciphertext)
+        with DATA_LOCK:
+            capture_file(self.filename)
+            atomic_write(self.filename, cipher.nonce + tag + ciphertext)
 
     def close(self):
         pass

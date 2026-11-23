@@ -77,7 +77,7 @@ def test_money_map_generation(monkeypatch):
 
     with app.test_client() as client:
         # insert into safe mocked in-memory tables
-        temp_users_table.insert({'username': 'x', 'password_hash': 'irrelevant'})
+        temp_users_table.insert({'username': 'x', 'password_hash': 'irrelevant', 'role': 'cashier'})
         temp_patients_table.insert({
             'id': 'pid1',
             'exams': [

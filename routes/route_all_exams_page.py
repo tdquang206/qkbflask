@@ -32,6 +32,8 @@ def get_exam_list():
         all_exams = []
         for patient in all_patients:
             for exam in patient.get('exams', []):
+                if exam.get('deleted_at'):
+                    continue
                 try:
                     service_fee = int(float(exam.get("service_fee") or 0))
                 except (ValueError, TypeError):
@@ -114,70 +116,42 @@ def get_exam_list():
 @exams_list_bp.route('/api/mark_paid', methods=['POST'])
 @login_required
 def mark_paid():
-    """Toggle the paid status for an exam and optionally log the real amount.
-
-    Request payload may include ``real_amount`` (number).  When the status is
-    flipped to ``True`` we record a ledger entry containing the amount, the
-    user who performed the action and a timestamp.  This lets the accounting
-    team generate in‑out reports without modifying the original patient
-    records.
-    """
+    """Set an explicit payment state; retrying the same state never toggles it."""
+    import math
+    from datetime import timezone
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('desired_status', True), bool):
+        return jsonify(success=False, error='Invalid payment request'), 400
+    desired = data.get('desired_status', True)
+    patient = patients.get(Query().id == data.get('patient_id'))
+    if not patient:
+        return jsonify(success=False, error='Patient not found'), 404
+    exam = next((e for e in patient.get('exams', []) if e.get('id') == data.get('exam_id') and not e.get('deleted_at')), None)
+    if exam is None:
+        return jsonify(success=False, error='Exam not found'), 404
+    if desired == exam.get('paid_status', False):
+        return jsonify(success=True, paid_status=desired, message='Payment state already saved')
+    expected = data.get('payment_revision')
+    if expected is not None and str(expected) != str(exam.get('payment_revision', 0)):
+        return jsonify(success=False, error='Payment changed. Reload before saving.'), 409
+    amount = data.get('real_amount')
+    if desired and amount is not None:
+        try:
+            number = float(amount)
+            if not math.isfinite(number) or number < 0 or not number.is_integer():
+                raise ValueError()
+            amount = int(number)
+        except (ValueError, TypeError, OverflowError):
+            return jsonify(success=False, error='Invalid amount'), 400
+    exam['paid_status'] = desired
+    exam['payment_revision'] = exam.get('payment_revision', 0) + 1
     try:
-        data = request.get_json()
-        patient_id = data.get('patient_id')  # UUID String
-        exam_id = data.get('exam_id')
-        real_amount = data.get('real_amount')
-        patients = db.table('patients')
-
-        results = patients.search(Query().id == patient_id)
-
-        if not results:
-            return jsonify({"success": False, "error": "Patient_id not found"}), 404
-
-        patient = results[0]
-
-        updated = False
-        new_status = None
-        for exam in patient.get('exams', []):
-            if exam.get('id') == exam_id:
-                current_status = exam.get('paid_status', False)
-                exam['paid_status'] = not current_status
-                new_status = exam['paid_status']
-                updated = True
-                break
-
-        if updated:
-            patients.update({'exams': patient['exams']}, doc_ids=[patient.doc_id])
-
-            # if we just marked it paid and there is a real_amount provided,
-            # append a ledger record
-            if new_status and real_amount is not None:
-                try:
-                    amount_int = int(float(real_amount))
-                except (ValueError, TypeError):
-                    amount_int = 0
-
-                ledger_entry = {
-                    'patient_id': patient_id,
-                    'exam_id': exam_id,
-                    'amount': amount_int,
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'user': current_user.username if hasattr(current_user, 'username') else None
-                }
-                money_log_table.insert(ledger_entry)
-
-            return jsonify({
-                "success": True,
-                "message": "Payment updated",
-                "paid_status": new_status
-            })
-        else:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": "Exam id not found. Unable to update"
-                }, 404
-            )
-    except Exception as e:
-        print("Error in /api/mark_paid", e)
-        return jsonify({"success": False, "error": str(e)}), 500
+        patients.update({'exams': patient['exams']}, doc_ids=[patient.doc_id])
+        if desired and amount is not None:
+            money_log_table.insert({'patient_id': patient['id'], 'exam_id': exam['id'],
+                                    'amount': amount, 'timestamp': datetime.now(timezone.utc).isoformat(),
+                                    'user': current_user.username, 'payment_revision': exam['payment_revision']})
+    except Exception:
+        # The request journal rolls both databases back before an error is returned.
+        return jsonify(success=False, error='Payment was not saved. Please retry.'), 500
+    return jsonify(success=True, paid_status=desired, payment_revision=exam['payment_revision'])
